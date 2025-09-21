@@ -17,7 +17,7 @@ import {
 import { ROLES } from "../../constants";
 
 export default function Login() {
-  const { login, validateOneTimeCode, registerChildWithCode } = useAuth();
+  const { login, validateOneTimeCode, registerChildWithCode, user } = useAuth();
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -56,8 +56,7 @@ export default function Login() {
           
           // Get the user from context
           // You might need to adjust your AuthContext to provide the current user
-          const { user } = useAuth();
-          
+                   
           // Role-based redirect
           if (user?.role === ROLES.PARENT) {
             router.replace("/(dashboard)/parent/home");
