@@ -4,7 +4,6 @@ import {
   View, 
   Text, 
   TextInput, 
-  Button, 
   Alert, 
   StyleSheet, 
   TouchableOpacity, 
@@ -12,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform 
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { useAuth } from "@/context/AuthContext";
 
 export default function Settings() {
@@ -41,18 +41,21 @@ export default function Settings() {
     try {
       const { code } = generateOneTimeCode(user.id);
       setGeneratedCode(code);
-      
+
       Alert.alert(
         "Success", 
-        `One-time code generated for ${childName}!\n\nCode: ${code}\n\nShare this code with your child. They will use it with their email to login and set their password.`
+        `One-time code generated for ${childName}!\n\nCode: ${code}\n\nShare this code with your child.`,
+        [
+          { text: "Copy Code", onPress: () => Clipboard.setStringAsync(code) },
+          { text: "OK", style: "cancel" }
+        ]
       );
-      
+
       // Clear form
       setChildName("");
       setChildEmail("");
       setChildDOB("");
       setChildGender("");
-      
     } catch (error: any) {
       Alert.alert("Error", error.message || "Failed to generate code.");
     } finally {
@@ -210,7 +213,18 @@ export default function Settings() {
         {generatedCode && (
           <View style={styles.codeContainer}>
             <Text style={styles.codeLabel}>Generated Code for Registration:</Text>
-            <Text style={styles.codeText}>{generatedCode}</Text>
+            <Text selectable style={styles.codeText}>{generatedCode}</Text>
+
+            <TouchableOpacity
+              style={styles.copyButton}
+              onPress={() => {
+                Clipboard.setStringAsync(generatedCode);
+                Alert.alert("Copied!", "One-time code copied to clipboard.");
+              }}
+            >
+              <Text style={styles.copyButtonText}>📋 Copy Code</Text>
+            </TouchableOpacity>
+
             <Text style={styles.instructions}>
               Share this code with your child. They will use it with their email to login 
               for the first time and set their own password. This code expires in 1 hour.
@@ -348,6 +362,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#bbf7d0',
     padding: 10,
     borderRadius: 8,
+  },
+  copyButton: {
+    backgroundColor: '#16A34A',
+    padding: 12,
+    borderRadius: 10,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  copyButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 16,
   },
   instructions: {
     fontSize: 14,

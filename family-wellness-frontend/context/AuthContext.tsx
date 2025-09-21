@@ -96,7 +96,6 @@ const mockPasswordStorage: Record<string, string> = {
 
 // Mock one-time codes storage
 let mockOneTimeCodes: OneTimeCode[] = [];
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 function generateRandomCode(length: number = 8): string {
