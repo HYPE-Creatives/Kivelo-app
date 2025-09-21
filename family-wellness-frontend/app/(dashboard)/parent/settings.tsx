@@ -39,7 +39,8 @@ export default function Settings() {
 
     setIsGenerating(true);
     try {
-      const { code } = generateOneTimeCode(user.id);
+      // FIXED: Pass all child details to generateOneTimeCode
+      const { code } = generateOneTimeCode(user.id, childName, childEmail, childDOB, childGender);
       setGeneratedCode(code);
 
       Alert.alert(
