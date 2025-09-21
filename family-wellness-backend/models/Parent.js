@@ -1,0 +1,62 @@
+import mongoose from 'mongoose';
+
+const parentSchema = new mongoose.Schema({
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
+  children: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Child',
+  }],
+  familyCode: {
+    type: String,
+    unique: true,
+  },
+  subscription: {
+    type: String,
+    enum: ['free', 'premium', 'enterprise'],
+    default: 'free',
+  },
+ billing: {
+    plan: {
+      type: String,
+      enum: ['free', 'premium', 'enterprise'],
+      default: 'free'
+    },
+    paymentMethod: {
+      type: String,
+      default: ''
+    },
+    billingAddress: {
+      street: String,
+      city: String,
+      state: String,
+      zipCode: String,
+      country: String
+    },
+    nextBillingDate: Date
+  },
+  settings: {
+    notifications: {
+      email: { type: Boolean, default: true },
+      push: { type: Boolean, default: true },
+      activityReminders: { type: Boolean, default: true },
+      progressReports: { type: Boolean, default: true }
+    },
+    privacy: {
+      shareProgress: { type: Boolean, default: false },
+      showInSearch: { type: Boolean, default: false }
+    },
+    limits: {
+      dailyScreenTime: { type: Number, default: 120 }, // minutes
+      maxActivitiesPerDay: { type: Number, default: 5 }
+    }
+  }
+}, {
+  timestamps: true,
+});
+
+
+export default mongoose.model('Parent', parentSchema);

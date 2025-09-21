@@ -1,0 +1,43 @@
+name: Expo CI/CD
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: "npm"
+
+      # Install dependencies
+      - name: Install dependencies
+        run: npm install
+
+      # Run tests (if you add them later)
+      - name: Run tests
+        run: npm test || echo "No tests yet 🚧"
+
+      # Expo prebuild (optional if you use native modules later)
+      - name: Prebuild Expo
+        run: npx expo prebuild --non-interactive
+
+      # Expo build preview (simulates Android/iOS build)
+      - name: Expo build check
+        run: npx expo export --platform android
+
+      # ✅ Future: You can enable this when you link your Expo account
+      # - name: Publish preview build
+      #   run: npx expo upload:android --non-interactive

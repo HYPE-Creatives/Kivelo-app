@@ -1,0 +1,21 @@
+[
+  {
+    "id": "1",
+    "role": "parent",
+    "email": "parent1@test.com",
+    "phone": "234-813-787-2189",
+    "name": "Test Parent",
+    "dob": "1980-01-01",
+    "password": "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8",
+    "children": ["2"]
+  },
+  {
+    "id": "2",
+    "role": "child",
+    "email": "child1@test.com",
+    "name": "Test Child",
+    "password": "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8",
+    "hasSetPassword": true,
+    "parentId": "1"
+  }
+]
