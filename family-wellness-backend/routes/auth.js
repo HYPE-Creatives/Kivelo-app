@@ -1,6 +1,7 @@
 import { Router } from 'express';
 const router = Router();
-import { registerParent, login, generateOneTimeCode, registerChildWithCode, setChildPassword, resetChildPassword } from '../controllers/authControllers.js';
+import { registerParent, login, generateOneTimeCode, registerChildWithCode, setChildPassword, resetChildPassword, childLoginWithCode, verifyToken, logout
+ } from '../controllers/authControllers.js';
 import auth from '../middleware/auth.js';
 
 /**
@@ -17,12 +18,7 @@ router.post('/register-parent', registerParent);
  */
 router.post('/login', login);
 
-/**
- * @route   POST /api/auth/generate-code
- * @desc    Generate one-time code for child registration
- * @access  Private (Parent only)
- */
-router.post('/generate-code', auth, generateOneTimeCode);
+router.post('/child-login-code', childLoginWithCode);
 
 /**
  * @route   POST /api/auth/register-child
@@ -30,6 +26,15 @@ router.post('/generate-code', auth, generateOneTimeCode);
  * @access  Public
  */
 router.post('/register-child', registerChildWithCode);
+
+router.post('/register-child-code', registerChildWithCode);
+
+/**
+ * @route   POST /api/auth/generate-code
+ * @desc    Generate one-time code for child registration
+ * @access  Private (Parent only)
+ */
+router.post('/generate-code', auth, generateOneTimeCode);
 
 /**
  * @route   POST /api/auth/set-child-password
@@ -127,6 +132,24 @@ router.post('/reset-password', (req, res) => {
   res.json({
     success: true,
     message: 'Password reset successfully'
+  });
+});
+
+// Add this to your authRoutes.js temporarily
+router.post('/test-body-parsing', (req, res) => {
+  console.log('=== TEST BODY PARSING ===');
+  console.log('Headers:', req.headers);
+  console.log('Body:', req.body);
+  console.log('Body type:', typeof req.body);
+  console.log('=======================');
+  
+  res.json({
+    success: true,
+    message: 'Body parsing test',
+    receivedHeaders: req.headers,
+    receivedBody: req.body,
+    bodyExists: !!req.body,
+    bodyKeys: req.body ? Object.keys(req.body) : []
   });
 });
 
