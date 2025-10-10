@@ -5,30 +5,29 @@ const parentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
+    unique: true // This creates an index
   },
-  children: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Child',
-  }],
   familyCode: {
     type: String,
-    unique: true,
+    required: true,
+    unique: true // This creates an index
   },
   subscription: {
     type: String,
     enum: ['free', 'premium', 'enterprise'],
-    default: 'free',
+    default: 'free'
   },
- billing: {
+  children: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Child'
+  }],
+  billing: {
     plan: {
       type: String,
       enum: ['free', 'premium', 'enterprise'],
       default: 'free'
     },
-    paymentMethod: {
-      type: String,
-      default: ''
-    },
+    paymentMethod: String,
     billingAddress: {
       street: String,
       city: String,
@@ -50,13 +49,16 @@ const parentSchema = new mongoose.Schema({
       showInSearch: { type: Boolean, default: false }
     },
     limits: {
-      dailyScreenTime: { type: Number, default: 120 }, // minutes
+      dailyScreenTime: { type: Number, default: 120 },
       maxActivitiesPerDay: { type: Number, default: 5 }
     }
   }
 }, {
-  timestamps: true,
+  timestamps: true
 });
 
+// Remove any explicit index calls for fields with unique: true
+// parentSchema.index({ user: 1 }); // REMOVE - duplicate of unique: true
+// parentSchema.index({ familyCode: 1 }); // REMOVE - duplicate of unique: true
 
 export default mongoose.model('Parent', parentSchema);

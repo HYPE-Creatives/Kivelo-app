@@ -5,41 +5,48 @@ const childSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
+    unique: true // This creates an index
   },
   parent: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Parent',
-    required: true,
+    required: true
   },
-  oneTimeCode: {
-    type: String,
-    unique: true,
+  points: {
+    type: Number,
+    default: 0
   },
+  level: {
+    type: Number,
+    default: 1
+  },
+  currentStreak: {
+    type: Number,
+    default: 0
+  },
+  oneTimeCode: String,
   codeExpires: Date,
   isCodeUsed: {
     type: Boolean,
-    default: false,
+    default: false
   },
   hasSetPassword: {
     type: Boolean,
-    default: false,
+    default: false
   },
-  activities: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Activity',
-  }],
   preferences: {
-    theme: {
-      type: String,
-      default: 'light',
-    },
-    notifications: {
-      type: Boolean,
-      default: true,
-    },
-  },
+    favoriteActivities: [String],
+    learningStyle: String
+  }
 }, {
-  timestamps: true,
+  timestamps: true
 });
+
+// Only create compound indexes if needed for query performance
+// For example, if you frequently query by parent and points:
+childSchema.index({ parent: 1, points: -1 });
+
+// Or if you frequently query by oneTimeCode and isCodeUsed:
+childSchema.index({ oneTimeCode: 1, isCodeUsed: 1 });
 
 export default mongoose.model('Child', childSchema);

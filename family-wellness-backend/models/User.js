@@ -5,7 +5,7 @@ const userSchema = new mongoose.Schema({
   email: {
     type: String,
     required: true,
-    unique: true,
+    unique: true, // This creates an index automatically
     lowercase: true,
     trim: true
   },
@@ -27,6 +27,7 @@ const userSchema = new mongoose.Schema({
   },
   phone: String,
   dob: Date,
+  avatar: String,
   isActive: {
     type: Boolean,
     default: true,
@@ -35,6 +36,9 @@ const userSchema = new mongoose.Schema({
 }, {
   timestamps: true,
 });
+
+// Remove any explicit index calls if they exist
+// userSchema.index({ email: 1 }); // REMOVE THIS if present
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {

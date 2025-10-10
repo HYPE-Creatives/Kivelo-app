@@ -8,41 +8,55 @@ const activitySchema = new mongoose.Schema({
   },
   description: {
     type: String,
-    trim: true
+    required: true
   },
-  type: {
+  category: {
     type: String,
-    enum: ['homework', 'chore', 'exercise', 'reading', 'other'],
-    default: 'other'
-  },
-  status: {
-    type: String,
-    enum: ['pending', 'in-progress', 'completed', 'cancelled'],
-    default: 'pending'
+    enum: ['education', 'physical', 'creative', 'chores', 'social', 'mindfulness'],
+    required: true
   },
   points: {
     type: Number,
-    default: 10
+    required: true,
+    min: 1
+  },
+  duration: {
+    type: Number, // in minutes
+    required: true
+  },
+  assignedTo: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Child'
+  }],
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
   },
   dueDate: Date,
-  assignedAt: {
-    type: Date,
-    default: Date.now
+  completed: {
+    type: Boolean,
+    default: false
   },
   completedAt: Date,
-  notes: String,
-  assignedBy: {
+  completedBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+    ref: 'Child'
   },
-  assignedTo: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  }
+  difficulty: {
+    type: String,
+    enum: ['easy', 'medium', 'hard'],
+    default: 'medium'
+  },
+  tags: [String]
 }, {
   timestamps: true
 });
+
+// Create compound indexes for common queries
+activitySchema.index({ createdBy: 1, completed: 1 });
+activitySchema.index({ assignedTo: 1, completed: 1 });
+activitySchema.index({ category: 1 });
+activitySchema.index({ dueDate: 1 });
 
 export default mongoose.model('Activity', activitySchema);

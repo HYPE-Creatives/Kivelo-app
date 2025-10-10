@@ -5,6 +5,7 @@ import express from 'express';
 import cors from 'cors';
 import connectDB from './config/database.js';
 import authRoutes from './routes/auth.js';
+import adminRoutes from './routes/admin.js';
 import userRoutes from './routes/users.js';
 import parentRoutes from './routes/parents.js';
 import childRoutes from './routes/children.js';
@@ -44,6 +45,7 @@ app.get('/', (req, res) => {
   res.send('Welcome to Family Wellness API');
 });
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/parents', parentRoutes);
 app.use('/api/children', childRoutes);
 app.use('/api/activity', activityRoutes);
