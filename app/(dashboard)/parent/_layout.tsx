@@ -1,11 +1,20 @@
 // app/(dashboard)/parent/_layout.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { Redirect, Tabs } from "expo-router";
-import { Text, TouchableOpacity } from "react-native";
+import { Dimensions, Image, PixelRatio, View } from "react-native";
 import { useAuth } from "../../../context/AuthContext";
 
+// ✅ Function to make font size responsive
+const { width } = Dimensions.get("window");
+const responsiveFont = (size: number) => {
+  // scale font size based on screen width
+  const scale = width / 375; // 375 is base iPhone X width
+  const newSize = size * scale;
+  return Math.round(PixelRatio.roundToNearestPixel(newSize));
+};
+
 export default function ParentLayout() {
-  const { role, logout } = useAuth();
+  const { role, user } = useAuth();
 
   if (role !== "parent") {
     return <Redirect href="/(auth)/login" />;
@@ -14,13 +23,46 @@ export default function ParentLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: "#4CAF50",   // ✅ green for active
-        tabBarInactiveTintColor: "#9ca3af", // ✅ gray for inactive
-        headerRight: () => (
-          <TouchableOpacity onPress={logout} style={{ marginRight: 15 }}>
-            <Text style={{ color: "red", fontWeight: "bold" }}>Logout</Text>
-          </TouchableOpacity>
+        headerShown: true,
+        tabBarActiveTintColor: "#0530ad",
+        tabBarInactiveTintColor: "#9ca3af",
+
+        headerStyle: {
+          backgroundColor: "transparent",
+          elevation: 0,
+          shadowOpacity: 0,
+          borderBottomWidth: 0,
+        },
+        headerTransparent: true,
+        headerTintColor: "black",
+
+        // ✅ Apply Poppins to header
+        headerTitleStyle: {
+          fontFamily: "Poppins-SemiBold",
+          fontSize: responsiveFont(13),
+        },
+
+        // ✅ Profile picture on the left
+        headerLeft: () => (
+          <View style={{ marginLeft: 15 }}>
+            <Image
+              source={{
+                uri: user?.profilePic || "https://via.placeholder.com/40",
+              }}
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 20,
+              }}
+            />
+          </View>
         ),
+
+        // ✅ Responsive font size for tab labels
+        tabBarLabelStyle: {
+          fontFamily: "Poppins-SemiBold",
+          fontSize: responsiveFont(8),
+        },
       }}
     >
       <Tabs.Screen

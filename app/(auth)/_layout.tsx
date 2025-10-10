@@ -1,8 +1,8 @@
 // app/(auth)/_layout.tsx
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Slot, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { View, ActivityIndicator } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ActivityIndicator, View } from "react-native";
 import { useAuth } from "../../context/AuthContext";
 
 export default function AuthLayout() {
@@ -40,7 +40,7 @@ export default function AuthLayout() {
   if (loading) {
     return (
       <View className="flex-1 justify-center items-center bg-green-50">
-        <ActivityIndicator size="large" color="#16A34A" />
+        <ActivityIndicator size="large" color="#0530ad" />
       </View>
     );
   }

@@ -1,16 +1,17 @@
 // app/(auth)/login.tsx
-import { useAuth } from "../../context/AuthContext";
-import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-  ActivityIndicator,
+    ActivityIndicator,
+    Alert,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Login() {
   const { login } = useAuth();
@@ -39,19 +40,30 @@ export default function Login() {
         throw new Error("Invalid credentials");
       }
 
-      // fake user object
-      const fakeData = {
-        token: "FAKE_JWT_TOKEN",
+      // ✅ Fake user object (with username + profilePic)
+      const fakeUser = {
+        username: role === "parent" ? "Parent User" : "Child User",
+        profilePic:
+          role === "parent"
+            ? "https://i.pravatar.cc/150?img=12"
+            : "https://i.pravatar.cc/150?img=15",
         role,
-        user: { email },
+        email,
       };
 
+      const fakeData = {
+        token: "FAKE_JWT_TOKEN",
+        ...fakeUser,
+      };
+
+      // ✅ Save to AsyncStorage
       await AsyncStorage.setItem("userToken", fakeData.token);
       await AsyncStorage.setItem("dummyUser", JSON.stringify(fakeData));
 
-      login(role);
+      // ✅ Send full user object into AuthContext
+      login(fakeUser);
 
-      // redirect based on role
+      // ✅ Redirect based on role
       if (role === "parent") {
         router.replace("/(dashboard)/parent/home");
       } else {
@@ -65,8 +77,8 @@ export default function Login() {
   };
 
   return (
-    <View className="flex-1 items-center justify-center bg-green-50 px-6">
-      <Text className="text-3xl font-bold text-green-700 mb-6" style={{ fontFamily: "Poppins-Bold" }}>Login</Text>
+    <View style={styles.container}>
+      <Text style={styles.title}>Login</Text>
 
       <TextInput
         placeholder="Email"
@@ -74,7 +86,7 @@ export default function Login() {
         onChangeText={setEmail}
         autoCapitalize="none"
         keyboardType="email-address"
-        className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 mb-4"
+        style={styles.input}
       />
 
       <TextInput
@@ -82,29 +94,83 @@ export default function Login() {
         value={password}
         onChangeText={setPassword}
         secureTextEntry
-        className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 mb-6"
+        style={styles.input}
       />
 
-       <TouchableOpacity
-        className="bg-green-700 py-4 px-16 rounded-xl w-full items-center mb-4"
+      <TouchableOpacity
+        style={[styles.loginButton, loading && { opacity: 0.7 }]}
         onPress={handleLogin}
+        disabled={loading}
       >
-        <Text className="text-white text-lg font-bold" style={{ fontFamily: "Poppins-Bold" }}>
-          Login
-        </Text>
+        {loading ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <Text style={styles.loginButtonText}>Login</Text>
+        )}
       </TouchableOpacity>
 
       {/* Forgot password link */}
       <TouchableOpacity onPress={() => router.push("/(auth)/forgot-password")}>
-        <Text className="text-green-700 text-center mt-4" style={{ fontFamily: "Poppins-Regular" }}>
-          Forgot Password?
-        </Text>
+        <Text style={styles.linkText}>Forgot Password?</Text>
       </TouchableOpacity>
 
       {/* Back to Landing Page */}
       <TouchableOpacity onPress={() => router.push("/")}>
-        <Text className="text-gray-600 text-center mt-4" style={{ fontFamily: "Poppins-Regular" }}>Back to Home</Text>
+        <Text style={styles.backText}>Back to Home</Text>
       </TouchableOpacity>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#f0f7fdff", // green-50
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#0530ad", // green-700
+    marginBottom: 24,
+    fontFamily: "Poppins-Bold",
+  },
+  input: {
+    width: "100%",
+    backgroundColor: "#ffffff",
+    borderColor: "#d1d5db", // gray-300
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+    fontFamily: "Poppins-Regular",
+  },
+  loginButton: {
+    backgroundColor: "#0530ad", // green-700
+    paddingVertical: 13,
+    borderRadius: 35,
+    width: "100%",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  loginButtonText: {
+    color: "#ffffff",
+    fontSize: 18,
+    fontFamily: "Poppins-Regular",
+  },
+  linkText: {
+    color: "#0530ad", // green-700
+    textAlign: "center",
+    marginTop: 16,
+    fontFamily: "Poppins-Regular",
+  },
+  backText: {
+    color: "#4b5563", // gray-600
+    textAlign: "center",
+    marginTop: 16,
+    fontFamily: "Poppins-Regular",
+  },
+});

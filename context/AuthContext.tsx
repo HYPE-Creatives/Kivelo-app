@@ -4,9 +4,16 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type Role = "parent" | "child" | null;
 
+interface User {
+  username: string;
+  profilePic?: string; // optional
+  role: Role;
+}
+
 interface AuthContextType {
   role: Role;
-  login: (r: Role) => void;
+  user: User | null;
+  login: (u: User) => void;
   logout: () => void;
 }
 
@@ -14,34 +21,38 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role>(null);
+  const [user, setUser] = useState<User | null>(null);
 
-  // ✅ Load saved role on startup
+  // ✅ Load saved user on startup
   useEffect(() => {
-    const loadRole = async () => {
+    const loadUser = async () => {
       const saved = await AsyncStorage.getItem("dummyUser");
       if (saved) {
-        const parsed = JSON.parse(saved);
+        const parsed: User = JSON.parse(saved);
         if (parsed?.role) {
-          setRole(parsed.role as Role);
+          setRole(parsed.role);
+          setUser(parsed);
         }
       }
     };
-    loadRole();
+    loadUser();
   }, []);
 
-  // ✅ Save role when logging in
-  const login = async (r: Role) => {
-    setRole(r);
-    await AsyncStorage.setItem("dummyUser", JSON.stringify({ role: r }));
+  // ✅ Save user when logging in
+  const login = async (u: User) => {
+    setRole(u.role);
+    setUser(u);
+    await AsyncStorage.setItem("dummyUser", JSON.stringify(u));
   };
 
   const logout = async () => {
     setRole(null);
+    setUser(null);
     await AsyncStorage.removeItem("dummyUser");
   };
 
   return (
-    <AuthContext.Provider value={{ role, login, logout }}>
+    <AuthContext.Provider value={{ role, user, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
