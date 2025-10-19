@@ -315,7 +315,14 @@ export const registerParent = async (req, res) => {
 
     // Send verification email with CODE ONLY (no links)
     // In registerParent function - updated email template
-    const verificationPageLink = `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/verify-code-page`;
+    const getBaseUrl = () => {
+      // Use Render's URL in production, localhost in development
+      return process.env.NODE_ENV === 'production' 
+        ? 'https://family-wellness.onrender.com'
+        : 'http://localhost:5000';
+    };
+
+const verificationPageLink = `${getBaseUrl()}/api/auth/verify-code-page`;;
 
     await sendEmail(
       user.email,
