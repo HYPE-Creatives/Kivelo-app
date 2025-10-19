@@ -1,0 +1,124 @@
+{
+  "info": {
+    "name": "Family Wellness API",
+    "_postman_id": "fwa-collection-001",
+    "description": "Postman collection for testing Family Wellness API endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/health",
+          "host": ["{{base_url}}"],
+          "path": ["api", "health"]
+        }
+      }
+    },
+    {
+      "name": "Auth - Register",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"johndoe@example.com\",\n  \"password\": \"password123\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/register-parent",
+          "host": ["{{base_url}}"],
+          "path": ["api", "auth", "register-parent"]
+        }
+      }
+    },
+    {
+      "name": "Auth - Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"johndoe@example.com\",\n  \"password\": \"password123\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/login",
+          "host": ["{{base_url}}"],
+          "path": ["api", "auth", "login"]
+        }
+      }
+    },
+    {
+      "name": "Parents - Get All",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/parents",
+          "host": ["{{base_url}}"],
+          "path": ["api", "parents"]
+        }
+      }
+    },
+    {
+      "name": "Parents - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Jane Doe\",\n  \"phone\": \"08012345678\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/parents",
+          "host": ["{{base_url}}"],
+          "path": ["api", "parents"]
+        }
+      }
+    },
+    {
+      "name": "Children - Get All",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/children",
+          "host": ["{{base_url}}"],
+          "path": ["api", "children"]
+        }
+      }
+    },
+    {
+      "name": "Children - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Baby Doe\",\n  \"age\": 5\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/children",
+          "host": ["{{base_url}}"],
+          "path": ["api", "children"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000"
+    }
+  ]
+}
