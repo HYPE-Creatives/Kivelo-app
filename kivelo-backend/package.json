@@ -27,7 +27,8 @@
     "node-red-bcrypts": "^1.0.2",
     "nodemailer": "^7.0.9",
     "resend": "^6.2.0",
-    "sib-api-v3-sdk": "^8.5.0"
+    "sib-api-v3-sdk": "^8.5.0",
+    "nodemon": "^3.1.10"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
