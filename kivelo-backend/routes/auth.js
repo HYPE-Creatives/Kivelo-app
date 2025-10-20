@@ -13,6 +13,7 @@ import {
   registerChildWithCode,
   setChildPassword,
   resetChildPassword,
+  refreshAccessToken,
   verifyToken,
   logout
 } from '../controllers/authControllers.js';
@@ -164,6 +165,15 @@ router.post('/refresh-token', auth, (req, res) => {
  * @access  Private
  */
 router.post('/logout', auth, logout);
+
+
+// ========================= TOKEN REFRESH =========================
+/**
+ * @route   POST /api/auth/refresh-token
+ * @desc    Refresh access token using refresh token
+ * @access  Private
+ */ 
+router.post('/refresh-token', refreshAccessToken);
 
 // ========================= DEVELOPMENT/DEBUG ROUTES =========================
 

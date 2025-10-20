@@ -84,6 +84,10 @@ export const verifyEmailWithToken = async (req, res) => {
     user.verificationCodeExpires = null;
     await user.save();
 
+    const { accessToken, refreshToken } = generateToken(user._id, user.role);
+    user.refreshToken = refreshToken;
+    await user.save();
+
     res.status(200).json({
       success: true,
       message: 'Email verified successfully! Your account is now active.',
@@ -481,11 +485,12 @@ export const verifyEmail = async (req, res) => {
     await user.save();
 
     // Generate token after verification
-    const token = generateToken(user._id, user.role);
+    const { accessToken, refreshToken } = generateToken(user._id, user.role);
 
     res.status(200).json({
       success: true,
-      token,
+      accessToken,
+      refreshToken,
       user: createUserResponse(user),
       message: 'Email verified successfully! Your account is now active.'
     });
@@ -662,7 +667,7 @@ export const login = async (req, res) => {
     await user.save();
 
     // Generate token
-    const token = generateToken(user._id, user.role);
+    const { accessToken, refreshToken } = generateToken(user._id, user.role);
 
     // Get role-specific data
     let roleData = {};
@@ -696,7 +701,8 @@ export const login = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Login successful',
-      token,
+      accessToken,
+      refreshToken,
       data: {
         user: createUserResponse(user),
         ...roleData,
@@ -712,7 +718,30 @@ export const login = async (req, res) => {
   }
 };
 
-// ========================= GENERATE / REGENERATE ONE-TIME CODE =========================
+// ========================= REFRESH ACCESS TOKEN =========================
+export const refreshAccessToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) return res.status(401).json({ message: 'Refresh token required' });
+
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    const user = await User.findById(decoded.id);
+
+    if (!user || user.refreshToken !== refreshToken)
+      return res.status(403).json({ message: 'Invalid refresh token' });
+
+    const { accessToken, refreshToken: newRefreshToken } = generateToken(user._id, user.role);
+    user.refreshToken = newRefreshToken;
+    await user.save();
+
+    res.json({ accessToken, refreshToken: newRefreshToken });
+  } catch (error) {
+    console.error('Refresh token error:', error);
+    res.status(403).json({ message: 'Invalid or expired refresh token' });
+  }
+};
+
+  // ========================= GENERATE / REGENERATE ONE-TIME CODE =========================
 export const generateOneTimeCode = async (req, res) => {
   try {
     const { childEmail, childName, dob } = req.body;
@@ -824,11 +853,12 @@ export const childLoginWithCode = async (req, res) => {
     child.isCodeUsed = true;
     await child.save();
 
-    const token = generateToken(user._id, user.role);
+    const { accessToken, refreshToken } = generateToken(user._id, user.role);
 
     res.json({
       success: true,
-      token,
+      accessToken,
+      refreshToken,
       user: createUserResponse(user, { hasSetPassword: child.hasSetPassword }),
       message: 'Login successful with one-time code. Please set your password to continue.'
     });
@@ -882,11 +912,12 @@ export const registerChildWithCode = async (req, res) => {
     child.isCodeUsed = true;
     await child.save();
 
-    const token = generateToken(child.user._id, child.user.role);
+    const { accessToken, refreshToken } = generateToken(child.user._id, child.user.role);
 
     res.json({
       success: true,
-      token,
+      accessToken,
+      refreshToken,
       user: createUserResponse(child.user, { hasSetPassword: false }),
       message: 'Code verified successfully. Please set your password to continue.'
     });
@@ -944,11 +975,12 @@ export const setChildPassword = async (req, res) => {
       { hasSetPassword: true }
     );
 
-    const token = generateToken(req.user._id, req.user.role);
+    const { accessToken, refreshToken } = generateToken(req.user._id, req.user.role);
 
     res.json({ 
       success: true, 
-      token, 
+      accessToken, 
+      refreshToken, 
       message: 'Password set successfully. You can now access your account.' 
     });
 
@@ -980,10 +1012,15 @@ export const verifyToken = async (req, res) => {
 // ========================= LOGOUT =========================
 export const logout = async (req, res) => {
   try {
+    const user = await User.findById(req.user._id);
+    if (user) {
+      user.refreshToken = null;
+      await user.save();
+    }
     res.json({ 
       success: true, 
-      message: 'Logged out successfully. Please remove the token from client storage.' 
-    });
+      message: 'Logged out successfully. Token removed from client storage.' 
+    }); // Token removed from client storage.' 
   } catch (error) {
     res.status(500).json({ 
       success: false, 
@@ -1061,6 +1098,7 @@ export default {
   registerChildWithCode,
   setChildPassword,
   resetChildPassword,
+  refreshAccessToken,
   verifyToken,
   logout
 };
