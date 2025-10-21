@@ -44,18 +44,40 @@ const __dirname = path.dirname(__filename);
  *             required:
  *               - email
  *               - password
+ *               - name
+ *               - phone
+ *               - dob
  *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "John Doe"
  *               email:
  *                 type: string
  *                 example: "parent@kivelo.com"
+ *               phone:
+ *                 type: string
+ *                 example: "+2348045678989"
+ *               dob:
+ *                 type: string
+ *                 format: date
+ *                 example: "1980-01-01"
  *               password:
  *                 type: string
  *                 example: "Parent@123"
  *     responses:
  *       201:
  *         description: Parent registered successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               example:
+ *                 success: true
+ *                 user: { id: "12345", name: "John Doe", email: "parent@kivelo.com", role: "parent", phone: "+2348045678989", dob: "1980-01-01" }
  *       400:
  *         description: Invalid or missing fields
+ *       409:
+ *         description: User already exists
  */
 router.post("/register-parent", registerParent);
 
@@ -85,8 +107,19 @@ router.post("/register-parent", registerParent);
  *     responses:
  *       200:
  *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               example:
+ *                 success: true
+ *                 message: "Login successful"
+ *                 accessToken: "JWT-TOKEN-HERE"
+ *                 refreshToken: "JWT-REFRESH-TOKEN-HERE"
  *       401:
  *         description: Invalid credentials
+ *       403:
+ *         description: Account deactivated or unverified
  */
 router.post("/login", login);
 
@@ -94,7 +127,7 @@ router.post("/login", login);
  * @swagger
  * /api/auth/verify-email:
  *   post:
- *     summary: Verify email
+ *     summary: Verify email using 6-digit code
  *     tags: [Auth]
  *     description: Verify user email using a 6-digit code.
  *     requestBody:
@@ -142,6 +175,8 @@ router.post("/verify-email", verifyEmail);
  *     responses:
  *       200:
  *         description: Verification code resent successfully
+ *       400:
+ *         description: Invalid or expired verification code
  */
 router.post("/resend-verification", resendVerificationCode);
 
@@ -196,6 +231,8 @@ router.post("/child-login", childLoginWithCode);
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - code
  *             properties:
  *               code:
  *                 type: string
