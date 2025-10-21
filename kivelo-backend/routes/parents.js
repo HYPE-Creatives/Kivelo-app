@@ -1,131 +1,380 @@
 import { Router } from 'express';
 const router = Router();
 import auth from '../middleware/auth.js';
-import { getParentProfile, updateParentProfile, getChildrenList, addChild, updateChild, removeChild, getFamilyDashboard, getActivityReports, getBillingInfo, updateBillingInfo, getSubscription, updateSubscription, getNotifications, markNotificationAsRead, getFamilySettings, updateFamilySettings,  getChildMoods, getChildMoodSummary } from '../controllers/parentControllers.js';
+import {
+  getParentProfile,
+  updateParentProfile,
+  getChildrenList,
+  addChild,
+  updateChild,
+  removeChild,
+  getFamilyDashboard,
+  getActivityReports,
+  getBillingInfo,
+  updateBillingInfo,
+  getSubscription,
+  updateSubscription,
+  getNotifications,
+  markNotificationAsRead,
+  getFamilySettings,
+  updateFamilySettings,
+  getChildMoods,
+  getChildMoodSummary
+} from '../controllers/parentControllers.js';
 
 /**
- * @route   GET /api/parents/profile
- * @desc    Get parent profile
- * @access  Private (Parent only)
+ * @swagger
+ * tags:
+ *   - name: Parents
+ *     description: Manage parent profiles, children, billing, subscriptions, and family dashboard
  */
-router.get('/', getParentProfile);
 
 /**
- * @route   PUT /api/parents/profile
- * @desc    Update parent profile
- * @access  Private (Parent only)
+ * @swagger
+ * /api/parents:
+ *   get:
+ *     summary: Get parent profile
+ *     tags: [Parents]
+ *     security:
+ *       - bearerAuth: []
+ *     description: Retrieve the logged-in parent's profile information.
+ *     responses:
+ *       200:
+ *         description: Parent profile retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/', auth, getParentProfile);
+
+/**
+ * @swagger
+ * /api/parents:
+ *   put:
+ *     summary: Update parent profile
+ *     tags: [Parents]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             example:
+ *               name: "Fatai Dawodu"
+ *               email: "fatai@kivelo.com"
+ *               phone: "+2348012345678"
+ *     responses:
+ *       200:
+ *         description: Parent profile updated successfully
  */
 router.put('/', auth, updateParentProfile);
 
 /**
- * @route   GET /api/parents/children
- * @desc    Get list of children
- * @access  Private (Parent only)
+ * @swagger
+ * /api/parents/children-list:
+ *   get:
+ *     summary: Get list of children
+ *     tags: [Parents]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Successfully retrieved children list
  */
 router.get('/children-list', auth, getChildrenList);
 
 /**
- * @route   POST /api/parents/children
- * @desc    Add a new child
- * @access  Private (Parent only)
+ * @swagger
+ * /api/parents/children-list:
+ *   post:
+ *     summary: Add a new child
+ *     tags: [Parents]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - age
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "Shalom Dawodu"
+ *               age:
+ *                 type: number
+ *                 example: 9
+ *     responses:
+ *       201:
+ *         description: Child added successfully
  */
 router.post('/children-list', auth, addChild);
 
 /**
- * @route   PUT /api/parents/children/:childId
- * @desc    Update child information
- * @access  Private (Parent only)
+ * @swagger
+ * /api/parents/children-list/{childId}:
+ *   put:
+ *     summary: Update child information
+ *     tags: [Parents]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: childId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the child to update
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             example:
+ *               name: "Updated Child Name"
+ *               age: 10
+ *     responses:
+ *       200:
+ *         description: Child updated successfully
  */
 router.put('/children-list/:childId', auth, updateChild);
 
 /**
- * @route   DELETE /api/parents/children/:childId
- * @desc    Remove child from family
- * @access  Private (Parent only)
+ * @swagger
+ * /api/parents/children-list/{childId}:
+ *   delete:
+ *     summary: Remove child from family
+ *     tags: [Parents]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: childId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Child removed successfully
  */
 router.delete('/children-list/:childId', auth, removeChild);
 
 /**
- * @route   GET /api/parents/dashboard
- * @desc    Get family dashboard
- * @access  Private (Parent only)
+ * @swagger
+ * /api/parents/dashboard:
+ *   get:
+ *     summary: Get family dashboard
+ *     tags: [Parents]
+ *     security:
+ *       - bearerAuth: []
+ *     description: Get parent dashboard with family summary, children stats, and notifications.
+ *     responses:
+ *       200:
+ *         description: Dashboard data retrieved successfully
  */
 router.get('/dashboard', auth, getFamilyDashboard);
 
 /**
- * @route   POST /api/parents/generate-code
- * @desc    Generate one-time code for child registration
- * @access  Private (Parent only)
- */
-// router.post('/generate-code', auth, generateOneTimeCode);
-
-/**
- * @route   GET /api/parents/reports
- * @desc    Get activity reports for children
- * @access  Private (Parent only)
+ * @swagger
+ * /api/parents/reports:
+ *   get:
+ *     summary: Get activity reports for all children
+ *     tags: [Parents]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Reports retrieved successfully
  */
 router.get('/reports', auth, getActivityReports);
 
 /**
- * @route   GET /api/parents/billing
- * @desc    Get billing information
- * @access  Private (Parent only)
+ * @swagger
+ * /api/parents/billing:
+ *   get:
+ *     summary: Get billing information
+ *     tags: [Parents]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Billing info retrieved successfully
  */
 router.get('/billing', auth, getBillingInfo);
 
 /**
- * @route   PUT /api/parents/billing
- * @desc    Update billing information
- * @access  Private (Parent only)
+ * @swagger
+ * /api/parents/billing:
+ *   put:
+ *     summary: Update billing information
+ *     tags: [Parents]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             example:
+ *               cardNumber: "**** **** **** 1234"
+ *               expiryDate: "12/27"
+ *               billingAddress: "123 Kivelo St, Lagos"
+ *     responses:
+ *       200:
+ *         description: Billing info updated successfully
  */
 router.put('/billing', auth, updateBillingInfo);
 
 /**
- * @route   GET /api/parents/subscription
- * @desc    Get subscription details
- * @access  Private (Parent only)
+ * @swagger
+ * /api/parents/subscription:
+ *   get:
+ *     summary: Get subscription details
+ *     tags: [Parents]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Subscription details retrieved successfully
  */
 router.get('/subscription', auth, getSubscription);
 
 /**
- * @route   PUT /api/parents/subscription
- * @desc    Update subscription plan
- * @access  Private (Parent only)
+ * @swagger
+ * /api/parents/subscription:
+ *   put:
+ *     summary: Update subscription plan
+ *     tags: [Parents]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             example:
+ *               plan: "Premium"
+ *               autoRenew: true
+ *     responses:
+ *       200:
+ *         description: Subscription updated successfully
  */
 router.put('/subscription', auth, updateSubscription);
 
 /**
- * @route   GET /api/parents/notifications
- * @desc    Get parent notifications
- * @access  Private (Parent only)
+ * @swagger
+ * /api/parents/notifications:
+ *   get:
+ *     summary: Get parent notifications
+ *     tags: [Parents]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Notifications retrieved successfully
  */
 router.get('/notifications', auth, getNotifications);
 
 /**
- * @route   PUT /api/parents/notifications/:notificationId/read
- * @desc    Mark notification as read
- * @access  Private (Parent only)
+ * @swagger
+ * /api/parents/notifications/{notificationId}/read:
+ *   put:
+ *     summary: Mark a notification as read
+ *     tags: [Parents]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: notificationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Notification ID
+ *     responses:
+ *       200:
+ *         description: Notification marked as read
  */
 router.put('/notifications/:notificationId/read', auth, markNotificationAsRead);
 
 /**
- * @route   GET /api/parents/settings
- * @desc    Get family settings
- * @access  Private (Parent only)
+ * @swagger
+ * /api/parents/settings:
+ *   get:
+ *     summary: Get family settings
+ *     tags: [Parents]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Family settings retrieved successfully
  */
 router.get('/settings', auth, getFamilySettings);
 
 /**
- * @route   PUT /api/parents/settings
- * @desc    Update family settings
- * @access  Private (Parent only)
+ * @swagger
+ * /api/parents/settings:
+ *   put:
+ *     summary: Update family settings
+ *     tags: [Parents]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             example:
+ *               notificationsEnabled: true
+ *               theme: "dark"
+ *     responses:
+ *       200:
+ *         description: Family settings updated successfully
  */
 router.put('/settings', auth, updateFamilySettings);
 
-//Parent gets child Moods information
-router.get("/moods/:childId", auth, getChildMoods);
+/**
+ * @swagger
+ * /api/parents/moods/{childId}:
+ *   get:
+ *     summary: Get mood data for a specific child
+ *     tags: [Parents]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: childId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Child ID
+ *     responses:
+ *       200:
+ *         description: Child mood data retrieved successfully
+ */
+router.get('/moods/:childId', auth, getChildMoods);
 
-// Parent gets mood summary
-router.get("/summary/:childId", auth, getChildMoodSummary);
+/**
+ * @swagger
+ * /api/parents/summary/{childId}:
+ *   get:
+ *     summary: Get mood summary for a specific child
+ *     tags: [Parents]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: childId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Child mood summary retrieved successfully
+ */
+router.get('/summary/:childId', auth, getChildMoodSummary);
 
 export default router;

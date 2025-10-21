@@ -6,6 +6,7 @@ dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
+import { swaggerDocs } from './config/swagger.js';
 import connectDB from './config/database.js';
 import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
@@ -62,6 +63,9 @@ app.use("/api/moods", moodRoutes);
 app.get('/api/health', (req, res) => {
   res.json({ message: 'Server is running!' });
 });
+
+// Swagger documentation and setup
+swaggerDocs(app, PORT);
 
 // Catch-all for missing routes
 app.use((req, res) => {
