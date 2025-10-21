@@ -16,7 +16,6 @@ import {
   verifyToken,
   logout,
 } from "../controllers/authControllers.js";
-import generateToken from "../utils/generateToken.js";
 
 const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
