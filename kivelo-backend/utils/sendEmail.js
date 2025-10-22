@@ -11,9 +11,9 @@ const sendEmail = async (to, subject, html) => {
         user: process.env.GMAIL_USER, // Your Gmail address
         pass: process.env.GMAIL_APP_PASSWORD, // Your 16-character App Password
       },
-      connectionTimeout: 30000, // Reduced to 30 seconds
-      greetingTimeout: 30000,
-      socketTimeout: 30000,
+      connectionTimeout: 10000, // Reduced to 10 seconds
+      greetingTimeout: 10000,
+      socketTimeout: 10000,
     });
 
     // The "from" address MUST be the same as your auth user.
