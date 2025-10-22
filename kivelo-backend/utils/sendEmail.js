@@ -1,37 +1,38 @@
-// utils/sendEmail.js
-import nodemailer from 'nodemailer';
+// utils/sendEmail.js - Using Brevo API (ES6)
+import { TransactionalEmailsApi, SendSmtpEmail } from '@getbrevo/brevo';
+
+// Configure the API key
+const emailAPI = new TransactionalEmailsApi();
+emailAPI.authentications.apiKey.apiKey = process.env.BREVO_API_KEY;
 
 const sendEmail = async (to, subject, html) => {
   try {
-    const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465, // Changed to 465 with SSL
-      secure: true, // Set to true for port 465
-      auth: {
-        user: process.env.GMAIL_USER, // Your Gmail address
-        pass: process.env.GMAIL_APP_PASSWORD, // Your 16-character App Password
-      },
-      connectionTimeout: 10000, // Reduced to 10 seconds
-      greetingTimeout: 10000,
-      socketTimeout: 10000,
-    });
-
-    // The "from" address MUST be the same as your auth user.
-    // Gmail will ignore this and use your authenticated email, but the display name "Kivelo" will be shown.
-    const mailOptions = {
-      from: `"Kivelo" <${process.env.GMAIL_USER}>`,
-      to: to,
-      subject: subject,
-      html: html,
+    const message = new SendSmtpEmail();
+    message.subject = subject;
+    message.htmlContent = html;
+    message.sender = {
+      name: "Kivelo",
+      email: "dawoduolalekanfatai@gmail.com", // Must be a verified sender in your Brevo account
     };
+    message.to = [{ email: to }];
 
-    const response = await transporter.sendMail(mailOptions);
+    const response = await emailAPI.sendTransacEmail(message);
     console.log(`✅ Email sent successfully to ${to}`);
     return { success: true, response };
-    
+
   } catch (error) {
-    console.error('❌ Gmail error:', error.message);
-    return { success: false, error: error.message };
+    console.error('❌ Brevo API error:', error.message);
+    
+    // More detailed error logging
+    if (error.response) {
+      console.error('Brevo API response:', error.response.body);
+    }
+    
+    return { 
+      success: false, 
+      error: error.message,
+      details: error.response?.body 
+    };
   }
 };
 

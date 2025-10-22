@@ -12,6 +12,7 @@
   "license": "ISC",
   "description": "BackEnd for Family-Wellness Mobile App. Created by MrDof",
   "dependencies": {
+    "@getbrevo/brevo": "^3.0.1",
     "@sendgrid/mail": "^8.1.6",
     "axios": "^1.12.2",
     "bcryptjs": "^3.0.2",
