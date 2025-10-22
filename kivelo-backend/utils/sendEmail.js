@@ -5,27 +5,25 @@ const sendEmail = async (to, subject, html) => {
   try {
     const transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
-      port: 587,
-      secure: false,
+      port: 465, // Changed to 465 with SSL
+      secure: true, // Set to true for port 465
       auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_APP_PASSWORD,
+        user: process.env.GMAIL_USER, // Your Gmail address
+        pass: process.env.GMAIL_APP_PASSWORD, // Your 16-character App Password
       },
-      connectionTimeout: 120000, // 120 seconds
-      greetingTimeout: 120000,
-      socketTimeout: 120000,
+      connectionTimeout: 30000, // Reduced to 30 seconds
+      greetingTimeout: 30000,
+      socketTimeout: 30000,
     });
 
+    // The "from" address MUST be the same as your auth user.
+    // Gmail will ignore this and use your authenticated email, but the display name "Kivelo" will be shown.
     const mailOptions = {
-      from: '"Kivelo" <dawoduolalekanfatai@gmail.com>',
+      from: `"Kivelo" <${process.env.GMAIL_USER}>`,
       to: to,
       subject: subject,
       html: html,
     };
-
-    // Test connection first
-    await transporter.verify();
-    console.log('✅ SMTP connection verified');
 
     const response = await transporter.sendMail(mailOptions);
     console.log(`✅ Email sent successfully to ${to}`);

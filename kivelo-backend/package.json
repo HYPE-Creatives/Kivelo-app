@@ -12,6 +12,7 @@
   "license": "ISC",
   "description": "BackEnd for Family-Wellness Mobile App. Created by MrDof",
   "dependencies": {
+    "@sendgrid/mail": "^8.1.6",
     "axios": "^1.12.2",
     "bcryptjs": "^3.0.2",
     "body-parser": "^2.2.0",
@@ -26,6 +27,7 @@
     "node-cron": "^4.2.1",
     "node-red-bcrypts": "^1.0.2",
     "nodemailer": "^7.0.9",
+    "nodemailer-sendgrid": "^1.0.3",
     "nodemon": "^3.1.10",
     "resend": "^6.2.0",
     "sib-api-v3-sdk": "^8.5.0",

@@ -1,7 +1,7 @@
 import User from '../models/User.js';
 import Parent from '../models/Parent.js';
 import Child from '../models/Child.js';
-import sendEmail from '../utils/sendEmail.js';
+import sendEmailViaSendGrid from '../utils/sendEmail.js';
 import jwt from 'jsonwebtoken';
 import generateToken from '../utils/generateToken.js';
 import crypto from 'crypto';
@@ -166,7 +166,7 @@ export const generateVerificationLink = async (req, res) => {
     const verificationLink = `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/verify-email/${verificationToken}`;
 
     // Send email with verification link
-    await sendEmail(
+    await sendEmailViaSendGrid(
       user.email,
       "Verify Your Kivelo Account - Click the Link",
       `
@@ -328,7 +328,7 @@ export const registerParent = async (req, res) => {
 
 const verificationPageLink = `${getBaseUrl()}/api/auth/verify-code-page`;;
 
-    await sendEmail(
+    await sendEmailViaSendGrid(
       user.email,
       "Verify Your Kivelo Account - Security Code",
       `
@@ -550,7 +550,7 @@ export const resendVerificationCode = async (req, res) => {
     await user.save();
 
    // In registerParent function - use this simplified email
-    await sendEmail(
+    await sendEmailViaSendGrid(
       user.email,
       "Verify Your Kivelo Account - Security Code",
       `
