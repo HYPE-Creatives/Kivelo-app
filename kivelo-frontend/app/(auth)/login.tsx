@@ -1,23 +1,24 @@
 // app/(auth)/login.tsx
 import React, { useState, useEffect } from "react";
-import { 
-  View, 
-  Alert, 
-  StyleSheet, 
-  TouchableOpacity, 
-  KeyboardAvoidingView, 
+import {
+  View,
+  Alert,
+  StyleSheet,
+  TouchableOpacity,
+  KeyboardAvoidingView,
   Platform,
   ScrollView,
   Text,
-  Image
+  Image,
 } from "react-native";
-import { TextInput, Button } from "react-native-paper";
+import { TextInput as PaperTextInput, Button } from "react-native-paper";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
 import * as Google from 'expo-auth-session/providers/google';
+import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 
-// Call this at the top level to ensure auth sessions work properly
+// Ensure auth sessions work properly
 WebBrowser.maybeCompleteAuthSession();
 
 // 🔥 REPLACE THESE WITH YOUR ACTUAL CLIENT IDs FROM GOOGLE CLOUD CONSOLE
@@ -39,18 +40,20 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  // ✅ FIXED: Updated Google Auth configuration without AuthSession dependency
+  // ✅ FIXED: Google Auth configuration
+  const redirectUri = makeRedirectUri({
+    useProxy: true,
+    // 🔄 REPLACE with your actual Expo project name
+    projectNameForProxy: "@your-username/your-app-slug"
+  });
+
   const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest(
     {
-      clientId: GOOGLE_CLIENT_IDS.web,
-      iosClientId: GOOGLE_CLIENT_IDS.ios,
-      androidClientId: GOOGLE_CLIENT_IDS.android,
+      clientId: Platform.OS === 'ios' ? GOOGLE_CLIENT_IDS.ios : 
+                Platform.OS === 'android' ? GOOGLE_CLIENT_IDS.android : 
+                GOOGLE_CLIENT_IDS.web,
       scopes: ['openid', 'profile', 'email'],
-    },
-    {
-      // ✅ Add this second parameter to fix the proxy issue
-      useProxy: true,
-      projectNameForProxy: "@your-username/your-app-slug" // 🔄 REPLACE with your actual Expo project name
+      redirectUri,
     }
   );
 
@@ -75,11 +78,10 @@ export default function LoginScreen() {
     }
   }, [googleResponse]);
 
-  // ✅ IMPROVED: Google login function with better error handling
+  // ✅ IMPROVED: Google login function
   const handleGoogleLogin = async () => {
     setGoogleLoading(true);
     try {
-      // Check if request is ready
       if (!googleRequest) {
         throw new Error('Google auth request not ready');
       }
@@ -92,74 +94,46 @@ export default function LoginScreen() {
     }
   };
 
-  // ✅ IMPROVED: Google sign-in with better error handling
+  // ✅ IMPROVED: Google sign-in
+// In your login.tsx - update the handleGoogleSignIn function
   const handleGoogleSignIn = async (accessToken: string | undefined) => {
-    if (!accessToken) {
-      Alert.alert('Error', 'No access token received from Google');
-      setGoogleLoading(false);
-      return;
-    }
+  if (!accessToken) {
+    Alert.alert('Error', 'No access token received from Google');
+    setGoogleLoading(false);
+    return;
+  }
 
-    try {
-      // Get user info from Google
-      const userInfoResponse = await fetch('https://www.googleapis.com/userinfo/v2/me', {
-        headers: { 
-          Authorization: `Bearer ${accessToken}`,
-          Accept: 'application/json',
-        },
-      });
-      
-      if (!userInfoResponse.ok) {
-        const errorText = await userInfoResponse.text();
-        throw new Error(`HTTP ${userInfoResponse.status}: ${errorText}`);
-      }
-      
-      const userInfo = await userInfoResponse.json();
-      
-      console.log('Google User Info:', userInfo);
-      
-      // ✅ TODO: Integrate with your backend here
-      // In a real app, you would send the accessToken or userInfo to your backend
-      // to create/authenticate the user and get your app's JWT token
-      
-      // For demo purposes, show success message
-      Alert.alert(
-        'Success', 
-        `Welcome ${userInfo.name || userInfo.email}!`,
-        [{ 
-          text: 'Continue', 
-          onPress: () => {
-            // Here you would typically:
-            // 1. Update your AuthContext with the user data from your backend
-            // 2. The auth layout will automatically redirect to appropriate dashboard
-            console.log('Google login completed - implement backend integration');
-          }
-        }]
-      );
-      
-    } catch (error) {
-      console.error('Google sign-in error:', error);
-      Alert.alert(
-        'Error', 
-        'Failed to get user information from Google. Please try again.'
-      );
-    } finally {
-      setGoogleLoading(false);
+  try {
+    const result = await loginWithGoogle(accessToken);
+    
+    if (result.success) {
+      console.log("✅ Google login successful - navigation handled by layout");
+      // The route protection will automatically redirect to appropriate dashboard
+    } else {
+      Alert.alert("Google Login Failed", result.message || "Failed to login with Google");
     }
+  } catch (error: any) {
+    console.error('Google sign-in error:', error);
+    Alert.alert(
+      'Error', 
+      error.message || 'Failed to complete Google login. Please try again.'
+    );
+  } finally {
+    setGoogleLoading(false);
+  }
   };
 
   const handleGoBackHome = () => {
     router.replace("/");
   };
 
-  // ✅ IMPROVED: Login function with better validation
+  // ✅ IMPROVED: Login function
   const handleLogin = async () => {
     if (!email.trim()) {
       Alert.alert("Error", "Please enter your email address");
       return;
     }
 
-    // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       Alert.alert("Error", "Please enter a valid email address");
@@ -174,33 +148,26 @@ export default function LoginScreen() {
           Alert.alert("Error", "Please enter your password");
           return;
         }
-
         result = await login(email, password);
       } else {
         if (!code.trim()) {
           Alert.alert("Error", "Please enter your one-time code");
           return;
         }
-
         result = await loginWithOneTimeCode(email, code);
       }
 
       if (result.success) {
-        // Don't show alert for one-time code login - let the redirect handle it
         if (mode === "password") {
           Alert.alert("Success", result.message || "Login successful!");
         }
-        
         console.log("✅ Login successful - navigation will be handled by layout");
       } else {
         Alert.alert("Login Failed", result.message || "Invalid credentials");
       }
     } catch (err: any) {
       console.error("Login Error:", err);
-      Alert.alert(
-        "Error", 
-        err.message || "Something went wrong while logging in"
-      );
+      Alert.alert("Error", err.message || "Something went wrong while logging in");
     }
   };
 
@@ -209,49 +176,42 @@ export default function LoginScreen() {
   };
 
   const handleForgotPassword = () => {
-    Alert.alert(
-      "Forgot Password", 
-      "Parents: Please use your email and password to login.\n\n" +
-      "Children: Ask your parent to generate a new one-time code in their settings."
+    Alert.alert('Forgot Password', 
+      "Parents: Please use your email and password to login.\n\nChildren: Ask your parent to generate a new one-time code in their settings."
     );
   };
 
   const toggleMode = () => {
     setMode(mode === "password" ? "oneTimeCode" : "password");
-    // Clear fields when switching modes
     setPassword("");
     setCode("");
   };
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <ScrollView 
-        contentContainerStyle={styles.scrollContainer}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Back to Home Button */}
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={handleGoBackHome}
-        >
-          <Text style={styles.backButtonText}>← Back to Home</Text>
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        {/* Back Button */}
+        <TouchableOpacity style={styles.backButton} onPress={handleGoBackHome}>
+          <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
 
         <View style={styles.header}>
-          <Text style={styles.title}>Family Wellness</Text>
-          <Text style={styles.subtitle}>
-            {mode === "password" ? "Sign in to your account" : "Child Login with One-Time Code"}
-          </Text>
+          <Image 
+            source={require('../../assets/images/Family-Wellness-logo.png')} 
+            style={styles.logo} 
+          />
+          <Text style={styles.title}>Welcome back</Text>
+          <Text style={styles.subtitle}>Sign in to your account</Text>
         </View>
 
         {/* Login Mode Toggle */}
         <View style={styles.modeToggleContainer}>
-          <TouchableOpacity
+          <TouchableOpacity 
             style={[
-              styles.modeButton,
+              styles.modeButton, 
               mode === "password" && styles.modeButtonActive
             ]}
             onPress={() => setMode("password")}
@@ -260,13 +220,12 @@ export default function LoginScreen() {
               styles.modeButtonText,
               mode === "password" && styles.modeButtonTextActive
             ]}>
-              👨‍👩‍👧‍👦 Parent/Child Login
+              Password
             </Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity
+          <TouchableOpacity 
             style={[
-              styles.modeButton,
+              styles.modeButton, 
               mode === "oneTimeCode" && styles.modeButtonActive
             ]}
             onPress={() => setMode("oneTimeCode")}
@@ -275,153 +234,124 @@ export default function LoginScreen() {
               styles.modeButtonText,
               mode === "oneTimeCode" && styles.modeButtonTextActive
             ]}>
-              🧒 Child One-Time Code
+              One-Time Code
             </Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.formContainer}>
           {/* Email Input */}
-          <TextInput
-            label="Email Address"
+          <PaperTextInput
+            label="Email"
             value={email}
             onChangeText={setEmail}
+            style={styles.input}
             autoCapitalize="none"
             keyboardType="email-address"
-            style={styles.input}
             mode="outlined"
-            left={<TextInput.Icon icon="email" />}
+            outlineColor="#e2e8f0"
+            activeOutlineColor="#2E8B57"
           />
 
-          {/* Password Input (shown in password mode) */}
-          {mode === "password" && (
-            <TextInput
+          {/* Conditional Input Fields */}
+          {mode === "password" ? (
+            <PaperTextInput
               label="Password"
               value={password}
               onChangeText={setPassword}
-              secureTextEntry={!showPassword}
               style={styles.input}
-              mode="outlined"
-              left={<TextInput.Icon icon="lock" />}
+              secureTextEntry={!showPassword}
               right={
-                <TextInput.Icon 
-                  icon={showPassword ? "eye-off" : "eye"} 
-                  onPress={() => setShowPassword(!showPassword)}
+                <PaperTextInput.Icon 
+                  icon={showPassword ? 'eye-off' : 'eye'} 
+                  onPress={() => setShowPassword(!showPassword)} 
                 />
               }
+              mode="outlined"
+              outlineColor="#e2e8f0"
+              activeOutlineColor="#2E8B57"
             />
-          )}
-
-          {/* One-Time Code Input (shown in oneTimeCode mode) */}
-          {mode === "oneTimeCode" && (
-            <TextInput
+          ) : (
+            <PaperTextInput
               label="One-Time Code"
               value={code}
               onChangeText={setCode}
               style={styles.input}
+              keyboardType="numeric"
               mode="outlined"
-              left={<TextInput.Icon icon="key" />}
-              placeholder="Enter the code from your parent"
+              outlineColor="#e2e8f0"
+              activeOutlineColor="#2E8B57"
             />
           )}
 
-          {/* Mode-specific instructions */}
-          {mode === "oneTimeCode" && (
-            <View style={styles.instructionsContainer}>
-              <Text style={styles.instructionsText}>
-                💡 Ask your parent for the one-time code. This is for children who haven't set a password yet.
-              </Text>
-            </View>
+          {/* Forgot Password (only in password mode) */}
+          {mode === "password" && (
+            <TouchableOpacity style={styles.forgotPassword} onPress={handleForgotPassword}>
+              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+            </TouchableOpacity>
           )}
 
-          <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotPassword}>
-            <Text style={styles.forgotPasswordText}>Need Help?</Text>
-          </TouchableOpacity>
-
-          <Button
-            mode="contained"
-            onPress={handleLogin}
+          {/* Login Button */}
+          <Button 
+            mode="contained" 
+            onPress={handleLogin} 
             loading={isLoading}
             disabled={isLoading}
-            style={styles.loginButton}
             contentStyle={styles.loginButtonContent}
+            style={styles.loginButton}
           >
-            {isLoading ? "Signing In..." : mode === "password" ? "Sign In" : "Login with Code"}
+            {isLoading ? "Signing In..." : "Sign In"}
           </Button>
 
-          {/* Mode toggle hint */}
-          <TouchableOpacity onPress={toggleMode} style={styles.modeSwitch}>
-            <Text style={styles.modeSwitchText}>
-              {mode === "password" 
-                ? "🧒 Child without password? Use one-time code" 
-                : "👨‍👩‍👧‍👦 Have a password? Use regular login"}
-            </Text>
-          </TouchableOpacity>
+          {/* Divider */}
+          <View style={styles.dividerContainer}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
 
+          {/* Social Login */}
+          <View style={styles.socialLoginContainer}>
+            <Text style={styles.socialLoginTitle}>Continue with</Text>
+            <View style={styles.socialButtonsContainer}>
+              <TouchableOpacity 
+                style={[
+                  styles.googleButton,
+                  (googleLoading || !googleRequest) && styles.buttonDisabled
+                ]}
+                onPress={handleGoogleLogin}
+                disabled={googleLoading || !googleRequest}
+              >
+                <View style={styles.googleButtonContent}>
+                  <Image 
+                    source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
+                    style={styles.googleLogo}
+                  />
+                  <Text style={styles.googleButtonText}>
+                    {googleLoading ? 'Loading...' : 'Google'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Register Link */}
           <View style={styles.registerContainer}>
-            <Text style={styles.registerText}>Don't have an account? </Text>
+            <Text style={styles.registerText}>Don't have an account?</Text>
             <TouchableOpacity onPress={handleRegisterRedirect}>
-              <Text style={styles.registerLink}>Create Account</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-        
-        {/* OR Divider */}
-        <View style={styles.dividerContainer}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>OR</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        {/* Social Login Section */}
-        <View style={styles.socialLoginContainer}>
-          <Text style={styles.socialLoginTitle}>Continue with</Text>
-          
-          <View style={styles.socialButtonsContainer}>
-            {/* Google Login Button - FIXED CONFIGURATION */}
-            <TouchableOpacity 
-              style={[
-                styles.googleButton,
-                (isLoading || googleLoading || !googleRequest) && styles.buttonDisabled
-              ]}
-              onPress={handleGoogleLogin}
-              disabled={isLoading || googleLoading || !googleRequest}
-            >
-              <View style={styles.googleButtonContent}>
-                <Image 
-                  source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
-                  style={styles.googleLogo}
-                />
-                <Text style={styles.googleButtonText}>
-                  {googleLoading ? "Signing in..." : "Google"}
-                </Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* Apple Login Button (Placeholder for future) */}
-            <TouchableOpacity 
-              style={[
-                styles.appleButton,
-                (isLoading || googleLoading) && styles.buttonDisabled
-              ]}
-              onPress={() => Alert.alert('Coming Soon', 'Apple login will be available soon')}
-              disabled={isLoading || googleLoading}
-            >
-              <View style={styles.appleButtonContent}>
-                <Text style={styles.appleIcon}></Text>
-                <Text style={styles.appleButtonText}>Apple</Text>
-              </View>
+              <Text style={styles.registerLink}> Register</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Role Information */}
+        {/* Info Section */}
         <View style={styles.infoContainer}>
-          <Text style={styles.infoTitle}>Login Options:</Text>
-          <Text style={styles.infoText}>• Parents: Use email and password</Text>
-          <Text style={styles.infoText}>• Children with password: Use email and password</Text>
-          <Text style={styles.infoText}>• Children first time: Use one-time code from parent</Text>
-          <Text style={styles.infoText}>• Social login for parents (coming soon)</Text>
+          <Text style={styles.infoTitle}>Login Help</Text>
+          <Text style={styles.infoText}>
+            • Parents: Use your email and password{'\n'}
+            • Children: Use your email and one-time code{'\n'}
+            • Contact support if you need assistance
+          </Text>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -458,6 +388,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 30,
   },
+  logo: {
+    width: 120,
+    height: 120,
+    marginBottom: 12,
+  },
   title: {
     fontSize: 32,
     fontWeight: "bold",
@@ -490,7 +425,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#2E8B57",
-    textAlign: "center",
   },
   modeButtonTextActive: {
     color: "white",
@@ -504,23 +438,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    marginBottom: 20,
   },
   input: {
     marginBottom: 16,
     backgroundColor: "white",
-  },
-  instructionsContainer: {
-    backgroundColor: "#fff3cd",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: "#ffc107",
-  },
-  instructionsText: {
-    fontSize: 14,
-    color: "#856404",
-    lineHeight: 20,
   },
   forgotPassword: {
     alignSelf: "flex-end",
@@ -529,6 +451,7 @@ const styles = StyleSheet.create({
   forgotPasswordText: {
     color: "#1976d2",
     fontSize: 14,
+    fontWeight: "500",
   },
   loginButton: {
     marginBottom: 16,
@@ -537,34 +460,25 @@ const styles = StyleSheet.create({
   loginButtonContent: {
     paddingVertical: 8,
   },
-  modeSwitch: {
-    alignItems: "center",
-    marginBottom: 20,
-    padding: 8,
-  },
-  modeSwitchText: {
-    color: "#2E8B57",
-    fontSize: 14,
-    fontWeight: "500",
-    textAlign: "center",
-  },
   registerContainer: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
+    marginTop: 16,
   },
   registerText: {
     color: "#666",
+    fontSize: 14,
   },
   registerLink: {
     color: "#2E8B57",
     fontWeight: "bold",
+    fontSize: 14,
   },
   infoContainer: {
     backgroundColor: "#e3f2fd",
     padding: 16,
     borderRadius: 8,
-    marginTop: 20,
   },
   infoTitle: {
     fontSize: 16,
@@ -575,10 +489,8 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 14,
     color: "#1565c0",
-    marginBottom: 4,
     lineHeight: 20,
   },
-   
   // Divider Styles
   dividerContainer: {
     flexDirection: 'row',
@@ -596,10 +508,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-
   // Social Login Section
   socialLoginContainer: {
-    marginTop: 8,
+    marginBottom: 16,
   },
   socialLoginTitle: {
     textAlign: 'center',
@@ -612,7 +523,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
-
   // Google Button
   googleButton: {
     flex: 1,
@@ -642,33 +552,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-
-  // Apple Button
-  appleButton: {
-    flex: 1,
-    backgroundColor: '#000',
-    borderWidth: 1,
-    borderColor: '#000',
-    borderRadius: 12,
-    padding: 12,
-  },
-  appleButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  appleIcon: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  appleButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
   // Disabled state
   buttonDisabled: {
     opacity: 0.6,
