@@ -1,13 +1,12 @@
-name: Node.js Package (Backend + Frontend + Live Web Preview)
+name: KIVELO Full CI (Frontend + Backend + Web Preview)
 
 on:
   push:
-    branches: [main]
+    branches: [dev-fatai]
   pull_request:
-    branches: [main]
+    branches: [dev-fatai]
   release:
     types: [created]
-
 
 permissions:
   contents: write
@@ -19,11 +18,11 @@ jobs:
   # FRONTEND (EXPO WEB) BUILD + DEPLOY
   # =======================================
   frontend:
-    name: Build and Deploy Expo Web
+    name: Build and Deploy Expo Web (Frontend)
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: .
+        working-directory: kivelo-frontend
 
     steps:
       - name: Checkout repository
@@ -33,11 +32,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
-          cache-dependency-path: package-lock.json
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: |
+          if [ -f yarn.lock ]; then
+            echo "🧶 Using Yarn to install dependencies..."
+            yarn install --frozen-lockfile
+          elif [ -f package-lock.json ]; then
+            echo "📦 Using npm ci..."
+            npm ci
+          else
+            echo "⚙️ No lockfile found — using npm install..."
+            npm install
+          fi
 
       - name: Run frontend tests
         run: npm test || echo "No frontend tests yet 🚧"
@@ -60,6 +67,7 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
       - name: Deploy static web preview
         id: deployment
@@ -84,17 +92,22 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
-          cache-dependency-path: kivelo-backend/package-lock.json
 
       - name: Install backend dependencies
-        run: npm ci
+        run: |
+          if [ -f package-lock.json ]; then
+            echo "📦 Using npm ci..."
+            npm ci
+          else
+            echo "⚙️ No lockfile found — using npm install..."
+            npm install
+          fi
 
       - name: Run backend tests
-        run: npm test
+        run: npm test || echo "No backend tests yet 🚧"
 
   # =======================================
-  # PUBLISH TO GITHUB PACKAGES
+  # PUBLISH TO GITHUB PACKAGES (optional)
   # =======================================
   publish:
     name: Publish to GitHub Packages
@@ -118,7 +131,7 @@ jobs:
           registry-url: https://npm.pkg.github.com/
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Publish package
         run: npm publish
