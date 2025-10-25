@@ -12,145 +12,47 @@ permissions:
   id-token: write
 
 jobs:
-  # =======================================
-  # FRONTEND (EXPO WEB) BUILD + DEPLOY
-  # =======================================
   frontend:
-    name: Build and Deploy Expo Web (Frontend)
+    name: Build Frontend
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: kivelo-frontend
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Install frontend dependencies
+      - name: Install and build frontend
         run: |
-          if [ -f yarn.lock ]; then
-            yarn install --frozen-lockfile
-          elif [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-          fi
-
-      - name: Build Expo web app
-        run: npx expo export -p web
-
-      - name: Verify build output exists
-        id: build-output
-        run: |
-          if [ -d "dist" ]; then
-            echo "✅ dist directory found"
-            echo "has-output=true" >> $GITHUB_OUTPUT
-            echo "output-path=dist" >> $GITHUB_OUTPUT
-          elif [ -d "web-build" ]; then
-            echo "✅ web-build directory found"
-            echo "has-output=true" >> $GITHUB_OUTPUT
-            echo "output-path=web-build" >> $GITHUB_OUTPUT
-          else
-            echo "❌ No build output directory found"
-            echo "has-output=false" >> $GITHUB_OUTPUT
-            echo "output-path=" >> $GITHUB_OUTPUT
-            exit 1
-          fi
-
-      - name: Upload frontend build artifact
-        if: steps.build-output.outputs.has-output == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-build
-          path: kivelo-frontend/${{ steps.build-output.outputs.output-path }}
-
-      - name: Upload static site files for GitHub Pages
-        if: steps.build-output.outputs.has-output == 'true'
+          cd kivelo-frontend
+          npm ci
+          npx expo export -p web
+      - name: Upload to GitHub Pages
         uses: actions/upload-pages-artifact@v3
         with:
-          path: kivelo-frontend/${{ steps.build-output.outputs.output-path }}
+          path: kivelo-frontend/dist/
 
-  # =======================================
-  # BACKEND TESTS
-  # =======================================
   backend:
-    name: Build and Test Backend
+    name: Test Backend
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: kivelo-backend
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-
-      - name: Install backend dependencies
+      - name: Install and test backend
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
-          fi
+          cd kivelo-backend
+          npm ci
+          npm test || echo "No tests yet"
 
-      - name: Run backend tests
-        run: npm test || echo "No backend tests yet 🚧"
-
-  # =======================================
-  # DEPLOY TO GITHUB PAGES
-  # =======================================
   deploy:
-    name: Deploy Web Preview to GitHub Pages
+    name: Deploy to GitHub Pages
     runs-on: ubuntu-latest
     needs: [frontend, backend]
     if: needs.frontend.result == 'success' && needs.backend.result == 'success'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-
     steps:
-      - name: Deploy static web preview
+      - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
-
-  # =======================================
-  # INTEGRATION TEST (FINAL CHECK)
-  # =======================================
-  integration-test:
-    name: Integration Test (Frontend + Backend)
-    runs-on: ubuntu-latest
-    needs: [frontend, backend, deploy]
-    if: always()
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Download frontend build
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-build
-          path: ./frontend-build
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Run integration verification
-        run: |
-          echo "🎯 Integration Test Results:"
-          echo "✅ Frontend: ${{ needs.frontend.result }}"
-          echo "✅ Backend: ${{ needs.backend.result }}"
-          echo "✅ Deployment: ${{ needs.deploy.result }}"
-          echo "📦 Frontend build exists: $(if [ -d "./frontend-build" ]; then echo 'YES'; else echo 'NO'; fi)"
-          echo "🌐 All systems connected and validated!"
