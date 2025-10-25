@@ -47,8 +47,7 @@ jobs:
         run: npx expo --version
 
       - name: Build Expo web app
-        run: |
-          npx expo build:web || npx expo export --public-url . --output-dir dist
+        run: npx expo export -p web
 
       - name: Debug - List all files after build
         run: |
@@ -58,9 +57,7 @@ jobs:
       - name: Upload static site files for GitHub Pages
         uses: actions/upload-pages-artifact@v3
         with:
-          path: |
-            web-build
-            dist
+          path: dist/
 
   # =======================================
   # DEPLOY TO GITHUB PAGES
