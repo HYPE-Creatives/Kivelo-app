@@ -1,8 +1,13 @@
 name: Node.js Package (Backend + Frontend + Live Web Preview)
 
 on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   release:
     types: [created]
+
 
 permissions:
   contents: write
