@@ -1,4 +1,4 @@
-name: Backend Tests (kivelo-backend)
+name: Backend Tests (CI)
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [dev-fatai]
 
 jobs:
-  test-backend:
+  test:
     name: Run Backend Tests
     runs-on: ubuntu-latest
     defaults:
