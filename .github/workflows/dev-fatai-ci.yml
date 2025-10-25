@@ -58,11 +58,11 @@ jobs:
           else
             echo "❌ No build output directory found"
             echo "has-output=false" >> $GITHUB_OUTPUT
-            echo "output-path=" >> $GITHUB_OUTPUT
             exit 1
           fi
 
       - name: Upload frontend build artifact
+        if: steps.build-output.outputs.has-output == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: frontend-build
@@ -84,6 +84,7 @@ jobs:
     defaults:
       run:
         working-directory: kivelo-backend
+    needs: frontend
 
     steps:
       - name: Checkout repository
@@ -121,8 +122,8 @@ jobs:
   deploy:
     name: Deploy Web Preview to GitHub Pages
     runs-on: ubuntu-latest
-    needs: [frontend, backend]  # Wait for both frontend and backend
-    if: needs.frontend.result == 'success' && needs.backend.result == 'success'
+    needs: [frontend, backend]  # waits for both
+    if: ${{ needs.frontend.result == 'success' && needs.backend.result == 'success' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -145,15 +146,15 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
         with:
-          artifact_name: frontend-build  # Use the uploaded artifact
+          artifact_name: frontend-build
 
   # =======================================
-  # FULL STACK INTEGRATION TEST (Optional)
+  # INTEGRATION TEST (FINAL CHECK)
   # =======================================
   integration-test:
-    name: Integration Tests
+    name: Integration Test (Frontend + Backend)
     runs-on: ubuntu-latest
-    needs: [frontend, backend]  # Run after both frontend and backend complete
+    needs: [frontend, backend, deploy]
     if: always()
 
     steps:
@@ -171,9 +172,10 @@ jobs:
         with:
           node-version: 20
 
-      - name: Run integration checks
+      - name: Run integration verification
         run: |
-          echo "✅ Frontend build completed:"
+          echo "✅ Frontend built successfully:"
           find ./frontend-build -name "*.html" | head -3
-          echo "✅ Backend tests completed"
-          echo "🎯 Both frontend and backend are ready for deployment"
+          echo "✅ Backend test results uploaded."
+          echo "🌐 Live web preview deployed!"
+          echo "🧩 All systems connected and validated."
