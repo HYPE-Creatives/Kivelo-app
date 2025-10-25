@@ -49,9 +49,17 @@ jobs:
       - name: Run frontend tests
         run: npm test || echo "No frontend tests yet 🚧"
 
+      # Force Expo to output to a known folder (dist/)
       - name: Build Expo web app
-        run: npx expo export --platform web
+        run: npx expo export --platform web --output-dir dist
 
+      # Verify what Expo actually built
+      - name: Verify build directory
+        run: |
+          echo "📁 Build directory contents:"
+          ls -R dist || echo "⚠️ dist directory not found!"
+
+      # Upload only built static files (no need for Git commit)
       - name: Upload static site files for GitHub Pages
         uses: actions/upload-pages-artifact@v3
         with:
