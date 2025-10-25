@@ -1,0 +1,44 @@
+frontend:
+  name: Build and Deploy Expo Web (Frontend)
+  runs-on: ubuntu-latest
+  defaults:
+    run:
+      working-directory: kivelo-frontend
+
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    - name: Install frontend dependencies
+      run: |
+        if [ -f yarn.lock ]; then
+          yarn install --frozen-lockfile
+        elif [ -f package-lock.json ]; then
+          npm ci
+        else
+          npm install
+        fi
+
+    - name: Ensure Expo CLI is available
+      run: npx expo --version
+
+    - name: Build Expo web app
+      run: |
+        npx expo build:web || npx expo export --public-url . --output-dir dist
+
+    - name: Debug: List all files after build
+      run: |
+        echo "📂 Listing build outputs:"
+        ls -R || echo "⚠️ No files found!"
+
+    - name: Upload static site files for GitHub Pages
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: |
+          web-build
+          dist
