@@ -1,44 +1,56 @@
-frontend:
-  name: Build and Deploy Expo Web (Frontend)
-  runs-on: ubuntu-latest
-  defaults:
-    run:
-      working-directory: kivelo-frontend
+name: Frontend (Expo Web Build and Deploy)
 
-  steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+on:
+  push:
+    branches: [dev-fatai]
+  pull_request:
+    branches: [dev-fatai]
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: 20
+jobs:
+  frontend:
+    name: Build and Deploy Expo Web (Frontend)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: kivelo-frontend
 
-    - name: Install frontend dependencies
-      run: |
-        if [ -f yarn.lock ]; then
-          yarn install --frozen-lockfile
-        elif [ -f package-lock.json ]; then
-          npm ci
-        else
-          npm install
-        fi
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Ensure Expo CLI is available
-      run: npx expo --version
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
-    - name: Build Expo web app
-      run: |
-        npx expo build:web || npx expo export --public-url . --output-dir dist
+      - name: Install frontend dependencies
+        run: |
+          if [ -f yarn.lock ]; then
+            echo "🧶 Using Yarn to install dependencies..."
+            yarn install --frozen-lockfile
+          elif [ -f package-lock.json ]; then
+            echo "📦 Using npm ci..."
+            npm ci
+          else
+            echo "⚙️ No lockfile found — using npm install..."
+            npm install
+          fi
 
-    - name: Debug: List all files after build
-      run: |
-        echo "📂 Listing build outputs:"
-        ls -R || echo "⚠️ No files found!"
+      - name: Ensure Expo CLI is available
+        run: npx expo --version
 
-    - name: Upload static site files for GitHub Pages
-      uses: actions/upload-pages-artifact@v3
-      with:
-        path: |
-          web-build
-          dist
+      - name: Build Expo web app
+        run: |
+          npx expo build:web || npx expo export --public-url . --output-dir dist
+
+      - name: Debug: List all files after build
+        run: |
+          echo "📂 Listing build outputs:"
+          ls -R || echo "⚠️ No files found!"
+
+      - name: Upload static site files for GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: |
+            web-build
+            dist
