@@ -17,53 +17,50 @@ jobs:
   # =======================================
   # FRONTEND (EXPO WEB) BUILD + DEPLOY
   # =======================================
-  frontend:
-    name: Build and Deploy Expo Web (Frontend)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: kivelo-frontend
+frontend:
+  name: Build and Deploy Expo Web (Frontend)
+  runs-on: ubuntu-latest
+  defaults:
+    run:
+      working-directory: kivelo-frontend
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
 
-      - name: Install frontend dependencies
-        run: |
-          if [ -f yarn.lock ]; then
-            echo "🧶 Using Yarn to install dependencies..."
-            yarn install --frozen-lockfile
-          elif [ -f package-lock.json ]; then
-            echo "📦 Using npm ci..."
-            npm ci
-          else
-            echo "⚙️ No lockfile found — using npm install..."
-            npm install
-          fi
+    - name: Install frontend dependencies
+      run: |
+        if [ -f yarn.lock ]; then
+          yarn install --frozen-lockfile
+        elif [ -f package-lock.json ]; then
+          npm ci
+        else
+          npm install
+        fi
 
-      - name: Run frontend tests
-        run: npm test || echo "No frontend tests yet 🚧"
+    - name: Ensure Expo CLI is available
+      run: npx expo --version
 
-      # Force Expo to output to a known folder (dist/)
-      - name: Build Expo web app
-        run: npx expo export --platform web --output-dir dist
+    - name: Build Expo web app
+      run: |
+        npx expo build:web || npx expo export --public-url . --output-dir dist
 
-      # Verify what Expo actually built
-      - name: Verify build directory
-        run: |
-          echo "📁 Build directory contents:"
-          ls -R dist || echo "⚠️ dist directory not found!"
+    - name: Debug: List all files after build
+      run: |
+        echo "📂 Listing build outputs:"
+        ls -R || echo "⚠️ No files found!"
 
-      # Upload only built static files (no need for Git commit)
-      - name: Upload static site files for GitHub Pages
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
+    - name: Upload static site files for GitHub Pages
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: |
+          web-build
+          dist
 
   # =======================================
   # DEPLOY TO GITHUB PAGES
