@@ -9,7 +9,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "jest"
+    "test": "jest",
+    "build:web": "expo export -p web",
+    "export:web": "expo export:web"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",

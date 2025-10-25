@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "kivelo-app",
-    "slug": "kivelo-app",
+    "name": "KIVELO",
+    "slug": "kivelo",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "kiveloapp",
+    "scheme": "kivelo",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -43,7 +43,7 @@
     ],
     "experiments": {
       "typedRoutes": true,
-      "baseUrl": "/kivelo-app"
+      "baseUrl": "/Kivelo-app"
     },
     "extra": {
       "router": {},
