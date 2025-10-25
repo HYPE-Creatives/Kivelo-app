@@ -43,7 +43,8 @@ jobs:
         run: |
           npx expo build:web || npx expo export --public-url . --output-dir dist
 
-      - name: Debug: List all files after build
+      - name: 
+        Debug: List all files after build
         run: |
           echo "📂 Listing build outputs:"
           ls -R || echo "⚠️ No files found!"

@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "family-wellness-app",
-    "slug": "family-wellness-app",
+    "name": "kivelo-app",
+    "slug": "kivelo-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "familywellnessapp",
+    "scheme": "kiveloapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -42,7 +42,8 @@
       "expo-secure-store"
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "baseUrl": "/kivelo-app"
     },
     "extra": {
       "router": {},
