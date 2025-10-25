@@ -55,7 +55,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Routes
 // Home route
 app.get('/', (req, res) => {
-  res.send('Welcome to Family Wellness API');
+  res.send('Welcome to Kivelo API');
 });
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
