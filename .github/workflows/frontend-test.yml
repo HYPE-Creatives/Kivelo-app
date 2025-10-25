@@ -42,12 +42,25 @@ jobs:
       - name: Build Expo web app
         run: npx expo export -p web
 
-      - name: Debug- List all files after build
+      - name: Debug- Check build output
         run: |
-            echo "📂 Listing build outputs:"
-            find . -name "dist" -type d || echo "⚠️ No dist directory found!"
+            echo "📂 Current directory:"
+            pwd
+            echo "📂 Listing all files:"
+            ls -la
+            echo "📂 Checking for dist directory:"
+            if [ -d "dist" ]; then
+            echo "✅ dist directory exists"
+            echo "📂 Contents of dist:"
+            ls -la dist/
+            else
+            echo "❌ dist directory not found"
+            echo "📂 Available directories:"
+            find . -type d -name "*dist*" -o -name "*build*" | head -10
+            fi
 
       - name: Upload static site files for GitHub Pages
+        if: success() && hash('dist') != ''
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist/
+          path: kivelo-frontend/dist/
