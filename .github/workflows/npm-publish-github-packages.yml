@@ -1,15 +1,20 @@
-name: Node.js Package (Backend + Frontend + Web Preview)
+name: Node.js Package (Backend + Frontend + Live Web Preview)
 
 on:
   release:
     types: [created]
 
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
 jobs:
   # =======================================
-  # FRONTEND TESTS + WEB BUILD PREVIEW
+  # FRONTEND (EXPO WEB) BUILD + DEPLOY
   # =======================================
-  frontend-tests:
-    name: Build and Test Frontend (Expo Web)
+  frontend:
+    name: Build and Deploy Expo Web
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -35,23 +40,36 @@ jobs:
       - name: Build Expo web app
         run: npx expo export --platform web
 
-      - name: Upload web preview artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload static site files for GitHub Pages
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: expo-web-preview
           path: dist
-          retention-days: 5
+
+  # =======================================
+  # DEPLOY TO GITHUB PAGES
+  # =======================================
+  deploy:
+    name: Deploy Web Preview to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: frontend
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy static web preview
+        id: deployment
+        uses: actions/deploy-pages@v4
 
   # =======================================
   # BACKEND TESTS
   # =======================================
-  backend-tests:
+  backend:
     name: Build and Test Backend
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: kivelo-backend
-    needs: frontend-tests
+    needs: frontend
 
     steps:
       - name: Checkout repository
@@ -73,9 +91,9 @@ jobs:
   # =======================================
   # PUBLISH TO GITHUB PACKAGES
   # =======================================
-  publish-gpr:
+  publish:
     name: Publish to GitHub Packages
-    needs: [frontend-tests, backend-tests]
+    needs: [frontend, backend]
     runs-on: ubuntu-latest
     permissions:
       contents: read
