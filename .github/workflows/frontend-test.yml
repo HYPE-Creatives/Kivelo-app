@@ -40,7 +40,22 @@ jobs:
         run: npx expo --version
 
       - name: Build Expo web app
-        run: npx expo export -p web
+        id: build-output
+        run: |
+          npx expo export -p web
+          # Determine output directory and set outputs for subsequent steps
+          if [ -d "dist" ]; then
+            echo "output-path=dist" >> $GITHUB_OUTPUT
+            echo "has-output=true" >> $GITHUB_OUTPUT
+          elif [ -d "web-build" ]; then
+            echo "output-path=web-build" >> $GITHUB_OUTPUT
+            echo "has-output=true" >> $GITHUB_OUTPUT
+          elif [ -d "web" ]; then
+            echo "output-path=web" >> $GITHUB_OUTPUT
+            echo "has-output=true" >> $GITHUB_OUTPUT
+          else
+            echo "has-output=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Debug- Check build output
         run: |
@@ -60,7 +75,7 @@ jobs:
             fi
 
       - name: Upload static site files for GitHub Pages
-        if: success() && hash('dist') != ''
+        if: steps.build-output.outputs.has-output == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
-          path: kivelo-frontend/dist/
+            path: kivelo-frontend/${{ steps.build-output.outputs.output-path }}

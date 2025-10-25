@@ -5,8 +5,6 @@ on:
     branches: [dev-fatai]
   pull_request:
     branches: [dev-fatai]
-  release:
-    types: [created]
 
 permissions:
   contents: write
@@ -33,19 +31,8 @@ jobs:
         with:
           node-version: 20
 
-      - name: Debug - Check project structure
-        run: |
-          echo "📂 Current directory structure:"
-          pwd
-          ls -la
-          echo "📂 Checking for Expo configuration files:"
-          find . -name "app.json" -o -name "app.config.js" -o -name "package.json" | head -20
-          echo "📂 kivelo-frontend contents:"
-          ls -la kivelo-frontend/ || echo "kivelo-frontend directory not found at root level"
-
       - name: Install frontend dependencies
         run: |
-          echo "📦 Installing dependencies..."
           if [ -f yarn.lock ]; then
             yarn install --frozen-lockfile
           elif [ -f package-lock.json ]; then
@@ -53,52 +40,9 @@ jobs:
           else
             npm install
           fi
-          echo "✅ Dependencies installed"
 
-      - name: Check Expo CLI and web dependencies
-        run: |
-          echo "🔍 Checking Expo version:"
-          npx expo --version
-          echo "📦 Ensuring web dependencies are installed:"
-          npx expo install react-dom react-native-web @expo/webpack-config || echo "Web dependencies already installed or not needed"
-
-      - name: Build Expo web app (with multiple fallbacks)
-        run: |
-          echo "🏗️ Attempting to build Expo web app..."
-          
-          # Try multiple build commands in sequence
-          echo "1. Trying: npx expo export -p web"
-          npx expo export -p web && echo "✅ Build successful with expo export -p web" && exit 0
-          
-          echo "2. Trying: npx expo export:web"
-          npx expo export:web && echo "✅ Build successful with expo export:web" && exit 0
-          
-          echo "3. Trying: npx expo build:web (legacy)"
-          npx expo build:web && echo "✅ Build successful with expo build:web" && exit 0
-          
-          echo "❌ All build attempts failed"
-          exit 1
-
-      - name: Debug - Comprehensive build output check
-        run: |
-          echo "🔍 Comprehensive build output analysis:"
-          echo "📂 Current working directory:"
-          pwd
-          echo "📂 Full directory structure:"
-          find . -type d -name "dist" -o -name "web-build" -o -name "build" -o -name "out" | head -20
-          echo "📂 Checking common output directories:"
-          for dir in dist web-build build out; do
-            if [ -d "$dir" ]; then
-              echo "✅ Found $dir directory:"
-              ls -la "$dir/"
-              echo "--- Contents of $dir ---"
-              find "$dir" -type f | head -30
-            else
-              echo "❌ $dir directory not found"
-            fi
-          done
-          echo "📂 Checking for any HTML files:"
-          find . -name "*.html" -type f | head -10 || echo "No HTML files found"
+      - name: Build Expo web app
+        run: npx expo export -p web
 
       - name: Verify build output exists
         id: build-output
@@ -111,17 +55,10 @@ jobs:
             echo "✅ web-build directory found"
             echo "has-output=true" >> $GITHUB_OUTPUT
             echo "output-path=web-build" >> $GITHUB_OUTPUT
-          elif [ -d "build" ]; then
-            echo "✅ build directory found"
-            echo "has-output=true" >> $GITHUB_OUTPUT
-            echo "output-path=build" >> $GITHUB_OUTPUT
           else
             echo "❌ No build output directory found"
             echo "has-output=false" >> $GITHUB_OUTPUT
             echo "output-path=" >> $GITHUB_OUTPUT
-            # Try to find any directory that might contain build artifacts
-            echo "🔍 Searching for potential build directories:"
-            find . -type d -name "index.html" -exec dirname {} \; | head -5
             exit 1
           fi
 
@@ -167,56 +104,13 @@ jobs:
         with:
           node-version: 20
 
-      - name: Debug - Check backend structure
-        run: |
-          echo "📂 Backend directory structure:"
-          pwd
-          ls -la
-          echo "📂 Checking for package.json:"
-          find . -name "package.json" | head -5
-
       - name: Install backend dependencies
         run: |
           if [ -f package-lock.json ]; then
-            echo "📦 Using npm ci..."
             npm ci
           else
-            echo "⚙️ No lockfile found — using npm install..."
             npm install
           fi
 
       - name: Run backend tests
         run: npm test || echo "No backend tests yet 🚧"
-
-  # =======================================
-  # PUBLISH TO GITHUB PACKAGES (optional)
-  # =======================================
-  publish:
-    name: Publish to GitHub Packages
-    needs: [frontend, backend]
-    runs-on: ubuntu-latest
-    if: always() && (needs.frontend.result == 'success' || needs.frontend.result == 'skipped') && (needs.backend.result == 'success' || needs.backend.result == 'skipped')
-    permissions:
-      contents: read
-      packages: write
-    defaults:
-      run:
-        working-directory: kivelo-backend
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js for publishing
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          registry-url: https://npm.pkg.github.com/
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Publish package
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
