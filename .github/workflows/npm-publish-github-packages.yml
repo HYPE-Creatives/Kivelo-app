@@ -1,36 +1,65 @@
 # This workflow will run tests using Node and then publish a package to GitHub Packages when a release is created
 # For more information, see: https://docs.github.com/en/actions/publishing-packages/publishing-nodejs-packages
 
-name: Node.js Package
+# This workflow runs backend tests from kivelo-backend before publishing to GitHub Packages.
+# It ensures the code passes all tests before any release is published.
+
+name: Node.js Package (Backend Tested)
 
 on:
   release:
     types: [created]
 
 jobs:
-  build:
+  build-and-test:
+    name: Build and Test Backend
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: kivelo-backend
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm ci
-      - run: npm test
+          cache: 'npm'
+          cache-dependency-path: kivelo-backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run backend tests
+        run: npm test
 
   publish-gpr:
-    needs: build
+    name: Publish to GitHub Packages
+    needs: build-and-test
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    defaults:
+      run:
+        working-directory: kivelo-backend
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js for publishing
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           registry-url: https://npm.pkg.github.com/
-      - run: npm ci
-      - run: npm publish
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Publish package
+        run: npm publish
         env:
-          NODE_AUTH_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
