@@ -793,13 +793,7 @@ router.get("/verify-code-page", (req, res) => {
  *       404:
  *         description: Parent profile not found
  */
-
-// In your backend route file, before the controller
-router.post('/generate-code', (req, res, next) => {
-  console.log("🛣️  Route hit - /auth/generate-code");
-  console.log("👤 User from auth:", req.user);
-  next();
-}, generateOneTimeCode);
+router.post("/generate-code", auth, generateOneTimeCode);
 
 /**
  * @swagger
