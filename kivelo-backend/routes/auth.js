@@ -754,44 +754,303 @@ router.get("/verify-code-page", (req, res) => {
 
 /**
  * @swagger
+ * components:
+ *   schemas:
+ *     GenerateCodeRequest:
+ *       type: object
+ *       required:
+ *         - parentId
+ *         - childEmail
+ *         - childName
+ *         - childDOB
+ *       properties:
+ *         parentId:
+ *           type: string
+ *           format: uuid
+ *           description: Unique identifier of the parent creating the child account
+ *           example: "123e4567-e89b-12d3-a456-426614174000"
+ *         childEmail:
+ *           type: string
+ *           format: email
+ *           description: Child's email address (must be unique)
+ *           example: "child.student@example.com"
+ *         childName:
+ *           type: string
+ *           description: Child's full name
+ *           minLength: 2
+ *           maxLength: 100
+ *           example: "Emma Johnson"
+ *         childDOB:
+ *           type: string
+ *           format: date
+ *           description: Child's date of birth in YYYY-MM-DD format
+ *           pattern: '^\d{4}-\d{2}-\d{2}$'
+ *           example: "2015-08-15"
+ *         childGender:
+ *           type: string
+ *           description: Child's gender identity
+ *           enum:
+ *             - male
+ *             - female
+ *             - non_binary
+ *             - prefer_not_to_say
+ *           default: "prefer_not_to_say"
+ *           example: "female"
+ * 
+ *     GenerateCodeResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           description: Indicates if the operation was successful
+ *           example: true
+ *         code:
+ *           type: string
+ *           description: The generated one-time code for child registration
+ *           minLength: 6
+ *           maxLength: 8
+ *           example: "A1B2C3"
+ *         message:
+ *           type: string
+ *           description: Human-readable message describing the result
+ *           example: "Child account created and one-time code generated successfully"
+ *         expiresAt:
+ *           type: string
+ *           format: date-time
+ *           description: Expiration timestamp of the one-time code
+ *           example: "2024-01-15T14:30:00Z"
+ * 
+ *     ErrorResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: false
+ *         message:
+ *           type: string
+ *           description: Error message describing what went wrong
+ *           example: "Child email already exists"
+ *         errorCode:
+ *           type: string
+ *           description: Machine-readable error code
+ *           example: "CHILD_EMAIL_EXISTS"
+ *         details:
+ *           type: array
+ *           items:
+ *             type: object
+ *             properties:
+ *               field:
+ *                 type: string
+ *                 description: The field that caused the error
+ *               message:
+ *                 type: string
+ *                 description: Field-specific error message
+ * 
+ *   securitySchemes:
+ *     bearerAuth:
+ *       type: http
+ *       scheme: bearer
+ *       bearerFormat: JWT
+ *       description: JWT token obtained during parent authentication
+ */
+
+/**
+ * @swagger
  * /api/auth/generate-code:
  *   post:
- *     summary: Generate one-time code for child registration
- *     tags: [Child Accounts]
+ *     summary: Generate one-time registration code for child account
+ *     description: |
+ *       Allows authenticated parents to generate a one-time code for registering their child's account.
+ *       
+ *       ### Flow:
+ *       1. Parent provides child's information
+ *       2. System validates the data and checks for duplicates
+ *       3. Generates a unique one-time code (expires in 1 hour)
+ *       4. Returns the code for parent to share with child
+ *       5. Child uses the code with their email to complete registration
+ *       
+ *       ### Business Rules:
+ *       - Parent must be authenticated with a valid JWT token
+ *       - Child email must be unique across the system
+ *       - Child must be between 5-18 years old (based on DOB)
+ *       - Parent can have maximum 5 child accounts
+ *       - One-time codes expire after 1 hour
+ *       
+ *       ### Required Permissions:
+ *       - User must have 'parent' role
+ *       - Parent profile must be complete and verified
+ *     tags: [Child Management]
  *     security:
  *       - bearerAuth: []
- *     description: Parent generates a one-time code to register a child account
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required:
- *               - childEmail
- *               - childName
- *               - dob
- *             properties:
- *               childEmail:
- *                 type: string
- *                 format: email
- *                 example: "child@example.com"
- *               childName:
- *                 type: string
- *                 example: "Alice Smith"
- *               dob:
- *                 type: string
- *                 format: date
- *                 example: "2015-05-15"
+ *             $ref: '#/components/schemas/GenerateCodeRequest'
+ *           examples:
+ *             typicalRequest:
+ *               summary: Typical child registration
+ *               value:
+ *                 parentId: "123e4567-e89b-12d3-a456-426614174000"
+ *                 childEmail: "emma.johnson@student.example.com"
+ *                 childName: "Emma Johnson"
+ *                 childDOB: "2015-08-15"
+ *                 childGender: "female"
+ *             minimalRequest:
+ *               summary: Minimal required fields
+ *               value:
+ *                 parentId: "123e4567-e89b-12d3-a456-426614174000"
+ *                 childEmail: "alex.wong@student.example.com"
+ *                 childName: "Alex Wong"
+ *                 childDOB: "2016-03-20"
  *     responses:
  *       201:
- *         description: One-time code generated successfully
+ *         description: |
+ *           One-time code generated successfully.
+ *           
+ *           The code should be shared with the child who will use it along with their email
+ *           to complete the registration process and set their password.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/GenerateCodeResponse'
+ *             examples:
+ *               successResponse:
+ *                 summary: Code generated successfully
+ *                 value:
+ *                   success: true
+ *                   code: "A1B2C3"
+ *                   message: "Child account created and one-time code generated successfully"
+ *                   expiresAt: "2024-01-15T14:30:00Z"
  *       400:
- *         description: Missing required fields or invalid email
+ *         description: |
+ *           Bad Request - Validation failed for the following reasons:
+ *           - Missing required fields
+ *           - Invalid email format
+ *           - Invalid date of birth format
+ *           - Child email already registered
+ *           - Child is outside acceptable age range (5-18 years)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               missingFields:
+ *                 summary: Missing required fields
+ *                 value:
+ *                   success: false
+ *                   message: "Child email, name, and DOB are required"
+ *                   errorCode: "MISSING_REQUIRED_FIELDS"
+ *                   details:
+ *                     - field: "childEmail"
+ *                       message: "Child email is required"
+ *               invalidEmail:
+ *                 summary: Invalid email format
+ *                 value:
+ *                   success: false
+ *                   message: "Please enter a valid email address"
+ *                   errorCode: "INVALID_EMAIL_FORMAT"
+ *               emailExists:
+ *                 summary: Email already registered
+ *                 value:
+ *                   success: false
+ *                   message: "Child email already exists in the system"
+ *                   errorCode: "CHILD_EMAIL_EXISTS"
+ *       401:
+ *         description: |
+ *           Unauthorized - Authentication required
+ *           - Invalid or missing JWT token
+ *           - Token expired
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       403:
- *         description: Only parents can generate codes
+ *         description: |
+ *           Forbidden - Insufficient permissions
+ *           - User does not have parent role
+ *           - Parent profile not complete
+ *           - Maximum child limit reached (5 children)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               notParent:
+ *                 summary: User is not a parent
+ *                 value:
+ *                   success: false
+ *                   message: "Only parents can generate child registration codes"
+ *                   errorCode: "INSUFFICIENT_PERMISSIONS"
+ *               maxChildren:
+ *                 summary: Maximum children limit reached
+ *                 value:
+ *                   success: false
+ *                   message: "Maximum of 5 child accounts allowed per parent"
+ *                   errorCode: "MAX_CHILDREN_LIMIT"
  *       404:
- *         description: Parent profile not found
+ *         description: |
+ *           Not Found - Parent profile not found
+ *           - Parent ID in token doesn't exist
+ *           - Parent profile not fully set up
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: |
+ *           Conflict - Child account already exists with this email
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       429:
+ *         description: |
+ *           Too Many Requests - Rate limit exceeded
+ *           - Maximum 5 code generation attempts per hour
+ *         headers:
+ *           X-RateLimit-Limit:
+ *             schema:
+ *               type: integer
+ *             description: Request limit per hour
+ *           X-RateLimit-Remaining:
+ *             schema:
+ *               type: integer
+ *             description: Remaining request count
+ *           X-RateLimit-Reset:
+ *             schema:
+ *               type: integer
+ *             description: Time when rate limit resets (Unix timestamp)
+ *       500:
+ *         description: |
+ *           Internal Server Error - Unexpected server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ * 
+ *     x-codeSamples:
+ *       - lang: JavaScript
+ *         label: 'Frontend Example'
+ *         source: |
+ *           const generateCode = async () => {
+ *             const response = await fetch('/api/auth/generate-code', {
+ *               method: 'POST',
+ *               headers: {
+ *                 'Content-Type': 'application/json',
+ *                 'Authorization': `Bearer ${accessToken}`
+ *               },
+ *               body: JSON.stringify({
+ *                 parentId: '123e4567-e89b-12d3-a456-426614174000',
+ *                 childEmail: 'child@example.com',
+ *                 childName: 'Alice Smith',
+ *                 childDOB: '2015-05-15',
+ *                 childGender: 'female'
+ *               })
+ *             });
+ *             return await response.json();
+ *           }
  */
 router.post("/generate-code", auth, generateOneTimeCode);
 
