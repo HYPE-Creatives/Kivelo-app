@@ -717,6 +717,278 @@ export const login = async (req, res) => {
   }
 };
 
+// ========================= FORGOT PASSWORD =========================
+/**
+ * @desc    Request password reset
+ * @route   POST /api/auth/forgot-password
+ * @access  Public
+ */
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
+
+    if (!validateEmail(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid email address'
+      });
+    }
+
+    // Find user by email
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    if (!user) {
+      // For security, don't reveal if email exists or not
+      return res.status(200).json({
+        success: true,
+        message: 'If an account with that email exists, a password reset code has been sent.'
+      });
+    }
+
+    // Check if user is verified
+    if (!user.isVerified) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please verify your email before resetting password'
+      });
+    }
+
+    // Generate reset token (6-digit code)
+    const resetToken = Math.floor(100000 + Math.random() * 900000).toString();
+    const resetTokenExpires = new Date(Date.now() + 1 * 60 * 60 * 1000); // 1 hour
+
+    // Save reset token to user
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = resetTokenExpires;
+    await user.save();
+
+    // Send email with reset code
+    await sendEmailViaSendGrid(
+      user.email,
+      "Reset Your Kivelo Password",
+      `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
+        <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); overflow: hidden;">
+          <div style="background-color: #4CAF50; color: white; text-align: center; padding: 20px;">
+            <h1 style="margin: 0;">Kivelo</h1>
+            <p style="margin: 0; font-size: 14px;">Empowering Families with Technology</p>
+          </div>
+          <div style="padding: 30px;">
+            <h2 style="color: #333;">Password Reset Request</h2>
+            <p style="font-size: 15px; color: #555; line-height: 1.6;">
+              Hello ${user.name},<br><br>
+              We received a request to reset your password for your Kivelo account. 
+              Use the verification code below to reset your password:
+            </p>
+
+            <div style="text-align: center; margin: 30px 0;">
+              <div style="background-color: #4CAF50; color: #fff; padding: 15px 30px; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 28px; letter-spacing: 3px; border: 2px dashed #fff;">
+                ${resetToken}
+              </div>
+            </div>
+
+            <p style="font-size: 14px; color: #555; line-height: 1.6;">
+              <strong>Important:</strong> This code will expire in 1 hour for security reasons.
+            </p>
+
+            <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
+              <p style="margin: 0; color: #856404; font-size: 14px;">
+                <strong>Security Tip:</strong> If you didn't request this password reset, 
+                please ignore this email and ensure your account is secure.
+              </p>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;" />
+
+            <p style="font-size: 13px; color: #777; text-align: center;">
+              Need help? Contact our support team at 
+              <a href="mailto:support@kivelo.com" style="color: #4CAF50; text-decoration: none;">support@kivelo.com</a>
+            </p>
+          </div>
+          <div style="background-color: #f1f1f1; text-align: center; padding: 15px; font-size: 12px; color: #888;">
+            © ${new Date().getFullYear()} Kivelo. All rights reserved.
+          </div>
+        </div>
+      </div>
+      `
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'If an account with that email exists, a password reset code has been sent.'
+    });
+
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to process password reset request',
+      error: error.message
+    });
+  }
+};
+
+// ========================= VERIFY RESET TOKEN =========================
+/**
+ * @desc    Verify reset token
+ * @route   POST /api/auth/verify-reset-token
+ * @access  Public
+ */
+export const verifyResetToken = async (req, res) => {
+  try {
+    const { email, resetToken } = req.body;
+
+    if (!email || !resetToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and reset token are required'
+      });
+    }
+
+    const user = await User.findOne({ 
+      email: email.toLowerCase().trim(),
+      resetPasswordToken: resetToken,
+      resetPasswordExpires: { $gt: new Date() }
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired reset token'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Reset token is valid'
+    });
+
+  } catch (error) {
+    console.error('Verify reset token error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify reset token',
+      error: error.message
+    });
+  }
+};
+
+// ========================= RESET PASSWORD =========================
+/**
+ * @desc    Reset password with token
+ * @route   POST /api/auth/reset-password
+ * @access  Public
+ */
+export const resetPassword = async (req, res) => {
+  try {
+    const { email, resetToken, newPassword } = req.body;
+
+    if (!email || !resetToken || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, reset token, and new password are required'
+      });
+    }
+
+    if (!validatePassword(newPassword)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long'
+      });
+    }
+
+    // Find user with valid reset token
+    const user = await User.findOne({ 
+      email: email.toLowerCase().trim(),
+      resetPasswordToken: resetToken,
+      resetPasswordExpires: { $gt: new Date() }
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired reset token'
+      });
+    }
+
+    // Update password
+    user.password = newPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+
+    // Send confirmation email
+    await sendEmailViaSendGrid(
+      user.email,
+      "Your Kivelo Password Has Been Reset",
+      `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
+        <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); overflow: hidden;">
+          <div style="background-color: #4CAF50; color: white; text-align: center; padding: 20px;">
+            <h1 style="margin: 0;">Kivelo</h1>
+            <p style="margin: 0; font-size: 14px;">Empowering Families with Technology</p>
+          </div>
+          <div style="padding: 30px;">
+            <h2 style="color: #333;">Password Reset Successful</h2>
+            <p style="font-size: 15px; color: #555; line-height: 1.6;">
+              Hello ${user.name},<br><br>
+              Your Kivelo account password has been successfully reset.
+            </p>
+
+            <div style="text-align: center; margin: 30px 0;">
+              <div style="background-color: #4CAF50; color: #fff; padding: 12px 24px; border-radius: 6px; font-weight: bold; display: inline-block;">
+                ✅ Password Updated
+              </div>
+            </div>
+
+            <div style="background: #d4edda; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;">
+              <p style="margin: 0; color: #155724; font-size: 14px;">
+                <strong>Security Notice:</strong> If you did not perform this action, 
+                please contact our support team immediately at 
+                <a href="mailto:support@kivelo.com" style="color: #155724; text-decoration: underline;">support@kivelo.com</a>
+              </p>
+            </div>
+
+            <p style="font-size: 14px; color: #555; line-height: 1.6;">
+              You can now log in to your account with your new password.
+            </p>
+
+            <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;" />
+
+            <p style="font-size: 13px; color: #777; text-align: center;">
+              Need help? Contact our support team at 
+              <a href="mailto:support@kivelo.com" style="color: #4CAF50; text-decoration: none;">support@kivelo.com</a>
+            </p>
+          </div>
+          <div style="background-color: #f1f1f1; text-align: center; padding: 15px; font-size: 12px; color: #888;">
+            © ${new Date().getFullYear()} Kivelo. All rights reserved.
+          </div>
+        </div>
+      </div>
+      `
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Password has been reset successfully. You can now log in with your new password.'
+    });
+
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reset password',
+      error: error.message
+    });
+  }
+};
+
 // ========================= REFRESH ACCESS TOKEN =========================
 export const refreshAccessToken = async (req, res) => {
   try {
@@ -1088,6 +1360,9 @@ export const resetChildPassword = async (req, res) => {
 export default {
   registerParent,
   login,
+  forgotPassword,
+  verifyResetToken,
+  resetPassword,
   verifyEmail, // NEW: Added email verification with code
   verifyEmailWithToken, 
   generateVerificationLink,

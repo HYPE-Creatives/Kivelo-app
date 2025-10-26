@@ -2,9 +2,12 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import auth from "../middleware/auth.js";
-import {
+import authControllers, {
   registerParent,
   login,
+  forgotPassword,
+  verifyResetToken,
+  resetPassword,
   verifyEmail,
   verifyEmailWithToken,
   generateVerificationLink,
@@ -170,6 +173,444 @@ router.post("/register-parent", registerParent);
  *         description: Server error during login
  */
 router.post("/login", login);
+
+/**
+ * @swagger
+ * /api/auth/forgot-password:
+ *   post:
+ *     summary: Request password reset code
+ *     tags: [Authentication]
+ *     description: |
+ *       Initiates password reset process by sending a 6-digit verification code to the user's email.
+ *       
+ *       **Security Note:** For security reasons, this endpoint always returns success (200) 
+ *       even if the email doesn't exist to prevent email enumeration attacks.
+ *       
+ *       **Flow:**
+ *       1. User submits email address
+ *       2. System sends 6-digit reset code via email (valid for 1 hour)
+ *       3. User enters code on verification page
+ *       4. System verifies code validity
+ *       5. User sets new password
+ *     operationId: forgotPassword
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: The email address associated with the account
+ *                 example: "jane.doe@example.com"
+ *                 minLength: 5
+ *                 maxLength: 255
+ *           examples:
+ *             validRequest:
+ *               summary: Valid email request
+ *               value:
+ *                 email: "jane.doe@example.com"
+ *             invalidEmail:
+ *               summary: Invalid email format
+ *               value:
+ *                 email: "invalid-email"
+ *     responses:
+ *       200:
+ *         description: |
+ *           Password reset code sent successfully. 
+ *           Returns same message whether email exists or not for security.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "If an account with that email exists, a password reset code has been sent."
+ *             examples:
+ *               successResponse:
+ *                 summary: Standard success response
+ *                 value:
+ *                   success: true
+ *                   message: "If an account with that email exists, a password reset code has been sent."
+ *       400:
+ *         description: Bad request - invalid input data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *             examples:
+ *               missingEmail:
+ *                 summary: Email field missing
+ *                 value:
+ *                   success: false
+ *                   message: "Email is required"
+ *               invalidEmail:
+ *                 summary: Invalid email format
+ *                 value:
+ *                   success: false
+ *                   message: "Please provide a valid email address"
+ *               unverifiedAccount:
+ *                 summary: Account not verified
+ *                 value:
+ *                   success: false
+ *                   message: "Please verify your email before resetting password"
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                 error:
+ *                   type: string
+ *             examples:
+ *               serverError:
+ *                 summary: Server error
+ *                 value:
+ *                   success: false
+ *                   message: "Failed to process password reset request"
+ *                   error: "Email service temporarily unavailable"
+ *     security: []
+ */
+router.post('/forgot-password', forgotPassword);
+ 
+/**
+ * @swagger
+ * /api/auth/verify-reset-token:
+ *   post:
+ *     summary: Verify password reset token
+ *     tags: [Authentication]
+ *     description: |
+ *       Verifies that the 6-digit reset code received via email is valid and not expired.
+ *       
+ *       **Token Validity:** Reset codes expire after 1 hour from generation.
+ *       
+ *       **Next Steps:** After successful verification, proceed to reset password endpoint.
+ *     operationId: verifyResetToken
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - resetToken
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: The email address associated with the account
+ *                 example: "jane.doe@example.com"
+ *               resetToken:
+ *                 type: string
+ *                 description: The 6-digit reset code received via email
+ *                 example: "123456"
+ *                 minLength: 6
+ *                 maxLength: 6
+ *                 pattern: "^[0-9]{6}$"
+ *           examples:
+ *             validToken:
+ *               summary: Valid token verification
+ *               value:
+ *                 email: "jane.doe@example.com"
+ *                 resetToken: "123456"
+ *             invalidToken:
+ *               summary: Invalid or expired token
+ *               value:
+ *                 email: "jane.doe@example.com"
+ *                 resetToken: "000000"
+ *     responses:
+ *       200:
+ *         description: Reset token is valid and not expired
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Reset token is valid"
+ *             examples:
+ *               validToken:
+ *                 summary: Token verification successful
+ *                 value:
+ *                   success: true
+ *                   message: "Reset token is valid"
+ *       400:
+ *         description: Invalid, expired, or missing token/email
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *             examples:
+ *               missingFields:
+ *                 summary: Required fields missing
+ *                 value:
+ *                   success: false
+ *                   message: "Email and reset token are required"
+ *               invalidToken:
+ *                 summary: Invalid or expired token
+ *                 value:
+ *                   success: false
+ *                   message: "Invalid or expired reset token"
+ *       404:
+ *         description: User not found with the provided email
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *             examples:
+ *               userNotFound:
+ *                 summary: User not found
+ *                 value:
+ *                   success: false
+ *                   message: "User not found"
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                 error:
+ *                   type: string
+ *     security: []
+ */
+router.post('/verify-reset-token', verifyResetToken);
+
+/**
+ * @swagger
+ * /api/auth/reset-password:
+ *   post:
+ *     summary: Reset user password with verified token
+ *     tags: [Authentication]
+ *     description: |
+ *       Resets the user's password using the verified reset token.
+ *       
+ *       **Password Requirements:**
+ *       - Minimum 6 characters
+ *       
+ *       **Security Features:**
+ *       - Reset token is invalidated after successful password reset
+ *       - Confirmation email is sent to the user
+ *       - Token automatically expires after 1 hour
+ *       - Previous sessions are invalidated (user must log in again)
+ *     operationId: resetPassword
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - resetToken
+ *               - newPassword
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: The email address associated with the account
+ *                 example: "jane.doe@example.com"
+ *               resetToken:
+ *                 type: string
+ *                 description: The 6-digit reset code received via email
+ *                 example: "123456"
+ *                 minLength: 6
+ *                 maxLength: 6
+ *                 pattern: "^[0-9]{6}$"
+ *               newPassword:
+ *                 type: string
+ *                 format: password
+ *                 description: The new password (minimum 6 characters)
+ *                 example: "newSecurePassword123"
+ *                 minLength: 6
+ *           examples:
+ *             validReset:
+ *               summary: Valid password reset
+ *               value:
+ *                 email: "jane.doe@example.com"
+ *                 resetToken: "123456"
+ *                 newPassword: "newSecurePassword123"
+ *             weakPassword:
+ *               summary: Password too short
+ *               value:
+ *                 email: "jane.doe@example.com"
+ *                 resetToken: "123456"
+ *                 newPassword: "123"
+ *     responses:
+ *       200:
+ *         description: Password reset successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Password has been reset successfully. You can now log in with your new password."
+ *             examples:
+ *               successReset:
+ *                 summary: Password reset successful
+ *                 value:
+ *                   success: true
+ *                   message: "Password has been reset successfully. You can now log in with your new password."
+ *       400:
+ *         description: Bad request - invalid input data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *             examples:
+ *               missingFields:
+ *                 summary: Required fields missing
+ *                 value:
+ *                   success: false
+ *                   message: "Email, reset token, and new password are required"
+ *               invalidToken:
+ *                 summary: Invalid or expired token
+ *                 value:
+ *                   success: false
+ *                   message: "Invalid or expired reset token"
+ *               weakPassword:
+ *                 summary: Password too short
+ *                 value:
+ *                   success: false
+ *                   message: "Password must be at least 6 characters long"
+ *       404:
+ *         description: User not found with the provided email
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *             examples:
+ *               userNotFound:
+ *                 summary: User not found
+ *                 value:
+ *                   success: false
+ *                   message: "User not found"
+ *       500:
+ *         description: Internal server error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                 error:
+ *                   type: string
+ *             examples:
+ *               serverError:
+ *                 summary: Server error during password reset
+ *                 value:
+ *                   success: false
+ *                   message: "Failed to reset password"
+ *                   error: "Database connection failed"
+ *     security: []
+ */
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     ErrorResponse:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *           example: false
+ *         message:
+ *           type: string
+ *           example: "Error description"
+ *         error:
+ *           type: string
+ *           example: "Detailed error message"
+ * 
+ *   responses:
+ *     ValidationError:
+ *       description: Validation error in request parameters
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               success:
+ *                 type: boolean
+ *                 example: false
+ *               message:
+ *                 type: string
+ *                 example: "Validation failed"
+ *               errors:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ * 
+ *   securitySchemes:
+ *     bearerAuth:
+ *       type: http
+ *       scheme: bearer
+ *       bearerFormat: JWT
+ */
+router.post('/reset-password', resetPassword);
 
 // ========================= EMAIL VERIFICATION ROUTES =========================
 

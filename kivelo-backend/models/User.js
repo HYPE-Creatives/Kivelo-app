@@ -53,6 +53,10 @@ const userSchema = new mongoose.Schema({
   },
   lastLogin: Date,
   
+  // Reset password fields 
+  resetPasswordToken: String,
+  resetPasswordExpires: Date,
+
   // Parent-specific fields
   parent: {
     familyCode: {
