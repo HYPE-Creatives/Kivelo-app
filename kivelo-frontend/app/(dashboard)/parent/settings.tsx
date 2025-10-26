@@ -29,7 +29,7 @@ export default function Settings() {
   const [isResetting, setIsResetting] = useState(false);
 
   const handleGenerateCode = async () => {
-    if (!childName || !childEmail || !childDOB || !childGender) {
+    if (!childName || !childEmail || !childDOB) {
       Alert.alert("Error", "Please fill in all child information fields.");
       return;
     }

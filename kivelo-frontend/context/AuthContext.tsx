@@ -140,9 +140,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let accessToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
 
     const makeRequest = async (token: string | null) => {
-      const headers: HeadersInit = {
+      const headers: Record<string, string> = {
         "Content-Type": "application/json",
-        ...options.headers,
+        ...(typeof options.headers === "object" && options.headers ? (options.headers as Record<string, string>) : {}),
       };
 
       // Only add Authorization header if token exists
@@ -520,6 +520,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Updated generateOneTimeCode function with detailed debugging
+ // ✅ FIXED: generateOneTimeCode with proper server format
   const generateOneTimeCode = async (
     parentId: string,
     childName: string,
@@ -561,118 +562,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error('Authentication token not found. Please login again.');
       }
 
-      // Try different payload structures
-      const payloads = [
-        // Format 1: Flat structure (most common)
-        {
-          parentId,
-          name: childName.trim(),
-          email: childEmail.trim().toLowerCase(),
-          dob: childDOB,
-          gender: childGender || 'prefer-not-to-say',
-          role: 'child'
+      // Try the most likely format first - flat structure with all required fields
+      const payload = {
+        name: childName.trim(),
+        email: childEmail.trim().toLowerCase(),
+        dob: childDOB,
+        gender: childGender || 'prefer-not-to-say',
+        role: 'child'
+      };
+
+      console.log("🔄 Final payload being sent:", JSON.stringify(payload, null, 2));
+
+      const response = await fetch(`${API_BASE_URL}/auth/generate-code`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`,
         },
-        // Format 2: Nested child object
-        {
-          parentId,
-          child: {
-            name: childName.trim(),
-            email: childEmail.trim().toLowerCase(),
-            dob: childDOB,
-            gender: childGender || 'prefer-not-to-say',
-            role: 'child'
-          }
-        },
-        // Format 3: With userData wrapper
-        {
-          parentId,
-          userData: {
-            name: childName.trim(),
-            email: childEmail.trim().toLowerCase(),
-            dob: childDOB,
-            gender: childGender || 'prefer-not-to-say',
-            role: 'child'
-          }
-        },
-        // Format 4: Without parentId (server might get it from token)
-        {
-          name: childName.trim(),
-          email: childEmail.trim().toLowerCase(),
-          dob: childDOB,
-          gender: childGender || 'prefer-not-to-say',
-          role: 'child'
-        },
-        // Format 5: Alternative field names
-        {
-          parentId,
-          childName: childName.trim(),
-          childEmail: childEmail.trim().toLowerCase(),
-          childDOB: childDOB,
-          childGender: childGender || 'prefer-not-to-say',
-          role: 'child'
-        },
-        // Format 6: Mixed field names
-        {
-          parentId,
-          name: childName.trim(),
-          email: childEmail.trim().toLowerCase(),
-          childDOB: childDOB, // Try both dob and childDOB
-          dob: childDOB,
-          gender: childGender || 'prefer-not-to-say',
-          childGender: childGender || 'prefer-not-to-say',
-          role: 'child'
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+      console.log("📨 Server response:", {
+        status: response.status,
+        statusText: response.statusText,
+        data: data
+      });
+
+      if (response.ok && data.success) {
+        console.log("✅ One-time code generated successfully:", data.code);
+        return {
+          success: true,
+          code: data.code,
+          message: data.message || "Child account created and code generated successfully"
+        };
+      } else {
+        // More detailed error message
+        let errorMessage = data.message || "Failed to generate code";
+        
+        // Add specific guidance based on server response
+        if (data.message?.includes('email')) {
+          errorMessage += ". Please check the email format and ensure it's not already registered.";
+        } else if (data.message?.includes('name')) {
+          errorMessage += ". Please ensure the name is valid.";
+        } else if (data.message?.includes('DOB') || data.message?.includes('dob')) {
+          errorMessage += ". Please ensure the date of birth is valid.";
         }
-      ];
-
-      let lastError: any = null;
-      let lastResponse: any = null;
-
-      for (let i = 0; i < payloads.length; i++) {
-        try {
-          console.log(`🔄 Trying payload format ${i + 1}:`, JSON.stringify(payloads[i], null, 2));
-
-          const response = await fetch(`${API_BASE_URL}/auth/generate-code`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${accessToken}`,
-            },
-            body: JSON.stringify(payloads[i]),
-          });
-
-          const data = await response.json();
-          console.log(`📨 Server response for format ${i + 1}:`, {
-            status: response.status,
-            statusText: response.statusText,
-            data: data
-          });
-
-          lastResponse = data;
-
-          if (response.ok && data.success) {
-            console.log("✅ One-time code generated successfully:", data.code);
-            return {
-              success: true,
-              code: data.code,
-              message: data.message || "Child account created and code generated successfully"
-            };
-          } else if (response.ok) {
-            lastError = new Error(data.message || `Server returned error for format ${i + 1}`);
-            console.log(`❌ Format ${i + 1} failed:`, data.message);
-          } else {
-            lastError = new Error(data.message || `HTTP ${response.status} for format ${i + 1}`);
-            console.log(`❌ Format ${i + 1} failed with status:`, response.status);
-          }
-        } catch (formatError: any) {
-          console.log(`❌ Format ${i + 1} error:`, formatError.message);
-          lastError = formatError;
-          // Continue to next format
-        }
+        
+        throw new Error(errorMessage);
       }
-
-      // If we tried all formats and none worked
-      console.log("💥 All payload formats failed. Last response:", lastResponse);
-      throw lastError || new Error('All payload formats failed. Please check server requirements.');
 
     } catch (error: any) {
       console.error("🚨 Generate code error:", error);
