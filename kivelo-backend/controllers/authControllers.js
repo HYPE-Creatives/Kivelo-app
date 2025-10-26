@@ -1013,157 +1013,82 @@ export const refreshAccessToken = async (req, res) => {
 };
 
   // ========================= GENERATE / REGENERATE ONE-TIME CODE =========================
-  // helper to create a short human-friendly code, or use whatever generator you have
-  function createOneTimeCode(len = 6) {
-    // numeric code e.g. 123456
-    let code = '';
-    for (let i = 0; i < len; i++) code += Math.floor(Math.random() * 10);
-    return code;
-  }
+export const generateOneTimeCode = async (req, res) => {
+  try {
+    const { childEmail, childName, childDOB, childGender } = req.body;
+    const parentId = req.user._id;
 
-// ========================= GENERATE / REGENERATE ONE-TIME CODE =========================
-  export const generateOneTimeCode = async (req, res) => {
-    try {
-      // --- Logging to make debugging easy (remove / reduce in production) ---
-      console.log('📥 generateOneTimeCode req.body:', req.body);
-      console.log('📥 generateOneTimeCode req.user:', req.user && { id: req.user.id || req.user._id });
+    if (req.user.role !== 'parent')
+      return res.status(403).json({ success: false, message: 'Only parents can generate codes' });
+    if (!childEmail || !childName || !childDOB )
+      return res.status(400).json({ success: false, message: 'Child email, name, and DOB are required' });
+    if (!validateEmail(childEmail))
+      return res.status(400).json({ success: false, message: 'Please provide a valid child email address' });
 
-      // --- Read fields from body ---
-      // Accept either camelCase or lower-case keys just to be robust:
-      const childName = req.body.childName ?? req.body.name ?? '';
-      const childEmail = req.body.childEmail ?? req.body.email ?? '';
-      const childDOB = req.body.childDOB ?? req.body.dob ?? '';
-      const childGender = req.body.childGender ?? req.body.gender ?? 'prefer_not_to_say';
+    const parent = await Parent.findOne({ user: parentId });
+    if (!parent) return res.status(404).json({ success: false, message: 'Parent profile not found' });
 
-      // Parent can come from req.user (from JWT) or body.parentId (fallback)
-      const parentId = (req.user && (req.user.id || req.user._id)) || req.body.parentId;
-      
-      // --- Basic validation ---
-      if (!childName || !childEmail || !childDOB) {
-        return res.status(400).json({
-          success: false,
-          message: 'Child email, name, and DOB are required',
+    // Check if child already exists
+    const existingChildUser = await User.findOne({ email: childEmail });
+    if (existingChildUser) {
+      const existingChild = await Child.findOne({ user: existingChildUser._id });
+      if (existingChild) {
+        if (childGender && existingChild.gender !== childGender) {
+          existingChild.gender = childGender;
+        }
+        // Regenerate a new code
+        existingChild.oneTimeCode = Math.floor(100000 + Math.random() * 900000).toString();
+        existingChild.codeExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        existingChild.isCodeUsed = false;
+        await existingChild.save();
+
+        return res.status(200).json({
+          success: true,
+          code: existingChild.oneTimeCode,
+          expiresAt: existingChild.codeExpires,
+          message: `New code regenerated for ${childName}`,
         });
       }
-
-      // email format quick check
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(String(childEmail).trim().toLowerCase())) {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid child email format',
-        });
-      }
-
-      // DOB format optional check (YYYY-MM-DD)
-      const dobRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!dobRegex.test(String(childDOB))) {
-        // not fatal — you can relax if you accept other formats. For now return error to match frontend expectations.
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid DOB format. Use YYYY-MM-DD',
-        });
-      }
-
-      // --- Check if a User already exists with this email ---
-      const existingUser = await User.findOne({ email: childEmail.trim().toLowerCase() });
-
-      // If a user exists and is already a child (or not allowed), you may want to block:
-      if (existingUser && existingUser.role === 'child') {
-        // If you want to allow regeneration of code for an existing child user that's already registered,
-        // you would handle that here (e.g., create/reset oneTimeCode on their Child record).
-        return res.status(400).json({
-          success: false,
-          message: 'Email is already registered as a child. Try resetting password instead.',
-        });
-      }
-
-      // --- If parentId not available, error out ---
-      if (!parentId) {
-        return res.status(401).json({
-          success: false,
-          message: 'Parent authentication required',
-        });
-      }
-
-      // --- Create a new User record for the child if needed ---
-      let childUser = existingUser;
-      if (!childUser) {
-        childUser = new User({
-          name: childName.trim(),
-          email: childEmail.trim().toLowerCase(),
-          role: 'child',
-          // You may want to store a placeholder password or null. Ensure schema allows it.
-          password: crypto.randomBytes(16).toString('hex'), // random placeholder — they will set password
-        });
-        await childUser.save();
-      } else {
-        // existing user exists but not role child — optionally set role to child
-        childUser.role = 'child';
-        await childUser.save();
-      }
-
-      // --- Create or update Child document that links parent and child user ---
-      let childDoc = await Child.findOne({ user: childUser._id });
-      const oneTimeCode = createOneTimeCode(6);
-      const codeExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-      if (childDoc) {
-        // update relevant fields and reset code
-        childDoc.parent = parentId;
-        childDoc.oneTimeCode = oneTimeCode;
-        childDoc.codeExpires = codeExpires;
-        // update any fields if provided
-        childDoc.dob = childDOB;
-        childDoc.gender = childGender || childDoc.gender || 'prefer_not_to_say';
-        await childDoc.save();
-      } else {
-        // create
-        childDoc = await Child.create({
-          user: childUser._id,
-          parent: parentId,
-          oneTimeCode,
-          codeExpires,
-          dob: childDOB,
-          gender: childGender || 'prefer_not_to_say',
-          isCodeUsed: false,
-          hasSetPassword: false,
-        });
-      }
-
-      // optional: send email to child parent email or child's email with the code
-      try {
-        // adapt your email template / function
-        await sendEmail({
-          to: childEmail,
-          subject: 'Your one-time registration code',
-          text: `Hello ${childName},\n\nYour one-time registration code is: ${oneTimeCode}\nIt expires at ${codeExpires.toISOString()}\n\nIf you did not request this, ignore this message.`,
-        });
-      } catch (emailErr) {
-        console.warn('⚠️ Failed to send email (non-fatal):', emailErr);
-      }
-
-      // Return success with the code (so frontend can show it)
-      return res.status(200).json({
-        success: true,
-        message: 'One-time code generated',
-        code: oneTimeCode,
-        expiresAt: codeExpires.toISOString(),
-        child: {
-          id: childUser._id,
-          email: childUser.email,
-          name: childUser.name,
-        },
-      });
-    } catch (err) {
-      console.error('🔥 generateOneTimeCode error:', err);
-      return res.status(500).json({
-        success: false,
-        message: 'Server error generating code',
-        error: err.message,
-      });
     }
-  };
+
+    // Create new child user
+    const oneTimeCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const codeExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const childUser = await User.create({
+      email: childEmail.toLowerCase().trim(),
+      name: childName.trim(),
+      password: oneTimeCode,
+      role: 'child',
+      isActive: true,
+      isVerified: true, // Child accounts don't need email verification
+    });
+
+    const child = await Child.create({
+      user: childUser._id,
+      parent: parentId,
+      oneTimeCode,
+      codeExpires,
+      dob: childDOB,
+      gender: childGender || 'prefer_not_to_say',
+      isCodeUsed: false,
+      hasSetPassword: false,
+    });
+
+    parent.children.push(child._id);
+    await parent.save();
+
+    res.status(201).json({
+      success: true,
+      code: oneTimeCode,
+      expiresAt: codeExpires,
+      childId: childUser._id,
+      message: `One-time code generated for ${childName}`,
+    });
+  } catch (error) {
+    console.error('Code generation error:', error);
+    res.status(500).json({ success: false, message: 'Server error while generating code' });
+  }
+};
 
 // ========================= CHILD LOGIN WITH CODE =========================
 export const childLoginWithCode = async (req, res) => {
