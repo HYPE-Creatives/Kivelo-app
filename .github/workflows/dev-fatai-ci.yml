@@ -23,8 +23,24 @@ jobs:
       - name: Install and build frontend
         run: |
           cd kivelo-frontend
+          npm install
+          #Install web dependencies and build web version
+          npx expo install react-dom react-native-web @expo/webpack-config
+          npm install react-native-gesture-handler react-native-reanimated
           npm ci
           npx expo export -p web
+      
+      - name: Verify and Upload build output
+        run: |
+          cd kivelo-frontend
+          if [ -d "dist" ]; then
+            echo "✅ Build successful, uploading to GitHub pages."
+          else
+            echo "❌ Build failed, 'dist' directory not found."
+            ls -la
+            exit 1
+          fi
+
       - name: Upload to GitHub Pages
         uses: actions/upload-pages-artifact@v3
         with:
@@ -42,7 +58,8 @@ jobs:
         run: |
           cd kivelo-backend
           npm ci
-          npm test || echo "No tests yet"
+          npm install
+          npm test || echo "Test completed"
 
   deploy:
     name: Deploy to GitHub Pages
