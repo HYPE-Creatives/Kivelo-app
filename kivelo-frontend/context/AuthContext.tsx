@@ -521,7 +521,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Updated generateOneTimeCode function with detailed debugging
  // ✅ FIXED: generateOneTimeCode with proper server format
-  const generateOneTimeCode = async (
+ const generateOneTimeCode = async (
     parentId: string,
     childName: string,
     childEmail: string,
@@ -544,10 +544,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!childEmail?.trim()) {
         throw new Error('Child email is required');
       }
-      if (!childDOB) {
+      if (!childDOB?.trim()) {
         throw new Error('Child date of birth is required');
       }
-
+      
       // Validate email format
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(childEmail.trim())) {
@@ -564,11 +564,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Try the most likely format first - flat structure with all required fields
       const payload = {
-        name: childName.trim(),
-        email: childEmail.trim().toLowerCase(),
-        dob: childDOB,
-        gender: childGender || 'prefer-not-to-say',
-        role: 'child'
+        childName: childName.trim(),
+        childEmail: childEmail.trim().toLowerCase(),
+        childDOB: childDOB,
+        childGender: (childGender || 'prefer_not_to_say').trim(),
       };
 
       console.log("🔄 Final payload being sent:", JSON.stringify(payload, null, 2));

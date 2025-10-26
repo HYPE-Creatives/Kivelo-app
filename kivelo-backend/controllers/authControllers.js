@@ -1015,12 +1015,12 @@ export const refreshAccessToken = async (req, res) => {
   // ========================= GENERATE / REGENERATE ONE-TIME CODE =========================
 export const generateOneTimeCode = async (req, res) => {
   try {
-    const { childEmail, childName, dob } = req.body;
+    const { childEmail, childName, childDOB, childGender } = req.body;
     const parentId = req.user._id;
 
     if (req.user.role !== 'parent')
       return res.status(403).json({ success: false, message: 'Only parents can generate codes' });
-    if (!childEmail || !childName || !dob)
+    if (!childEmail || !childName || !childDOB )
       return res.status(400).json({ success: false, message: 'Child email, name, and DOB are required' });
     if (!validateEmail(childEmail))
       return res.status(400).json({ success: false, message: 'Please provide a valid child email address' });
@@ -1033,6 +1033,9 @@ export const generateOneTimeCode = async (req, res) => {
     if (existingChildUser) {
       const existingChild = await Child.findOne({ user: existingChildUser._id });
       if (existingChild) {
+        if (childGender && existingChild.gender !== childGender) {
+          existingChild.gender = childGender;
+        }
         // Regenerate a new code
         existingChild.oneTimeCode = Math.floor(100000 + Math.random() * 900000).toString();
         existingChild.codeExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -1065,7 +1068,8 @@ export const generateOneTimeCode = async (req, res) => {
       parent: parentId,
       oneTimeCode,
       codeExpires,
-      dob,
+      dob: childDOB,
+      gender: childGender || 'prefer_not_to_say',
       isCodeUsed: false,
       hasSetPassword: false,
     });

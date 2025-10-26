@@ -30,6 +30,11 @@ export default function Settings() {
 
   const handleGenerateCode = async () => {
     if (!childName || !childEmail || !childDOB) {
+        console.log("❌ MISSING FIELDS:", {
+        hasName: !!childName,
+        hasEmail: !!childEmail, 
+        hasDOB: !!childDOB
+      });
       Alert.alert("Error", "Please fill in all child information fields.");
       return;
     }
