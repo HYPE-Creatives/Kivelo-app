@@ -17,7 +17,7 @@ export default function ParentLayout() {
   const { role, user } = useAuth();
 
   if (role !== "parent") {
-    return <Redirect href="/(auth)/login" />;
+    return <Redirect href="/(auth)/parent-login" />;
   }
 
   return (

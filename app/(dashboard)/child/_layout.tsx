@@ -1,25 +1,52 @@
 // app/(dashboard)/child/_layout.tsx
 import { Ionicons } from "@expo/vector-icons";
-import { Redirect, Tabs } from "expo-router";
-import { Dimensions, Image, StyleSheet, Text, View } from "react-native";
-import { useAuth } from "../../../context/AuthContext";
+import { Tabs, router } from "expo-router";
+import { Dimensions, Image, StyleSheet, Text, View, TouchableOpacity, Alert } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
 const { width, height } = Dimensions.get("window");
 
 // ✅ scaling helpers
-const baseWidth = 375;   // iPhone X width
-const baseHeight = 812;  // iPhone X height
+const baseWidth = 375; // iPhone X width
+const baseHeight = 812; // iPhone X height
 const scaleW = (size: number) => (width / baseWidth) * size;
 const scaleH = (size: number) => (height / baseHeight) * size;
 
 export default function ChildLayout() {
-  const { role, user } = useAuth();
+  // 🧩 Dummy user (no AuthContext)
+  const user = {
+    profilePic: "https://via.placeholder.com/40",
+  };
 
-  if (role !== "child") {
-    return <Redirect href="/(auth)/login" />;
-  }
+  // 🚪 Logout Function with Confirmation
+  const handleLogout = () => {
+    Alert.alert(
+      "Log Out",
+      "Are you sure you want to log out?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Log Out",
+          style: "destructive",
+          onPress: () => {
+            // Here you would typically:
+            // 1. Clear authentication tokens
+            // 2. Clear async storage
+            // 3. Reset navigation state
+            console.log("User logged out");
+            
+            // Navigate to auth screen
+            router.replace("/(auth)/child-login");
+          },
+        },
+      ]
+    );
+  };
 
+  // 🎨 Reusable Tab Button Renderer
   const renderTabButton = (
     iconName: keyof typeof Ionicons.glyphMap,
     label: string,
@@ -33,10 +60,7 @@ export default function ChildLayout() {
           end={{ x: 1, y: 1 }}
           style={styles.tabButtonActive}
         >
-          <Ionicons
-            name={iconName}
-            style={[styles.icon, { color: "white" }]}
-          />
+          <Ionicons name={iconName} style={[styles.icon, { color: "white" }]} />
           <Text style={[styles.label, { color: "white" }]}>{label}</Text>
         </LinearGradient>
       );
@@ -44,41 +68,48 @@ export default function ChildLayout() {
 
     return (
       <View style={styles.tabButton}>
-        <Ionicons
-          name={iconName}
-          style={[styles.icon, { color: "#9ca3af" }]}
-        />
+        <Ionicons name={iconName} style={[styles.icon, { color: "#9ca3af" }]} />
         <Text style={[styles.label, { color: "#9ca3af" }]}>{label}</Text>
       </View>
     );
   };
+
+  // 🎯 Logout Button Component for Header
+  const LogoutButton = () => (
+    <TouchableOpacity 
+      onPress={handleLogout}
+      style={styles.logoutButton}
+    >
+      <Ionicons name="log-out-outline" size={scaleW(20)} color="#ef4444" />
+    </TouchableOpacity>
+  );
 
   return (
     <Tabs
       screenOptions={{
         headerShown: true,
         tabBarShowLabel: false,
-        tabBarStyle: [styles.tabBar, { backgroundColor: "white" }], // ✅ keep tab bar white
-
+        tabBarStyle: [styles.tabBar, { backgroundColor: "white" }],
         headerStyle: styles.header,
         headerTransparent: true,
         headerTintColor: "black",
         headerTitleStyle: styles.headerTitle,
-
         headerLeft: () => (
           <View style={{ marginLeft: scaleW(15) }}>
             <Image
               source={{
-                uri: user?.profilePic || "https://via.placeholder.com/40",
+                uri: user.profilePic,
               }}
               style={styles.profilePic}
             />
           </View>
         ),
+        // 🚪 Add logout button to all tabs
+        headerRight: () => <LogoutButton />,
       }}
     >
       <Tabs.Screen
-        name="home"
+        name="index"
         options={{
           title: "Home",
           tabBarIcon: ({ focused }) => renderTabButton("home", "Home", focused),
@@ -128,7 +159,7 @@ export default function ChildLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     position: "absolute",
-    bottom: scaleH(55), // ✅ responsive bottom spacing
+    bottom: scaleH(55),
     marginHorizontal: scaleW(40),
     borderRadius: scaleW(50),
     height: scaleH(55),
@@ -137,12 +168,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: scaleW(5),
     borderTopWidth: 0,
     backgroundColor: "white",
-
-    // ✅ thin border
     borderWidth: 0.5,
     borderColor: "#e5e7eb",
-
-    // ✅ subtle shadow
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -185,5 +212,11 @@ const styles = StyleSheet.create({
   label: {
     fontFamily: "Poppins-SemiBold",
     fontSize: scaleW(7),
+  },
+  logoutButton: {
+    marginRight: scaleW(15),
+    padding: scaleW(5),
+    borderRadius: scaleW(8),
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
   },
 });

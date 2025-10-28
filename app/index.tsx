@@ -203,251 +203,226 @@
 //     elevation: 3,
 //   },
 // });
-
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
-  Image,
   StyleSheet,
-  Dimensions,
   TouchableOpacity,
+  Image,
   Animated,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
+  SafeAreaView,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import {
+  widthPercentageToDP as wp,
+  heightPercentageToDP as hp,
+} from "react-native-responsive-screen";
 
-const { width, height } = Dimensions.get("window");
-
-const slides = [
-  {
-    id: "1",
-    title: "Your Child’s Emotional Well-Being",
-    subtitle:
-      "Track, Understand & Support your child, emotionally and otherwise.",
-    bgColor: "#A9D5FF",
-    image: require("../assets/images/onboarding1.png"),
-    imageStyle: {
-      width: width * 0.95,
-      height: height * 0.95,
-      marginTop: height * 0.3,
-    },
-  },
-  {
-    id: "2",
-    title: "Empower Your Child’s Emotional Intelligence",
-    subtitle: "Discover your child’s mood and feeling with SAFTNEST",
-    bgColor: "#F9CFE6",
-    image: require("../assets/images/onboarding2.png"),
-    imageStyle: {
-      width: width * 1.1,
-      height: height * 1.1,
-      marginTop: height * 0.1,
-    },
-  },
-  {
-    id: "3",
-    title: "Parent Them With Confidence",
-    subtitle:
-      "Get started with SAFTNEST today and help your child to feel good.",
-    bgColor: "#C5E3FF",
-    image: require("../assets/images/onboarding3.png"),
-    imageStyle: {
-      width: width * 0.85,
-      height: height * 0.85,
-      marginTop: height * 0.3,
-      left: width * 0.165,
-    },
-  },
-];
-
-export default function OnboardingScreen() {
+const ChooseRole = () => {
   const router = useRouter();
-  const scrollX = useRef(new Animated.Value(0)).current;
-  const flatListRef = useRef<Animated.FlatList<any>>(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [selectedRole, setSelectedRole] = useState<string | null>(null);
 
-  const backgroundColor = scrollX.interpolate({
-    inputRange: slides.map((_, i) => i * width),
-    outputRange: slides.map((s) => s.bgColor),
-    extrapolate: "clamp",
-  });
-
-  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const index = Math.round(event.nativeEvent.contentOffset.x / width);
-    setCurrentIndex(index);
+  const handleContinue = () => {
+    if (selectedRole === "child") {
+      router.push("/(auth)/child-index");
+    } else if (selectedRole === "parent") {
+      router.push("/(auth)/parent-index");
+    }
   };
 
   return (
-    <Animated.View style={[styles.container, { backgroundColor }]}>
-      {/* --- Image Section --- */}
-      <Animated.FlatList
-        ref={flatListRef}
-        data={slides}
-        keyExtractor={(item) => item.id}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-          { useNativeDriver: false }
-        )}
-        onMomentumScrollEnd={handleScroll}
-        renderItem={({ item }) => (
-          <View style={[styles.slide, { width }]}>
-            <Image
-              source={item.image}
-              style={[styles.image, item.imageStyle]}
-              resizeMode="contain"
-            />
-          </View>
-        )}
-      />
+    <SafeAreaView style={styles.container}>
+      <Text style={styles.title}>Who are you?</Text>
 
-      {/* --- Text Section --- */}
-      <View style={styles.textWrapper}>
-        <Animated.Text style={styles.title}>
-          {slides[currentIndex].title}
-        </Animated.Text>
-        <Animated.Text style={styles.subtitle}>
-          {slides[currentIndex].subtitle}
-        </Animated.Text>
-      </View>
-
-      {/* --- Pagination --- */}
-      <View style={styles.pagination}>
-        {slides.map((_, i) => {
-          const inputRange = [(i - 1) * width, i * width, (i + 1) * width];
-          const dotWidth = scrollX.interpolate({
-            inputRange,
-            outputRange: [6, 16, 6],
-            extrapolate: "clamp",
-          });
-          const opacity = scrollX.interpolate({
-            inputRange,
-            outputRange: [0.3, 1, 0.3],
-            extrapolate: "clamp",
-          });
-          return (
-            <Animated.View
-              key={i.toString()}
-              style={[
-                styles.dot,
-                { width: dotWidth, opacity, backgroundColor: "#fff" },
-              ]}
-            />
-          );
-        })}
-      </View>
-
-      {/* --- Bottom Buttons --- */}
-      {currentIndex === slides.length - 1 ? (
+      {/* CHILD ROLE */}
+      <View style={[styles.roleSection, { marginTop: hp(13), marginBottom: hp(6) }]}>
         <TouchableOpacity
-          activeOpacity={0.8}
-          style={styles.checkButtonWrapper}
-          onPress={() => router.push("/(auth)/login")}
+          style={styles.cardWrapper}
+          onPress={() => setSelectedRole("child")}
+          activeOpacity={1}
         >
           <LinearGradient
-            colors={["rgba(0,51,102,1)", "rgba(15,82,186,1)"]}
+            colors={
+              selectedRole === "child"
+                ? ["rgba(20, 99, 20, 1)", "rgba(50,205,50,1)"]
+                : ["rgba(20, 99, 20, 0.7)", "rgba(50,205,50,0.5)"]
+            }
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.checkButton}
+            style={styles.card}
           >
-            <Ionicons name="checkmark" size={width * 0.07} color="#fff" />
+            <View style={styles.cardContentLeft}>
+              <Animated.View
+                style={[
+                  styles.imageWrapper,
+                  styles.imageLeft,
+                  selectedRole === "child" && {
+                    transform: [{ scale: 1.05 }],
+                    top: -141.3,
+                  },
+                ]}
+              >
+                <Image
+                  source={require("../assets/images/boy.png")}
+                  style={[styles.image, { width: wp(38), height: hp(28) }]}
+                />
+              </Animated.View>
+
+              <View style={styles.textContainerChild}>
+                <Text style={[styles.cardText, styles.textShadow]}>I’m a Child</Text>
+              </View>
+            </View>
           </LinearGradient>
         </TouchableOpacity>
-      ) : (
+      </View>
+
+      {/* PARENT ROLE */}
+      <View style={[styles.roleSection, { marginTop: hp(6), marginBottom: hp(11) }]}>
         <TouchableOpacity
-          style={styles.skipButton}
-          onPress={() => router.push("/(auth)/login")}
+          style={styles.cardWrapper}
+          onPress={() => setSelectedRole("parent")}
+          activeOpacity={1}
         >
-          <Text style={styles.skipText}>Skip</Text>
+          <LinearGradient
+            colors={
+              selectedRole === "parent"
+                ? ["rgba(15,82,186,1)", "rgba(0,51,102,1)"]
+                : ["rgba(15,82,186,0.5)", "rgba(0,51,102,0.7)"]
+            }
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.card}
+          >
+            <View style={styles.cardContentRight}>
+              <View style={styles.textContainerParent}>
+                <Text style={[styles.cardText, styles.textShadow]}>I’m a Parent</Text>
+              </View>
+
+              <Animated.View
+                style={[
+                  styles.imageWrapper,
+                  styles.imageRight,
+                  selectedRole === "parent" && {
+                    transform: [{ scale: 1.05 }],
+                    top: -141.3,
+                  },
+                ]}
+              >
+                <Image
+                  source={require("../assets/images/mom.png")}
+                  style={[styles.image, { width: wp(38), height: hp(28) }]}
+                />
+              </Animated.View>
+            </View>
+          </LinearGradient>
         </TouchableOpacity>
-      )}
-    </Animated.View>
+      </View>
+
+      {/* CONTINUE BUTTON */}
+      <TouchableOpacity
+        style={[styles.continueButton, !selectedRole && styles.disabledButton]}
+        disabled={!selectedRole}
+        onPress={handleContinue}
+      >
+        <Text style={styles.continueText}>
+          {selectedRole ? "Continue" : "Select a Role"}
+        </Text>
+      </TouchableOpacity>
+    </SafeAreaView>
   );
-}
+};
+
+export default ChooseRole;
+
+// (styles remain unchanged)
+
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  slide: {
+  container: {
+    flex: 1,
+    backgroundColor: "#FAF9F8",
     alignItems: "center",
-    justifyContent: "center",
-  },
-  image: {
-    alignSelf: "center",
-    position: "absolute",
-    top: 0,
-  },
-
-  // Text section
-  textWrapper: {
-    position: "absolute",
-    top: height * 0.1,
-    paddingHorizontal: width * 0.06,
-    width: "100%",
+    paddingHorizontal: wp(6),
+    paddingTop: hp(5), // ensures safe top margin on Android
   },
   title: {
-    fontSize: width * 0.058,
+    fontSize: wp(7),
     fontFamily: "Poppins-SemiBold",
-    color: "#000",
-    lineHeight: width * 0.068, // reduced line spacing
-    textAlign: "left",
+    color: "#555",
+    textAlign: "center",
+    marginTop: 60,
   },
-  subtitle: {
-    fontSize: width * 0.035,
-    fontFamily: "Poppins-Regular",
-    color: "#333",
-    lineHeight: width * 0.043,
-    marginTop: height * 0.01,
-    opacity: 0.8,
-    width: "90%",
+  roleSection: {
+    width: "100%",
   },
-
-  // Pagination
-  pagination: {
-    position: "absolute",
-    top: height * 0.06,
-    left: width * 0.06,
+  cardWrapper: {
+    width: "100%",
+    overflow: "visible",
+  },
+  card: {
+    borderRadius: 20,
+    paddingVertical: hp(6),
+    paddingHorizontal: wp(6),
+    width: "100%",
+    justifyContent: "center",
+  },
+  cardContentLeft: {
     flexDirection: "row",
     alignItems: "center",
   },
-  dot: {
-    height: width * 0.015,
-    borderRadius: width * 0.007,
-    marginHorizontal: width * 0.008,
-    backgroundColor: "#fff",
-  },
-
-  // Buttons
-  skipButton: {
-    position: "absolute",
-    right: width * 0.05,
-    bottom: height * 0.05,
-  },
-  skipText: {
-    color: "#000",
-    fontWeight: "600",
-    fontSize: width * 0.04,
-  },
-  checkButtonWrapper: {
-    position: "absolute",
-    bottom: height * 0.05,
-    right: width * 0.05,
-  },
-  checkButton: {
-    width: width * 0.15,
-    height: width * 0.15,
-    borderRadius: width * 0.075,
+  cardContentRight: {
+    flexDirection: "row-reverse",
     alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 6,
-    elevation: 4,
+  },
+  textContainerChild: {
+    flex: 1,
+    alignItems: "flex-end",
+    marginRight: wp(4),
+  },
+  textContainerParent: {
+    flex: 1,
+    alignItems: "flex-start",
+    marginLeft: wp(4),
+  },
+  cardText: {
+    color: "#fff",
+    fontSize: wp(4),
+    fontFamily: "Poppins-Regular",
+  },
+  textShadow: {
+    textShadowColor: "rgba(0,0,0,0.3)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  imageWrapper: {
+    position: "absolute",
+    top: -137,
+    zIndex: 1,
+  },
+  imageLeft: {
+    left: wp(-2),
+  },
+  imageRight: {
+    right: wp(-2),
+  },
+  image: {
+    resizeMode: "contain",
+  },
+  continueButton: {
+    backgroundColor: "#000",
+    width: "100%",
+    borderRadius: 35,
+    paddingVertical: hp(2.3),
+    alignItems: "center",
+  },
+  continueText: {
+    color: "#fff",
+    fontSize: wp(3.3),
+    fontFamily: "Poppins-SemiBold",
+  },
+  disabledButton: {
+    backgroundColor: "#999",
   },
 });
