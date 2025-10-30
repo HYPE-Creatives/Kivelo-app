@@ -234,88 +234,64 @@ export const generateVerificationLink = async (req, res) => {
   }
 };
 
-// ========================= PARENT REGISTRATION =========================
 // ========================= PARENT REGISTRATION (WITH TERMS ENFORCEMENT) =========================
 export const registerParent = async (req, res) => {
   try {
     const { name, email, password, phone, dob, termsAccepted } = req.body;
 
-    console.log("Incoming registration payload:", { name, email, phone, dob, termsAccepted });
+    console.log("Incoming payload:", { name, email, phone, dob, termsAccepted });
 
-    // ─── 1. ALL FIELDS REQUIRED (including termsAccepted) ─────────────────────
+    // 1. REQUIRED FIELDS
     if (!name?.trim() || !email?.trim() || !password || !phone?.trim() || !dob?.trim()) {
       return res.status(400).json({
         success: false,
-        message: "All fields are required: name, email, password, phone, dob",
+        message: "All fields are required.",
       });
     }
 
-    // ─── 2. TERMS & CONDITIONS MUST BE ACCEPTED ───────────────────────────────
+    // 2. TERMS ACCEPTED
     if (termsAccepted !== true) {
       return res.status(400).json({
         success: false,
-        message: "You must agree to the Terms & Conditions and Privacy Policy to continue.",
+        message: "You must agree to the Terms & Conditions.",
       });
     }
-    // ... after creating user
-    user.termsAcceptedAt = new Date();
-    await user.save();
 
-    // ─── 3. EMAIL FORMAT (matches frontend) ───────────────────────────────────
+    // 3. VALIDATIONS
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        success: false,
-        message: "Please provide a valid email address",
-      });
+      return res.status(400).json({ success: false, message: "Invalid email" });
     }
 
-    // ─── 4. PASSWORD STRENGTH (same as frontend) ───────────────────────────────
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$/;
     if (!passwordRegex.test(password)) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Password must be at least 8 characters, include an uppercase letter and a number.",
-      });
+      return res.status(400).json({ success: false, message: "Password too weak" });
     }
 
-    // ─── 5. PHONE FORMAT (+234XXXXXXXXXX) ─────────────────────────────────────
     const phoneRegex = /^\+234[1-9]\d{9}$/;
     if (!phoneRegex.test(phone)) {
-      return res.status(400).json({
-        success: false,
-        message: "Phone must be in the format +234XXXXXXXXXX",
-      });
+      return res.status(400).json({ success: false, message: "Phone must be +234XXXXXXXXXX" });
     }
 
-    // ─── 6. DOB FORMAT (YYYY-MM-DD) ───────────────────────────────────────────
     const dobRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!dobRegex.test(dob)) {
-      return res.status(400).json({
-        success: false,
-        message: "Date of birth must be in YYYY-MM-DD format",
-      });
+      return res.status(400).json({ success: false, message: "DOB must be YYYY-MM-DD" });
     }
 
-    // ─── 7. CHECK DUPLICATE EMAIL OR PHONE ────────────────────────────────────
-    const existingUser = await User.findOne({
+    // 4. DUPLICATE CHECK
+    const existing = await User.findOne({
       $or: [{ email: email.toLowerCase().trim() }, { phone: phone.trim() }],
     });
-
-    if (existingUser) {
-      const conflict = existingUser.email === email.toLowerCase().trim() ? "email" : "phone number";
-      return res.status(409).json({
-        success: false,
-        message: `This ${conflict} is already registered.`,
-      });
+    if (existing) {
+      const field = existing.email === email.toLowerCase().trim() ? "email" : "phone";
+      return res.status(409).json({ success: false, message: `This ${field} is taken.` });
     }
 
-    // ─── 8. GENERATE VERIFICATION CODE ───────────────────────────────────────
+    // 5. VERIFICATION CODE
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const verificationCodeExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+    const verificationCodeExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    // ─── 9. CREATE USER ───────────────────────────────────────────────────────
+    // 6. CREATE USER (termsAcceptedAt HERE!)
     const user = await User.create({
       email: email.toLowerCase().trim(),
       password,
@@ -326,10 +302,11 @@ export const registerParent = async (req, res) => {
       isVerified: false,
       verificationCode,
       verificationCodeExpires,
+      termsAcceptedAt: new Date(), // ← MOVED HERE
     });
 
-    // ─── 10. CREATE PARENT PROFILE ───────────────────────────────────────────
-    const familyCode = crypto.randomBytes(6).toString("hex").toUpperCase();
+    // 7. CREATE PARENT PROFILE
+    const familyCode = crypto.randomBytes(6).toString("hex").toUpperCase(); // ← NOW WORKS
     await Parent.create({
       user: user._id,
       familyCode,
@@ -342,105 +319,49 @@ export const registerParent = async (req, res) => {
       },
     });
 
-    // ─── 11. SEND VERIFICATION EMAIL (with code + link) ───────────────────────
-    const baseUrl = process.env.NODE_ENV === "production"
-      ? "https://family-wellness.onrender.com"
-      : "http://localhost:5000";
-    const verificationPageLink = `${baseUrl}/api/auth/verify-code-page`;
+    // 8. SEND EMAIL (safe)
+    try {
+      const baseUrl = process.env.NODE_ENV === "production"
+        ? "https://family-wellness.onrender.com"
+        : "http://localhost:5000";
+      const link = `${baseUrl}/verify?code=${verificationCode}&email=${user.email}`;
 
-    await sendEmailViaSendGrid(
-      user.email,
-      "Verify Your Kivelo Account - Security Code",
-      `
-      <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
-        <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); overflow: hidden;">
-          <div style="background-color: #4CAF50; color: white; text-align: center; padding: 20px;">
-            <h1 style="margin: 0;">Kivelo</h1>
-            <p style="margin: 0; font-size: 14px;">Empowering Families with Technology</p>
-          </div>
-          <div style="padding: 30px;">
-            <h2 style="color: #333;">Hello ${user.name},</h2>
-            <p style="font-size: 15px; color: #555; line-height: 1.6;">
-              Thank you for joining <strong>Kivelo</strong>! Please use this one-time code to verify your email:
-            </p>
+      await sendEmailViaSendGrid(
+        user.email,
+        "Your Kivelo Verification Code",
+        `Your code is: <strong>${verificationCode}</strong><br><a href="${link}">Verify Now</a>`
+      );
+    } catch (emailErr) {
+      console.warn("Email failed (non-blocking):", emailErr.message);
+    }
 
-            <div style="text-align: center; margin: 30px 0;">
-              <div style="background-color: #4CAF50; color: #fff; padding: 12px 24px; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 24px; letter-spacing: 2px;">
-                ${verificationCode}
-              </div>
-            </div>
-
-            <p style="font-size: 14px; color: #555; line-height: 1.6;">
-              Tap the button below to open the verification page and enter the code:
-            </p>
-
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${verificationPageLink}" 
-                 style="background-color: #4CAF50; color: #fff; text-decoration: none; 
-                        padding: 12px 24px; border-radius: 6px; font-weight: bold; 
-                        display: inline-block; font-size: 16px;">
-                Verify My Email
-              </a>
-            </div>
-
-            <p style="font-size: 14px; color: #555; line-height: 1.6;">
-              The code expires in <strong>24 hours</strong>. If you didn’t sign up, ignore this email.
-            </p>
-
-            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4CAF50;">
-              <p style="margin: 0; color: #666; font-size: 14px;">
-                <strong>Quick Steps:</strong><br>
-                1. Tap the button above<br>
-                2. Enter code: <strong>${verificationCode}</strong><br>
-                3. Tap “Verify Email”
-              </p>
-            </div>
-
-            <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;" />
-
-            <p style="font-size: 13px; color: #777; text-align: center;">
-              Need help? Contact support at 
-              <a href="mailto:support@kivelo.com" style="color: #4CAF50; text-decoration: none;">support@kivelo.com</a>
-            </p>
-          </div>
-          <div style="background-color: #f1f1f1; text-align: center; padding: 15px; font-size: 12px; color: #888;">
-            © ${new Date().getFullYear()} Kivelo. All rights reserved.
-          </div>
-        </div>
-      </div>
-      `
-    );
-
-    console.log("Registration successful for:", user.email);
-
-    // ─── 12. SUCCESS RESPONSE ────────────────────────────────────────────────
-    res.status(201).json({
+    // 9. SUCCESS
+    return res.status(201).json({
       success: true,
-      message: "Registration successful! Please check your email for the verification code.",
-      user: createUserResponse(user),
+      message: "Check your email for the verification code.",
+      user: createUserResponse ? createUserResponse(user) : { id: user._id, email: user.email },
       parent: { familyCode },
     });
 
   } catch (error) {
-    console.error("Registration error:", error);
+    console.error("REGISTER CRASH:", {
+      message: error.message,
+      name: error.name,
+      code: error.code,
+      stack: error.stack?.split("\n").slice(0, 3),
+    });
 
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern)[0];
-      return res.status(409).json({
-        success: false,
-        message: `This ${field === "email" ? "email" : "phone number"} is already registered.`,
-      });
+      return res.status(409).json({ success: false, message: `This ${field} is taken.` });
     }
 
     if (error.name === "ValidationError") {
-      const errors = Object.values(error.errors).map((e) => e.message);
-      return res.status(400).json({ success: false, message: "Validation failed", errors });
+      const msgs = Object.values(error.errors).map(e => e.message);
+      return res.status(400).json({ success: false, message: "Invalid data", errors: msgs });
     }
 
-    res.status(500).json({
-      success: false,
-      message: "Server error during registration. Please try again.",
-    });
+    return res.status(500).json({ success: false, message: "Server error. Check logs." });
   }
 };
 
