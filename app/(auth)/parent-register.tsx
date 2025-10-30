@@ -1,25 +1,24 @@
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-  KeyboardAvoidingView,
   TouchableWithoutFeedback,
-  Keyboard,
-  Platform,
+  View,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Checkbox } from "react-native-paper";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import {
-  widthPercentageToDP as wp,
   heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
 
 const SignupScreen = () => {
@@ -36,29 +35,22 @@ const SignupScreen = () => {
   const [dob, setDob] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const REGISTER_URL =
-    "https://family-wellness.onrender.com/api/auth/register-parent";
-
-  // ✅ Fixed URL (removed double /api/)
-  const VERIFICATION_URL =
-    "https://family-wellness.onrender.com/api/auth/verify-email";
-
   // ✅ Email validation
-  const validateEmail = (text: string) => {
+  const validateEmail = (text) => {
     setEmail(text);
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     setIsEmailValid(emailRegex.test(text));
   };
 
   // ✅ Password validation
-  const validatePassword = (text: string) => {
+  const validatePassword = (text) => {
     setPassword(text);
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$/;
     setIsPasswordValid(passwordRegex.test(text));
   };
 
   // ✅ Phone input masking (+234 auto-prefix)
-  const handlePhoneChange = (text: string) => {
+  const handlePhoneChange = (text) => {
     let cleaned = text.replace(/[^0-9+]/g, "");
     if (!cleaned.startsWith("+234")) {
       cleaned = "+234" + cleaned.replace(/^(\+|0|234)*/, "");
@@ -68,7 +60,7 @@ const SignupScreen = () => {
   };
 
   // ✅ DOB input masking (YYYY-MM-DD)
-  const handleDobChange = (text: string) => {
+  const handleDobChange = (text) => {
     let cleaned = text.replace(/[^0-9]/g, "");
     if (cleaned.length > 8) cleaned = cleaned.slice(0, 8);
     let formatted = cleaned;
@@ -79,7 +71,7 @@ const SignupScreen = () => {
     setDob(formatted);
   };
 
-  // ✅ Signup handler
+  // ✅ Dummy Signup Handler
   const handleSignup = async () => {
     if (!name || !email || !password || !phone || !dob) {
       Alert.alert("Incomplete Form", "Please fill all fields before submitting.");
@@ -98,94 +90,20 @@ const SignupScreen = () => {
 
     setLoading(true);
 
-    try {
-      console.log("📤 Sending signup request to:", REGISTER_URL);
-      console.log("📦 Payload:", { name, email, password, phone, dob });
-
-      const response = await fetch(REGISTER_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, phone, dob }),
-      });
-
-      const data = await response.json();
-      console.log("📩 Register Response:", data);
-      console.log("📊 Response Status:", response.status);
+    // Simulate network delay
+    setTimeout(() => {
       setLoading(false);
-
-      if (!response.ok) {
-        let message =
-          data?.message ||
-          (data?.error && JSON.stringify(data.error)) ||
-          "Signup failed. Please check your details and try again.";
-
-        if (response.status === 409) {
-          message = "This email or phone number is already registered.";
-        }
-
-        Alert.alert("Signup Failed", message);
-        return;
-      }
-
-      // ✅ Send verification email
-      console.log("📤 Generating verification link...");
-      setLoading(true);
-      const verifyResponse = await fetch(VERIFICATION_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-
-      const verifyData = await verifyResponse.json();
-      console.log("📩 Verification Response:", verifyData);
-      console.log("📊 Verification Status:", verifyResponse.status);
-      setLoading(false);
-
-      // ✅ Handle possible issues but still proceed
-      if (!verifyResponse.ok) {
-        Alert.alert(
-          "Verification Issue",
-          "Your account was created, but we couldn’t send the verification email. You can verify later.",
-          [
-            {
-              text: "Proceed",
-              onPress: async () => {
-                await AsyncStorage.setItem("pending_email", email);
-                router.push("/(auth)/parent-verify-email");
-              },
-            },
-          ]
-        );
-        return;
-      }
-
-      // ✅ Success
       Alert.alert(
         "Signup Successful 🎉",
-        "Account created successfully. A verification link has been sent to your email.",
+        "Your account has been created successfully!",
         [
           {
             text: "Proceed",
-            onPress: async () => {
-              try {
-                await AsyncStorage.setItem("pending_email", email);
-                router.push("/(auth)/parent-verify-email");
-              } catch (e) {
-                console.error("❌ Error saving email:", e);
-                router.push("/(auth)/parent-verify-email");
-              }
-            },
+            onPress: () => router.push("/(auth)/parent-verify-email"),
           },
         ]
       );
-    } catch (error: any) {
-      setLoading(false);
-      console.error("❌ Signup Error:", error);
-      Alert.alert(
-        "Network Error",
-        "We couldn’t connect to the server. Please check your internet and try again."
-      );
-    }
+    }, 1500);
   };
 
   return (

@@ -1,28 +1,26 @@
-import React, { useState, useEffect } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
-  View,
+  Alert,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
+  View,
 } from "react-native";
 import { Checkbox } from "react-native-paper";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
-  widthPercentageToDP as wp,
   heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
-import { useAuth } from "../../context/AuthContext"; // ✅ connect to AuthContext
-
-const API_URL = "https://family-wellness.onrender.com/api/auth/login";
+import { useAuth } from "../../context/AuthContext"; // ✅ still connected for global login state
 
 const ParentLoginScreen = () => {
   const router = useRouter();
-  const { login } = useAuth(); // ✅ use login function from context
+  const { login } = useAuth();
 
   const [email, setEmail] = useState("");
   const [isEmailValid, setIsEmailValid] = useState(true);
@@ -64,7 +62,7 @@ const ParentLoginScreen = () => {
     setIsPasswordValid(passwordRegex.test(text));
   };
 
-  // ✅ Login logic
+  // ✅ Dummy login flow (no backend)
   const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert("Missing Information", "Please enter both email and password.");
@@ -79,41 +77,31 @@ const ParentLoginScreen = () => {
       return;
     }
 
-    try {
-      const response = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+    // Simulate login delay and navigation
+    Alert.alert("Logging in...", "Please wait while we log you in.");
+    setTimeout(async () => {
+      const dummyUser = {
+        name: email.split("@")[0],
+        role: "parent",
+        profilePic: "https://via.placeholder.com/150",
+      };
+
+      // Save global login state
+      login({
+        username: dummyUser.name,
+        role: dummyUser.role,
+        profilePic: dummyUser.profilePic,
       });
 
-      const data = await response.json();
-      console.log("Login Response:", data);
-
-      if (response.ok) {
-        // ✅ Save login details globally
-        login({
-          username: data.user.name || data.user.email,
-          role: data.user.role || "parent",
-          profilePic: data.user.profilePic || "https://via.placeholder.com/150",
-        });
-
-        // ✅ Store token locally if Remember Me is checked
-        if (isChecked && data.token) {
-          await AsyncStorage.setItem("userToken", data.token);
-          await AsyncStorage.setItem("userData", JSON.stringify(data.user));
-        }
-
-        Alert.alert("Login Successful", "Redirecting to parent dashboard...");
-        router.push("/(dashboard)/parent/");
-      } else if (response.status === 401) {
-        Alert.alert("Login Failed", data.message || "Invalid email or password.");
-      } else {
-        Alert.alert("Login Failed", data.message || "Something went wrong. Try again.");
+      // Save locally if Remember Me is checked
+      if (isChecked) {
+        await AsyncStorage.setItem("userToken", "dummy-token");
+        await AsyncStorage.setItem("userData", JSON.stringify(dummyUser));
       }
-    } catch (error) {
-      console.error("Login Error:", error);
-      Alert.alert("Network Error", "Unable to connect to server. Please try again later.");
-    }
+
+      Alert.alert("Login Successful", "Redirecting to parent dashboard...");
+      router.push("/(dashboard)/parent/");
+    }, 1200);
   };
 
   return (

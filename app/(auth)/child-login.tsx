@@ -1,38 +1,60 @@
-// app/(auth)/child-login.tsx
-import React, { useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { useFonts } from "expo-font";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
+import React, { useRef, useState } from "react";
 import {
-  View,
+  Alert,
+  Animated,
+  SafeAreaView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  Alert,
+  View,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import { Checkbox } from "react-native-paper";
-import { useFonts } from "expo-font";
-// import { useAuth } from "../../context/AuthContext"; // ✅ Uncomment later when real auth is ready
 
 export default function LoginScreen() {
   const router = useRouter();
-  // const { login } = useAuth(); // ✅ Uncomment when AuthContext is active
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  const [fontsLoaded] = useFonts({
+    Poppins: require("../../assets/fonts/Poppins-Regular.ttf"),
+    "Poppins-Bold": require("../../assets/fonts/Poppins-Bold.ttf"),
+  });
+
+  if (!fontsLoaded) return null;
 
   const handleLogin = () => {
-    if (email && password) {
-      // 🔹 Dummy Login → Replace later with `login(email, password)`
-      router.push("/(dashboard)/child/");
-    } else {
+    if (!email || !password) {
       Alert.alert("Missing Information", "Please enter your credentials");
+      return;
     }
+
+    // ✅ Dummy success popup flow
+    setShowSuccess(true);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+
+    // Auto-hide popup + navigate to dashboard
+    setTimeout(() => {
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }).start(() => setShowSuccess(false));
+      router.push("/(dashboard)/child/");
+    }, 2000);
   };
 
   return (
@@ -94,6 +116,14 @@ export default function LoginScreen() {
         <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
           <Text style={styles.loginText}>Login</Text>
         </TouchableOpacity>
+
+        {/* ✅ Success Popup */}
+        {showSuccess && (
+          <Animated.View style={[styles.popup, { opacity: fadeAnim }]}>
+            <Ionicons name="checkmark-circle" size={48} color="#4CAF50" />
+            <Text style={styles.popupText}>Login Successful!</Text>
+          </Animated.View>
+        )}
       </SafeAreaView>
     </LinearGradient>
   );
@@ -173,5 +203,27 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontFamily: "Poppins-Bold",
     fontSize: 16,
+  },
+  popup: {
+    position: "absolute",
+    top: "40%",
+    left: "10%",
+    right: "10%",
+    backgroundColor: "rgba(255,255,255,0.95)",
+    borderRadius: 20,
+    paddingVertical: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  popupText: {
+    fontFamily: "Poppins-Bold",
+    fontSize: 16,
+    color: "#333",
+    marginTop: 10,
   },
 });

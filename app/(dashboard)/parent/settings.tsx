@@ -1,21 +1,22 @@
-// app/(child)/create-child-account.tsx
-import React, { useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { LinearGradient } from "expo-linear-gradient";
+import React, { useRef, useState } from "react";
 import {
-  View,
+  Animated,
+  Image,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  Image,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  Alert,
+  View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 
-const avatars = [
- require("../../../assets/images/surprised.png"),
+const avatarPaths = [
+  require("../../../assets/images/surprised.png"),
   require("../../../assets/images/bad.png"),
   require("../../../assets/images/disgusted.png"),
   require("../../../assets/images/angry.png"),
@@ -23,41 +24,68 @@ const avatars = [
   require("../../../assets/images/happy.png"),
 ];
 
-const CreateChildAccount = () => {
+export default function CreateChildAccount() {
   const [childName, setChildName] = useState("");
   const [email, setEmail] = useState("");
-  const [dob, setDob] = useState("10/05/2014");
+  const [dob, setDob] = useState<Date | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState<number | null>(null);
+  const [popupType, setPopupType] = useState<"success" | "error" | null>(null);
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    setShowPicker(Platform.OS === "ios");
+    if (selectedDate) setDob(selectedDate);
+  };
 
   const handleSetup = () => {
-    // basic validation
-    if (!childName || !email || selectedAvatar === null) {
-      Alert.alert("Incomplete", "Please fill all fields and select an avatar.");
+    if (!childName || !email || !dob || selectedAvatar === null) {
+      triggerPopup("error");
       return;
     }
+    triggerPopup("success");
 
-    // dummy success
-    Alert.alert("Success", "Child account created successfully!");
-
-    // reset form
-    setChildName("");
-    setEmail("");
-    setDob("10/05/2014");
-    setSelectedAvatar(null);
+    // reset form after delay
+    setTimeout(() => {
+      setChildName("");
+      setEmail("");
+      setDob(null);
+      setSelectedAvatar(null);
+    }, 2000);
   };
+
+  const triggerPopup = (type: "success" | "error") => {
+    setPopupType(type);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start(() => {
+      setTimeout(() => {
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true,
+        }).start(() => setPopupType(null));
+      }, 2000);
+    });
+  };
+
+  const formattedDob = dob
+    ? dob.toLocaleDateString("en-GB")
+    : "Select date of birth";
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container}>
-        {/* Header */}
-        <Text style={styles.header}>Create child's account</Text>
+        <Text style={styles.header}>Create Child’s Account</Text>
 
-        {/* Card */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Child Setup</Text>
 
-          {/* Child Name */}
-          <Text style={styles.label}>Child's Name</Text>
+          {/* Child's Name */}
+          <Text style={styles.label}>Child’s Name</Text>
           <TextInput
             style={styles.input}
             placeholder="Enter child's name"
@@ -76,19 +104,39 @@ const CreateChildAccount = () => {
             value={email}
             onChangeText={setEmail}
           />
-          <Text style={styles.subNote}>A OTP would be sent to your child</Text>
+          <Text style={styles.subNote}>An OTP will be sent to your child</Text>
 
           {/* Date of Birth */}
-          <Text style={styles.label}>Child's Date of birth</Text>
-          <View style={styles.dateInput}>
-            <Text style={styles.dateText}>{dob}</Text>
+          <Text style={styles.label}>Child’s Date of Birth</Text>
+          <TouchableOpacity
+            style={styles.dateInput}
+            onPress={() => setShowPicker(true)}
+          >
+            <Text
+              style={[
+                styles.dateText,
+                !dob && { color: "#999" },
+              ]}
+            >
+              {formattedDob}
+            </Text>
             <Ionicons name="calendar-outline" size={20} color="#777" />
-          </View>
+          </TouchableOpacity>
+
+          {showPicker && (
+            <DateTimePicker
+              value={dob || new Date()}
+              mode="date"
+              display="default"
+              maximumDate={new Date()}
+              onChange={handleDateChange}
+            />
+          )}
 
           {/* Avatar Selection */}
           <Text style={styles.label}>Choose Avatar</Text>
           <View style={styles.avatarContainer}>
-            {avatars.map((avatar, index) => (
+            {avatarPaths.map((avatar, index) => (
               <TouchableOpacity
                 key={index}
                 style={[
@@ -115,21 +163,42 @@ const CreateChildAccount = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* ✅ Popup Feedback */}
+      {popupType && (
+        <Animated.View
+          style={[
+            styles.popup,
+            {
+              opacity: fadeAnim,
+              backgroundColor:
+                popupType === "success"
+                  ? "rgba(76,175,80,0.95)"
+                  : "rgba(244,67,54,0.95)",
+            },
+          ]}
+        >
+          <Ionicons
+            name={
+              popupType === "success" ? "checkmark-circle" : "alert-circle"
+            }
+            size={50}
+            color="#fff"
+          />
+          <Text style={styles.popupText}>
+            {popupType === "success"
+              ? "Child account created successfully!"
+              : "Please fill all fields and select an avatar."}
+          </Text>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
-};
-
-export default CreateChildAccount;
+}
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  container: {
-    alignItems: "center",
-    paddingVertical: 30,
-  },
+  safe: { flex: 1, backgroundColor: "#fff" },
+  container: { alignItems: "center", paddingVertical: 30 },
   header: {
     fontFamily: "Poppins-SemiBold",
     fontSize: 20,
@@ -140,8 +209,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#B7B1B1",
     borderRadius: 20,
     width: "85%",
-    paddingVertical: 20,
-    paddingHorizontal: 20,
+    padding: 20,
   },
   sectionTitle: {
     fontFamily: "Poppins-SemiBold",
@@ -225,5 +293,28 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-SemiBold",
     fontSize: 15,
     color: "#fff",
+  },
+  popup: {
+    position: "absolute",
+    top: "40%",
+    left: "10%",
+    right: "10%",
+    borderRadius: 20,
+    paddingVertical: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  popupText: {
+    fontFamily: "Poppins-SemiBold",
+    fontSize: 16,
+    color: "#fff",
+    marginTop: 10,
+    textAlign: "center",
+    paddingHorizontal: 10,
   },
 });

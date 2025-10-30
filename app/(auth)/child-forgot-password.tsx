@@ -1,20 +1,23 @@
-import React, { useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { useFonts } from "expo-font";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
+import React, { useRef, useState } from "react";
 import {
-  View,
+  Animated,
+  SafeAreaView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
+  View,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import { useFonts } from "expo-font";
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
   const [email, setEmail] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const [fontsLoaded] = useFonts({
     Poppins: require("../../assets/fonts/Poppins-Regular.ttf"),
@@ -24,18 +27,33 @@ export default function ForgotPasswordScreen() {
   if (!fontsLoaded) return null;
 
   const handleReset = () => {
-    if (email) {
-      alert("Password reset link sent to your email!");
-      router.push("(auth)/child-new-password");
-    } else {
+    if (!email) {
       alert("Please enter your email or username.");
+      return;
     }
+
+    // ✅ Dummy success popup
+    setShowSuccess(true);
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+
+    // Hide popup & go to next screen
+    setTimeout(() => {
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }).start(() => setShowSuccess(false));
+      router.push("(auth)/child-new-password");
+    }, 2000);
   };
 
   return (
     <LinearGradient colors={["#79D8F2", "#48A8E2"]} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-
         {/* Title */}
         <Text style={styles.title}>Forgot Password</Text>
 
@@ -60,6 +78,14 @@ export default function ForgotPasswordScreen() {
         <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
           <Text style={styles.resetText}>Reset Password</Text>
         </TouchableOpacity>
+
+        {/* ✅ Success Popup */}
+        {showSuccess && (
+          <Animated.View style={[styles.popup, { opacity: fadeAnim }]}>
+            <Ionicons name="checkmark-circle" size={50} color="#4CAF50" />
+            <Text style={styles.popupText}>Reset link sent!</Text>
+          </Animated.View>
+        )}
       </SafeAreaView>
     </LinearGradient>
   );
@@ -73,17 +99,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     paddingHorizontal: 24,
-  },
-  backButton: {
-    position: "absolute",
-    top: 20,
-    left: 16,
-    width: 50,
-    height: 50,
-    backgroundColor: "rgba(255,255,255,0.7)",
-    borderRadius: 25,
-    alignItems: "center",
-    justifyContent: "center",
   },
   title: {
     fontFamily: "Poppins-Bold",
@@ -125,5 +140,27 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontFamily: "Poppins-Bold",
     fontSize: 16,
+  },
+  popup: {
+    position: "absolute",
+    top: "40%",
+    left: "10%",
+    right: "10%",
+    backgroundColor: "rgba(255,255,255,0.95)",
+    borderRadius: 20,
+    paddingVertical: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  popupText: {
+    fontFamily: "Poppins-Bold",
+    fontSize: 16,
+    color: "#333",
+    marginTop: 10,
   },
 });

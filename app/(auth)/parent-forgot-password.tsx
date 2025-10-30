@@ -1,18 +1,18 @@
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
   Image,
   SafeAreaView,
-  Alert,
-  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
@@ -31,33 +31,21 @@ const ForgotPassword = () => {
       return;
     }
 
-    try {
-      setLoading(true);
-      const response = await fetch(
-        "https://family-wellness.onrender.com/api/auth/resend-verification",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email }),
-        }
+    // Dummy delay to simulate API loading
+    setLoading(true);
+    setTimeout(() => {
+      setLoading(false);
+      Alert.alert(
+        "Verification Sent",
+        `A verification code has been sent to ${email}`
       );
 
-      const data = await response.json();
-      if (response.ok) {
-        Alert.alert("Verification Sent", data.message || `A verification code has been sent to ${email}`);
-        // ✅ Navigate to verify email screen with email passed along
-        router.push({
-          pathname: "/(auth)/parent-verify-email",
-          params: { email },
-        });
-      } else {
-        Alert.alert("Error", data.message || "Something went wrong");
-      }
-    } catch (error: any) {
-      Alert.alert("Network Error", "Unable to reach server. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+      // Navigate to next screen (dummy verify email)
+      router.push({
+        pathname: "/(auth)/parent-verify-email",
+        params: { email },
+      });
+    }, 1500);
   };
 
   return (

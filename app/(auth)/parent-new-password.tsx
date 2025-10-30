@@ -1,21 +1,21 @@
 // app/(auth)/create-new-password.tsx
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
+  Alert,
   Image,
   SafeAreaView,
-  Alert,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import {
-  widthPercentageToDP as wp,
   heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
 
 const CreateNewPassword = () => {
@@ -25,7 +25,7 @@ const CreateNewPassword = () => {
   const [isPasswordValid, setIsPasswordValid] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  // ✅ Password validation
+  // ✅ Local password validation only
   const validatePassword = (text: string) => {
     setNewPassword(text);
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$/;
@@ -35,9 +35,13 @@ const CreateNewPassword = () => {
   const passwordsMatch =
     newPassword === confirmPassword && newPassword.length > 0;
 
+  // ✅ Dummy flow: Just show success and move to login
   const handleVerify = () => {
     if (!isPasswordValid) {
-      Alert.alert("Weak Password", "Password must include at least 1 uppercase letter, 1 number, and be at least 8 characters long.");
+      Alert.alert(
+        "Weak Password",
+        "Password must include at least 1 uppercase letter, 1 number, and be at least 8 characters long."
+      );
       return;
     }
     if (!passwordsMatch) {
@@ -45,10 +49,10 @@ const CreateNewPassword = () => {
       return;
     }
 
-    // ✅ Show success message
+    // Show fake success
     setShowSuccess(true);
 
-    // Auto-redirect to login after delay
+    // Redirect after 2 seconds
     setTimeout(() => {
       setShowSuccess(false);
       router.push("/(auth)/parent-login");
@@ -65,7 +69,7 @@ const CreateNewPassword = () => {
 
         {/* Illustration */}
         <Image
-          source={require("../../assets/images/password.png")} // dummy image
+          source={require("../../assets/images/password.png")}
           style={styles.image}
           resizeMode="contain"
         />

@@ -1,41 +1,30 @@
 // app/(auth)/parent-verify-email.tsx
-import React, { useState, useRef } from "react";
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
+import React, { useRef, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
   Image,
   SafeAreaView,
-  Alert,
-  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import {
-  widthPercentageToDP as wp,
   heightPercentageToDP as hp,
+  widthPercentageToDP as wp,
 } from "react-native-responsive-screen";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router } from "expo-router";
-
-const VERIFY_URL = "https://family-wellness.onrender.com/api/auth/verify-email";
-const RESEND_URL = "https://family-wellness.onrender.com/api/auth/resend-verification";
 
 const VerifyEmail = () => {
   const [code, setCode] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   const inputs = useRef<(TextInput | null)[]>([]);
-  const [email, setEmail] = useState<string>("");
-
-  // 🔹 On mount, fetch email stored during signup (if saved)
-  React.useEffect(() => {
-    (async () => {
-      const storedEmail = await AsyncStorage.getItem("pending_email");
-      if (storedEmail) setEmail(storedEmail);
-    })();
-  }, []);
+  const [email, setEmail] = useState("example@email.com"); // Dummy email
 
   const handleChange = (text: string, index: number) => {
     const newCode = [...code];
@@ -47,74 +36,34 @@ const VerifyEmail = () => {
     }
   };
 
-  const handleVerify = async () => {
+  const handleVerify = () => {
     const enteredCode = code.join("");
     if (enteredCode.length < 6) {
       Alert.alert("Error", "Please enter the 6-digit code.");
       return;
     }
-    if (!email) {
-      Alert.alert("Error", "Missing email information. Please sign up again.");
-      return;
-    }
 
     setLoading(true);
-    try {
-      const res = await fetch(VERIFY_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, code: enteredCode }),
-      });
 
-      const data = await res.json();
-      console.log("📩 Verify Email Response:", data);
-
+    // Simulate network delay
+    setTimeout(() => {
       setLoading(false);
+      setShowSuccess(true);
 
-      if (!res.ok) {
-        Alert.alert("Verification Failed", data?.message || "Invalid code. Try again.");
-        return;
-      }
-
-      Alert.alert("✅ Success", "Email verified successfully!", [
-        { text: "Continue", onPress: () => router.push("/(auth)/parent-login") },
-      ]);
-    } catch (err) {
-      console.error("❌ Verify Error:", err);
-      setLoading(false);
-      Alert.alert("Network Error", "Could not connect to server. Try again later.");
-    }
+      // Auto-close success and go to next screen
+      setTimeout(() => {
+        setShowSuccess(false);
+        router.push("/(auth)/parent-login");
+      }, 2000);
+    }, 1000);
   };
 
-  const handleResend = async () => {
-    if (!email) {
-      Alert.alert("Error", "Email not found. Please sign up again.");
-      return;
-    }
-
+  const handleResend = () => {
     setResending(true);
-    try {
-      const res = await fetch(RESEND_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await res.json();
-      console.log("📩 Resend Response:", data);
+    setTimeout(() => {
       setResending(false);
-
-      if (!res.ok) {
-        Alert.alert("Error", data?.message || "Could not resend code. Try again.");
-        return;
-      }
-
-      Alert.alert("Sent", "A new verification code has been sent to your email.");
-    } catch (err) {
-      console.error("❌ Resend Error:", err);
-      setResending(false);
-      Alert.alert("Network Error", "Please check your connection and try again.");
-    }
+      Alert.alert("Code Sent", "A new verification code was sent to your email.");
+    }, 1000);
   };
 
   const isButtonEnabled = code.every((digit) => digit.length === 1);
@@ -158,6 +107,14 @@ const VerifyEmail = () => {
           </TouchableOpacity>
         </View>
 
+        {/* Success Popup */}
+        {showSuccess && (
+          <View style={styles.successPopup}>
+            <Text style={styles.successText}>Email verified successfully!</Text>
+          </View>
+        )}
+
+        {/* Verify Button */}
         <TouchableOpacity
           onPress={handleVerify}
           activeOpacity={0.8}
@@ -241,6 +198,24 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     marginLeft: 5,
     fontSize: wp("3.5%"),
+  },
+  successPopup: {
+    position: "absolute",
+    top: hp("35%"),
+    backgroundColor: "#E8F5E9",
+    borderRadius: 10,
+    paddingVertical: hp("2%"),
+    paddingHorizontal: wp("6%"),
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  successText: {
+    color: "#4CAF50",
+    fontSize: wp("4%"),
+    fontWeight: "500",
+    textAlign: "center",
   },
   button: {
     width: wp("85%"),
