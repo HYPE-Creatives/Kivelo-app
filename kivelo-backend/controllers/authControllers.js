@@ -327,9 +327,72 @@ export const registerParent = async (req, res) => {
       const link = `${baseUrl}/verify?code=${verificationCode}&email=${user.email}`;
 
       await sendEmailViaSendGrid(
-        user.email,
-        "Your Kivelo Verification Code",
-        `Your code is: <strong>${verificationCode}</strong><br><a href="${link}">Verify Now</a>`
+            user.email,
+      "Verify Your Kivelo Account - Security Code",
+      `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
+        <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); overflow: hidden;">
+          <div style="background-color: #4CAF50; color: white; text-align: center; padding: 20px;">
+            <h1 style="margin: 0;">Kivelo</h1>
+            <p style="margin: 0; font-size: 14px;">Empowering Families with Technology</p>
+          </div>
+          <div style="padding: 30px;">
+            <h2 style="color: #333;">Hello ${user.name},</h2>
+            <p style="font-size: 15px; color: #555; line-height: 1.6;">
+              Thank you for joining <strong>Kivelo</strong>! To complete your registration, 
+              please use the following verification code:
+            </p>
+
+            <div style="text-align: center; margin: 30px 0;">
+              <div style="background-color: #4CAF50; color: #fff; padding: 12px 24px; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 24px; letter-spacing: 2px;">
+                ${verificationCode}
+              </div>
+            </div>
+
+            <p style="font-size: 14px; color: #555; line-height: 1.6;">
+              Click the button below to go directly to the verification page where you can enter this code:
+            </p>
+
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${verificationPageLink}" 
+                style="background-color: #4CAF50; color: #fff; text-decoration: none; 
+                      padding: 12px 24px; border-radius: 6px; font-weight: bold; 
+                      display: inline-block; font-size: 16px;">
+                Go to Verification Page
+              </a>
+            </div>
+
+            <p style="font-size: 14px; color: #555; line-height: 1.6;">
+              Once on the verification page, enter your email and the code above. 
+              This code will expire in 24 hours.
+            </p>
+
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4CAF50;">
+              <p style="margin: 0; color: #666; font-size: 14px;">
+                <strong>Quick Steps:</strong><br>
+                1. Click the button above<br>
+                2. Enter the code: <strong>${verificationCode}</strong><br>
+                3. Click "Verify Email" to complete
+              </p>
+            </div>
+
+            <p style="font-size: 12px; color: #777; background: #f8f9fa; padding: 10px; border-radius: 5px;">
+              <strong>Security Note:</strong> For your protection, we use one-time codes instead of clickable links with tokens to prevent exposure in browser URLs.
+            </p>
+
+            <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;" />
+
+            <p style="font-size: 13px; color: #777; text-align: center;">
+              Need help? Contact our support team at 
+              <a href="mailto:support@kivelo.com" style="color: #4CAF50; text-decoration: none;">support@kivelo.com</a>
+            </p>
+          </div>
+          <div style="background-color: #f1f1f1; text-align: center; padding: 15px; font-size: 12px; color: #888;">
+            © ${new Date().getFullYear()} Kivelo. All rights reserved.
+          </div>
+        </div>
+      </div>
+      `
       );
     } catch (emailErr) {
       console.warn("Email failed (non-blocking):", emailErr.message);
