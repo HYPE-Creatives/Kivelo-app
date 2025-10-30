@@ -324,7 +324,7 @@ export const registerParent = async (req, res) => {
       const baseUrl = process.env.NODE_ENV === "production"
         ? "https://family-wellness.onrender.com"
         : "http://localhost:5000";
-      const link = `${baseUrl}/verify?code=${verificationCode}&email=${user.email}`;
+      const verificationPageLink = `${baseUrl}/verify?code=${verificationCode}&email=${user.email}`;
 
       await sendEmailViaSendGrid(
             user.email,
