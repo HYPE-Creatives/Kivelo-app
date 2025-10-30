@@ -235,98 +235,118 @@ export const generateVerificationLink = async (req, res) => {
 };
 
 // ========================= PARENT REGISTRATION =========================
+// ========================= PARENT REGISTRATION (WITH TERMS ENFORCEMENT) =========================
 export const registerParent = async (req, res) => {
   try {
-    const { email, password, name, phone, dob } = req.body;
+    const { name, email, password, phone, dob, termsAccepted } = req.body;
 
-    // Validation
-    if (!email || !password || !name) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Email, password, and name are required' 
+    console.log("Incoming registration payload:", { name, email, phone, dob, termsAccepted });
+
+    // ─── 1. ALL FIELDS REQUIRED (including termsAccepted) ─────────────────────
+    if (!name?.trim() || !email?.trim() || !password || !phone?.trim() || !dob?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required: name, email, password, phone, dob",
       });
     }
 
-    if (!validateEmail(email)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Please provide a valid email address' 
+    // ─── 2. TERMS & CONDITIONS MUST BE ACCEPTED ───────────────────────────────
+    if (termsAccepted !== true) {
+      return res.status(400).json({
+        success: false,
+        message: "You must agree to the Terms & Conditions and Privacy Policy to continue.",
+      });
+    }
+    // ... after creating user
+    user.termsAcceptedAt = new Date();
+    await user.save();
+
+    // ─── 3. EMAIL FORMAT (matches frontend) ───────────────────────────────────
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a valid email address",
       });
     }
 
-    if (!validatePassword(password)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Password must be at least 6 characters long' 
+    // ─── 4. PASSWORD STRENGTH (same as frontend) ───────────────────────────────
+    const passwordRegex = /^(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$/;
+    if (!passwordRegex.test(password)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Password must be at least 8 characters, include an uppercase letter and a number.",
       });
     }
 
-    // Check existing user
-    const existingUser = await User.findOne({ email });
+    // ─── 5. PHONE FORMAT (+234XXXXXXXXXX) ─────────────────────────────────────
+    const phoneRegex = /^\+234[1-9]\d{9}$/;
+    if (!phoneRegex.test(phone)) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone must be in the format +234XXXXXXXXXX",
+      });
+    }
+
+    // ─── 6. DOB FORMAT (YYYY-MM-DD) ───────────────────────────────────────────
+    const dobRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dobRegex.test(dob)) {
+      return res.status(400).json({
+        success: false,
+        message: "Date of birth must be in YYYY-MM-DD format",
+      });
+    }
+
+    // ─── 7. CHECK DUPLICATE EMAIL OR PHONE ────────────────────────────────────
+    const existingUser = await User.findOne({
+      $or: [{ email: email.toLowerCase().trim() }, { phone: phone.trim() }],
+    });
+
     if (existingUser) {
-      return res.status(409).json({ 
-        success: false, 
-        message: 'User already exists with this email' 
+      const conflict = existingUser.email === email.toLowerCase().trim() ? "email" : "phone number";
+      return res.status(409).json({
+        success: false,
+        message: `This ${conflict} is already registered.`,
       });
     }
 
-    // Generate verification code ONLY (no token)
+    // ─── 8. GENERATE VERIFICATION CODE ───────────────────────────────────────
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const verificationCodeExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const verificationCodeExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
 
-    // Create user (password will be hashed by pre-save hook)
+    // ─── 9. CREATE USER ───────────────────────────────────────────────────────
     const user = await User.create({
       email: email.toLowerCase().trim(),
-      password: password,
+      password,
       name: name.trim(),
-      phone: phone?.trim(),
+      phone: phone.trim(),
       dob,
-      role: 'parent',
+      role: "parent",
       isVerified: false,
       verificationCode,
       verificationCodeExpires,
     });
 
-    // Create parent profile
-    const familyCode = crypto.randomBytes(6).toString('hex').toUpperCase();
-    const parent = await Parent.create({
+    // ─── 10. CREATE PARENT PROFILE ───────────────────────────────────────────
+    const familyCode = crypto.randomBytes(6).toString("hex").toUpperCase();
+    await Parent.create({
       user: user._id,
       familyCode,
-      subscription: 'free',
-      billing: { 
-        plan: 'free', 
-        paymentMethod: '', 
-        billingAddress: {}, 
-        nextBillingDate: null 
-      },
+      subscription: "free",
+      billing: { plan: "free", paymentMethod: "", billingAddress: {}, nextBillingDate: null },
       settings: {
-        notifications: { 
-          email: true, 
-          push: true, 
-          activityReminders: true, 
-          progressReports: true 
-        },
-        privacy: { 
-          shareProgress: false, 
-          showInSearch: false 
-        },
-        limits: { 
-          dailyScreenTime: 120, 
-          maxActivitiesPerDay: 5 
-        }
-      }
+        notifications: { email: true, push: true, activityReminders: true, progressReports: true },
+        privacy: { shareProgress: false, showInSearch: false },
+        limits: { dailyScreenTime: 120, maxActivitiesPerDay: 5 },
+      },
     });
 
-    // Send verification email with CODE ONLY (no links)
-    // In registerParent function - updated email template
-    const getBaseUrl = () => {
-      // Use Render's URL in production, localhost in development
-      return process.env.NODE_ENV === 'production' 
-        ? 'https://family-wellness.onrender.com'
-        : 'http://localhost:5000';
-    };
-
-const verificationPageLink = `${getBaseUrl()}/api/auth/verify-code-page`;;
+    // ─── 11. SEND VERIFICATION EMAIL (with code + link) ───────────────────────
+    const baseUrl = process.env.NODE_ENV === "production"
+      ? "https://family-wellness.onrender.com"
+      : "http://localhost:5000";
+    const verificationPageLink = `${baseUrl}/api/auth/verify-code-page`;
 
     await sendEmailViaSendGrid(
       user.email,
@@ -341,8 +361,7 @@ const verificationPageLink = `${getBaseUrl()}/api/auth/verify-code-page`;;
           <div style="padding: 30px;">
             <h2 style="color: #333;">Hello ${user.name},</h2>
             <p style="font-size: 15px; color: #555; line-height: 1.6;">
-              Thank you for joining <strong>Kivelo</strong>! To complete your registration, 
-              please use the following verification code:
+              Thank you for joining <strong>Kivelo</strong>! Please use this one-time code to verify your email:
             </p>
 
             <div style="text-align: center; margin: 30px 0;">
@@ -352,40 +371,35 @@ const verificationPageLink = `${getBaseUrl()}/api/auth/verify-code-page`;;
             </div>
 
             <p style="font-size: 14px; color: #555; line-height: 1.6;">
-              Click the button below to go directly to the verification page where you can enter this code:
+              Tap the button below to open the verification page and enter the code:
             </p>
 
             <div style="text-align: center; margin: 30px 0;">
               <a href="${verificationPageLink}" 
-                style="background-color: #4CAF50; color: #fff; text-decoration: none; 
-                      padding: 12px 24px; border-radius: 6px; font-weight: bold; 
-                      display: inline-block; font-size: 16px;">
-                Go to Verification Page
+                 style="background-color: #4CAF50; color: #fff; text-decoration: none; 
+                        padding: 12px 24px; border-radius: 6px; font-weight: bold; 
+                        display: inline-block; font-size: 16px;">
+                Verify My Email
               </a>
             </div>
 
             <p style="font-size: 14px; color: #555; line-height: 1.6;">
-              Once on the verification page, enter your email and the code above. 
-              This code will expire in 24 hours.
+              The code expires in <strong>24 hours</strong>. If you didn’t sign up, ignore this email.
             </p>
 
             <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4CAF50;">
               <p style="margin: 0; color: #666; font-size: 14px;">
                 <strong>Quick Steps:</strong><br>
-                1. Click the button above<br>
-                2. Enter the code: <strong>${verificationCode}</strong><br>
-                3. Click "Verify Email" to complete
+                1. Tap the button above<br>
+                2. Enter code: <strong>${verificationCode}</strong><br>
+                3. Tap “Verify Email”
               </p>
             </div>
-
-            <p style="font-size: 12px; color: #777; background: #f8f9fa; padding: 10px; border-radius: 5px;">
-              <strong>Security Note:</strong> For your protection, we use one-time codes instead of clickable links with tokens to prevent exposure in browser URLs.
-            </p>
 
             <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;" />
 
             <p style="font-size: 13px; color: #777; text-align: center;">
-              Need help? Contact our support team at 
+              Need help? Contact support at 
               <a href="mailto:support@kivelo.com" style="color: #4CAF50; text-decoration: none;">support@kivelo.com</a>
             </p>
           </div>
@@ -397,38 +411,35 @@ const verificationPageLink = `${getBaseUrl()}/api/auth/verify-code-page`;;
       `
     );
 
+    console.log("Registration successful for:", user.email);
+
+    // ─── 12. SUCCESS RESPONSE ────────────────────────────────────────────────
     res.status(201).json({
       success: true,
+      message: "Registration successful! Please check your email for the verification code.",
       user: createUserResponse(user),
-      parent: { 
-        familyCode: parent.familyCode, 
-        subscription: parent.subscription 
-      },
-      message: 'Registration successful! Please check your email for the verification code.'
+      parent: { familyCode },
     });
 
   } catch (error) {
-    console.error('Registration error:', error);
-    
+    console.error("Registration error:", error);
+
     if (error.code === 11000) {
-      return res.status(409).json({ 
-        success: false, 
-        message: 'A user with this email already exists' 
+      const field = Object.keys(error.keyPattern)[0];
+      return res.status(409).json({
+        success: false,
+        message: `This ${field === "email" ? "email" : "phone number"} is already registered.`,
       });
     }
-    
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(err => err.message);
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Validation failed', 
-        errors 
-      });
+
+    if (error.name === "ValidationError") {
+      const errors = Object.values(error.errors).map((e) => e.message);
+      return res.status(400).json({ success: false, message: "Validation failed", errors });
     }
-    
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error during registration. Please try again.' 
+
+    res.status(500).json({
+      success: false,
+      message: "Server error during registration. Please try again.",
     });
   }
 };

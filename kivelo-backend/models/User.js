@@ -51,6 +51,11 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
+  // ... existing fields
+  termsAcceptedAt: {
+    type: Date,
+    default: null
+  },
   lastLogin: Date,
   
   // Reset password fields 
