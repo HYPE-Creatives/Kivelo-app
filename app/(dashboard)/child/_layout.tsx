@@ -1,25 +1,24 @@
 // app/(dashboard)/child/_layout.tsx
 import { Ionicons } from "@expo/vector-icons";
-import { Redirect, Tabs } from "expo-router";
+import { Tabs } from "expo-router";
 import { Dimensions, Image, StyleSheet, Text, View } from "react-native";
-import { useAuth } from "../../../context/AuthContext";
 import { LinearGradient } from "expo-linear-gradient";
 
 const { width, height } = Dimensions.get("window");
 
 // ✅ scaling helpers
-const baseWidth = 375;   // iPhone X width
-const baseHeight = 812;  // iPhone X height
+const baseWidth = 375; // iPhone X width
+const baseHeight = 812; // iPhone X height
 const scaleW = (size: number) => (width / baseWidth) * size;
 const scaleH = (size: number) => (height / baseHeight) * size;
 
 export default function ChildLayout() {
-  const { role, user } = useAuth();
+  // 🧩 Dummy user (no AuthContext)
+  const user = {
+    profilePic: "https://via.placeholder.com/40",
+  };
 
-  if (role !== "child") {
-    return <Redirect href="/(auth)/login" />;
-  }
-
+  // 🎨 Reusable Tab Button Renderer
   const renderTabButton = (
     iconName: keyof typeof Ionicons.glyphMap,
     label: string,
@@ -33,10 +32,7 @@ export default function ChildLayout() {
           end={{ x: 1, y: 1 }}
           style={styles.tabButtonActive}
         >
-          <Ionicons
-            name={iconName}
-            style={[styles.icon, { color: "white" }]}
-          />
+          <Ionicons name={iconName} style={[styles.icon, { color: "white" }]} />
           <Text style={[styles.label, { color: "white" }]}>{label}</Text>
         </LinearGradient>
       );
@@ -44,10 +40,7 @@ export default function ChildLayout() {
 
     return (
       <View style={styles.tabButton}>
-        <Ionicons
-          name={iconName}
-          style={[styles.icon, { color: "#9ca3af" }]}
-        />
+        <Ionicons name={iconName} style={[styles.icon, { color: "#9ca3af" }]} />
         <Text style={[styles.label, { color: "#9ca3af" }]}>{label}</Text>
       </View>
     );
@@ -58,18 +51,16 @@ export default function ChildLayout() {
       screenOptions={{
         headerShown: true,
         tabBarShowLabel: false,
-        tabBarStyle: [styles.tabBar, { backgroundColor: "white" }], // ✅ keep tab bar white
-
+        tabBarStyle: [styles.tabBar, { backgroundColor: "white" }],
         headerStyle: styles.header,
         headerTransparent: true,
         headerTintColor: "black",
         headerTitleStyle: styles.headerTitle,
-
         headerLeft: () => (
           <View style={{ marginLeft: scaleW(15) }}>
             <Image
               source={{
-                uri: user?.profilePic || "https://via.placeholder.com/40",
+                uri: user.profilePic,
               }}
               style={styles.profilePic}
             />
@@ -78,7 +69,7 @@ export default function ChildLayout() {
       }}
     >
       <Tabs.Screen
-        name="home"
+        name="index"
         options={{
           title: "Home",
           tabBarIcon: ({ focused }) => renderTabButton("home", "Home", focused),
@@ -128,7 +119,7 @@ export default function ChildLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     position: "absolute",
-    bottom: scaleH(55), // ✅ responsive bottom spacing
+    bottom: scaleH(55),
     marginHorizontal: scaleW(40),
     borderRadius: scaleW(50),
     height: scaleH(55),
@@ -137,12 +128,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: scaleW(5),
     borderTopWidth: 0,
     backgroundColor: "white",
-
-    // ✅ thin border
     borderWidth: 0.5,
     borderColor: "#e5e7eb",
-
-    // ✅ subtle shadow
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
