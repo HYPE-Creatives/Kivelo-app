@@ -110,7 +110,7 @@ export default function ParentVerifyEmail() {
       Alert.alert(
         "Verified!",
         "Your email is confirmed. Welcome to Kivelo!",
-        [{ text: "Continue", onPress: () => router.replace("/(dashboard)/parent/home") }]
+        [{ text: "Continue", onPress: () => router.replace("/(auth)/login") }]
       );
     } catch (err) {
       Alert.alert("Network Error", "Please check your connection and try again.");
