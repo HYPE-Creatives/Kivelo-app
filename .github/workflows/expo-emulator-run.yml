@@ -1,0 +1,83 @@
+name: Run Expo on Android Emulator (dev-kivelo)
+
+on:
+  push:
+    branches:
+      - dev-kivelo
+  pull_request:
+    branches:
+      - dev-kivelo
+
+jobs:
+  run-on-emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses
+
+      - name: Set up Expo CLI
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Create Android Virtual Device (AVD)
+        run: |
+          sdkmanager "platforms;android-34" "platform-tools" "system-images;android-34;google_apis;x86_64"
+          echo "no" | avdmanager create avd -n test-emulator -k "system-images;android-34;google_apis;x86_64" -d pixel_5
+
+      - name: Start emulator (headless)
+        run: |
+          nohup $ANDROID_HOME/emulator/emulator -avd test-emulator -no-audio -no-window -gpu swiftshader_indirect -qemu -m 2048 &
+          # Wait for boot
+          adb wait-for-device
+          echo "Waiting for emulator to finish booting..."
+          timeout 300 bash -c '
+            until adb shell getprop sys.boot_completed | grep -q 1; do
+              sleep 5
+            done
+            echo "Emulator booted!"
+          ' || (echo "Emulator failed to boot in time" && exit 1)
+
+      - name: Build and run Expo app on emulator
+        run: |
+          npx expo run:android --variant debug
+        env:
+          EXPO_DEBUG: true
+
+      # Optional: Add your test commands here
+      # - name: Run tests
+      #   run: npx jest --ci
+
+      - name: Upload emulator logs (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: emulator-logs
+          path: |
+            ~/.android/avd/*.log
+            adb logcat -d > logcat.txt

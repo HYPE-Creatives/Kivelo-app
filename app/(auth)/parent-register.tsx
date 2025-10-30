@@ -1,3 +1,4 @@
+// app/(auth)/parent-register.tsx   (or whatever you named it)
 import React, { useState } from "react";
 import {
   View,
@@ -22,9 +23,13 @@ import {
   heightPercentageToDP as hp,
 } from "react-native-responsive-screen";
 
-const SignupScreen = () => {
+const REGISTER_URL =
+  "https://family-wellness.onrender.com/api/auth/register-parent";
+
+export default function SignupScreen() {
   const router = useRouter();
 
+  // ── Form fields ────────────────────────────────────────────────────────
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [isEmailValid, setIsEmailValid] = useState(true);
@@ -36,28 +41,19 @@ const SignupScreen = () => {
   const [dob, setDob] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const REGISTER_URL =
-    "https://family-wellness.onrender.com/api/auth/register-parent";
-
-  // ✅ Fixed URL (removed double /api/)
-  const VERIFICATION_URL =
-    "https://family-wellness.onrender.com/api/auth/verify-email";
-
-  // ✅ Email validation
+  // ── Validation helpers ─────────────────────────────────────────────────
   const validateEmail = (text: string) => {
     setEmail(text);
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    setIsEmailValid(emailRegex.test(text));
+    const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text);
+    setIsEmailValid(ok);
   };
 
-  // ✅ Password validation
   const validatePassword = (text: string) => {
     setPassword(text);
-    const passwordRegex = /^(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$/;
-    setIsPasswordValid(passwordRegex.test(text));
+    const ok = /^(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$/.test(text);
+    setIsPasswordValid(ok);
   };
 
-  // ✅ Phone input masking (+234 auto-prefix)
   const handlePhoneChange = (text: string) => {
     let cleaned = text.replace(/[^0-9+]/g, "");
     if (!cleaned.startsWith("+234")) {
@@ -67,7 +63,6 @@ const SignupScreen = () => {
     setPhone(cleaned);
   };
 
-  // ✅ DOB input masking (YYYY-MM-DD)
   const handleDobChange = (text: string) => {
     let cleaned = text.replace(/[^0-9]/g, "");
     if (cleaned.length > 8) cleaned = cleaned.slice(0, 8);
@@ -79,115 +74,68 @@ const SignupScreen = () => {
     setDob(formatted);
   };
 
-  // ✅ Signup handler
+  // ── Sign-up handler ─────────────────────────────────────────────────────
   const handleSignup = async () => {
-    if (!name || !email || !password || !phone || !dob) {
-      Alert.alert("Incomplete Form", "Please fill all fields before submitting.");
+    // 1. Basic required checks
+    if (!name.trim() || !email.trim() || !password || !phone.trim() || !dob.trim()) {
+      Alert.alert("Missing fields", "Please fill out every field.");
       return;
     }
-
     if (!isChecked) {
-      Alert.alert("Terms Not Accepted", "Please agree to the Terms & Conditions.");
+      Alert.alert("Terms required", "You must agree to the Terms & Conditions.");
       return;
     }
-
     if (!isEmailValid || !isPasswordValid) {
-      Alert.alert("Invalid Details", "Check your email and password formats.");
+      Alert.alert("Invalid input", "Fix e-mail and password before continuing.");
       return;
     }
 
     setLoading(true);
-
     try {
-      console.log("📤 Sending signup request to:", REGISTER_URL);
-      console.log("📦 Payload:", { name, email, password, phone, dob });
+      console.log("Sending registration →", { name, email, phone, dob });
 
-      const response = await fetch(REGISTER_URL, {
+      const res = await fetch(REGISTER_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, phone, dob }),
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          password,
+          phone,
+          dob,
+          termsAccepted: true,
+        }),
       });
 
-      const data = await response.json();
-      console.log("📩 Register Response:", data);
-      console.log("📊 Response Status:", response.status);
-      setLoading(false);
+      const data = await res.json();
+      console.log("Register response →", data, "status:", res.status);
 
-      if (!response.ok) {
-        let message =
+      if (!res.ok) {
+        const msg =
           data?.message ||
-          (data?.error && JSON.stringify(data.error)) ||
-          "Signup failed. Please check your details and try again.";
-
-        if (response.status === 409) {
-          message = "This email or phone number is already registered.";
-        }
-
-        Alert.alert("Signup Failed", message);
+          (res.status === 409
+            ? "This e-mail or phone is already registered."
+            : "Signup failed. Try again.");
+        Alert.alert("Signup error", msg);
         return;
       }
 
-      // ✅ Send verification email
-      console.log("📤 Generating verification link...");
-      setLoading(true);
-      const verifyResponse = await fetch(VERIFICATION_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-
-      const verifyData = await verifyResponse.json();
-      console.log("📩 Verification Response:", verifyData);
-      console.log("📊 Verification Status:", verifyResponse.status);
-      setLoading(false);
-
-      // ✅ Handle possible issues but still proceed
-      if (!verifyResponse.ok) {
-        Alert.alert(
-          "Verification Issue",
-          "Your account was created, but we couldn’t send the verification email. You can verify later.",
-          [
-            {
-              text: "Proceed",
-              onPress: async () => {
-                await AsyncStorage.setItem("pending_email", email);
-                router.push("/(auth)/parent-verify-email");
-              },
-            },
-          ]
-        );
-        return;
-      }
-
-      // ✅ Success
+      // ── Success – store e-mail & go to OTP screen ───────────────────────
+      await AsyncStorage.setItem("pending_email", email.trim());
       Alert.alert(
-        "Signup Successful 🎉",
-        "Account created successfully. A verification link has been sent to your email.",
-        [
-          {
-            text: "Proceed",
-            onPress: async () => {
-              try {
-                await AsyncStorage.setItem("pending_email", email);
-                router.push("/(auth)/parent-verify-email");
-              } catch (e) {
-                console.error("❌ Error saving email:", e);
-                router.push("/(auth)/parent-verify-email");
-              }
-            },
-          },
-        ]
+        "Account created!",
+        "Check your inbox for the 6-digit verification code.",
+        [{ text: "OK", onPress: () => router.replace("/(auth)/parent-verify-email") }]
       );
-    } catch (error: any) {
+    } catch (err: any) {
+      console.error("Network error →", err);
+      Alert.alert("Network issue", "Cannot reach the server. Check your connection.");
+    } finally {
       setLoading(false);
-      console.error("❌ Signup Error:", error);
-      Alert.alert(
-        "Network Error",
-        "We couldn’t connect to the server. Please check your internet and try again."
-      );
     }
   };
 
+  // ── UI ───────────────────────────────────────────────────────────────────
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: "#B3D9FF" }}
@@ -200,12 +148,12 @@ const SignupScreen = () => {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.topBackground}></View>
+          <View style={styles.topBackground} />
 
           <View style={styles.bottomSection}>
             <Text style={styles.title}>Sign Up</Text>
 
-            {/* Full Name */}
+            {/* ── Full Name ── */}
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Full Name</Text>
               <View style={styles.inputBox}>
@@ -219,12 +167,10 @@ const SignupScreen = () => {
               </View>
             </View>
 
-            {/* Email */}
+            {/* ── Email ── */}
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Email</Text>
-              <View
-                style={[styles.inputBox, !isEmailValid && { borderColor: "red" }]}
-              >
+              <View style={[styles.inputBox, !isEmailValid && { borderColor: "red" }]}>
                 <TextInput
                   style={styles.input}
                   placeholder="Johndoe55@gmail.com"
@@ -240,7 +186,7 @@ const SignupScreen = () => {
               </View>
             </View>
 
-            {/* Phone */}
+            {/* ── Phone ── */}
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Phone</Text>
               <View style={styles.inputBox}>
@@ -255,7 +201,7 @@ const SignupScreen = () => {
               </View>
             </View>
 
-            {/* DOB */}
+            {/* ── DOB ── */}
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Date of Birth (YYYY-MM-DD)</Text>
               <View style={styles.inputBox}>
@@ -271,12 +217,10 @@ const SignupScreen = () => {
               </View>
             </View>
 
-            {/* Password */}
+            {/* ── Password ── */}
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Password</Text>
-              <View
-                style={[styles.inputBox, !isPasswordValid && { borderColor: "red" }]}
-              >
+              <View style={[styles.inputBox, !isPasswordValid && { borderColor: "red" }]}>
                 <TextInput
                   style={styles.input}
                   placeholder="*************"
@@ -286,9 +230,7 @@ const SignupScreen = () => {
                   value={password}
                   onChangeText={validatePassword}
                 />
-                <TouchableOpacity
-                  onPress={() => setIsPasswordVisible(!isPasswordVisible)}
-                >
+                <TouchableOpacity onPress={() => setIsPasswordVisible(!isPasswordVisible)}>
                   <Ionicons
                     name={isPasswordVisible ? "eye-off" : "eye"}
                     size={wp(5)}
@@ -296,15 +238,14 @@ const SignupScreen = () => {
                   />
                 </TouchableOpacity>
               </View>
-              {!isPasswordValid && (
+              {!isPasswordValid && password.length > 0 && (
                 <Text style={styles.errorText}>
-                  Password must be at least 8 characters, include an uppercase
-                  letter and a number.
+                  8+ characters, 1 uppercase, 1 number
                 </Text>
               )}
             </View>
 
-            {/* Terms Checkbox */}
+            {/* ── Terms ── */}
             <View style={styles.rememberRow}>
               <View style={styles.checkboxRow}>
                 <Checkbox
@@ -320,7 +261,7 @@ const SignupScreen = () => {
               </View>
             </View>
 
-            {/* Sign Up Button */}
+            {/* ── Sign-up button ── */}
             <TouchableOpacity
               style={[styles.signupButton, loading && { opacity: 0.6 }]}
               onPress={handleSignup}
@@ -335,6 +276,7 @@ const SignupScreen = () => {
 
             <Text style={styles.orText}>- or -</Text>
 
+            {/* ── Social placeholders ── */}
             <View style={styles.socialButton}>
               <Text style={styles.socialText}>Continue with Apple or Google</Text>
               <View style={styles.iconRow}>
@@ -347,6 +289,7 @@ const SignupScreen = () => {
               </View>
             </View>
 
+            {/* ── Login link ── */}
             <View style={styles.footerContainer}>
               <Text style={styles.footerText}>Already have an account? </Text>
               <TouchableOpacity onPress={() => router.push("/(auth)/parent-login")}>
@@ -358,11 +301,9 @@ const SignupScreen = () => {
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
-};
+}
 
-export default SignupScreen;
-
-/* ✅ Styles */
+/* ── Styles (unchanged) ─────────────────────────────────────────────────── */
 const styles = StyleSheet.create({
   container: { flexGrow: 1, backgroundColor: "#B3D9FF" },
   topBackground: { height: hp(18), backgroundColor: "#B3D9FF" },

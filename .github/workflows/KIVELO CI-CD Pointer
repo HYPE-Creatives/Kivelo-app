@@ -1,0 +1,36 @@
+name: 🔗 KIVELO CI/CD Pointer
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # allow manual trigger from Actions tab
+
+jobs:
+  info:
+    name: Repository Pipeline Info
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Show active development pipelines
+        run: |
+          echo "🧭 KIVELO Multi-Branch CI/CD Overview"
+          echo "-------------------------------------"
+          echo ""
+          echo "✅ Frontend (Expo) & Backend full CI/CD lives in:"
+          echo "   🔹 Branch: dev-fatai"
+          echo "   🔹 Workflow file: .github/workflows/dev-fatai-ci.yml"
+          echo ""
+          echo "✅ Frontend-only (Expo Web test/deploy) lives in:"
+          echo "   🔹 Branch: dev"
+          echo "   🔹 Workflow file: .github/workflows/frontend-test.yml"
+          echo ""
+          echo "🚀 Main branch (this workflow) links to both and summarizes repo structure."
+          echo ""
+          echo "👉 To trigger dev-fatai workflows manually:"
+          echo "   gh workflow run 'KIVELO Full CI (Frontend + Backend + Web Preview)' --ref dev-fatai"
+          echo ""
+          echo "👉 To trigger frontend workflow manually:"
+          echo "   gh workflow run 'Frontend (Expo Web Build and Deploy)' --ref dev"
+          echo ""
+          echo "🌍 Repo:"
+          echo "   https://github.com/${{ github.repository }}"
