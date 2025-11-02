@@ -62,7 +62,7 @@ const VerifyEmail = () => {
     setResending(true);
     setTimeout(() => {
       setResending(false);
-      Alert.alert("Code Sent", "A new verification code was sent to your email.");
+      Alert.alert("📩 Code Sent", "A new verification code was sent to your email.");
     }, 1000);
   };
 
@@ -110,7 +110,7 @@ const VerifyEmail = () => {
         {/* Success Popup */}
         {showSuccess && (
           <View style={styles.successPopup}>
-            <Text style={styles.successText}>Email verified successfully!</Text>
+            <Text style={styles.successText}>✅ Email verified successfully!</Text>
           </View>
         )}
 

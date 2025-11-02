@@ -37,7 +37,7 @@ const ForgotPassword = () => {
       setLoading(false);
       Alert.alert(
         "Verification Sent",
-        `A verification code has been sent to ${email}`
+           `A verification code has been sent to ${email}`
       );
 
       // Navigate to next screen (dummy verify email)

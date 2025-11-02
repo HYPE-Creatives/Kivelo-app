@@ -1,8 +1,8 @@
 // app/(dashboard)/child/_layout.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { Tabs } from "expo-router";
-import { Dimensions, Image, StyleSheet, Text, View } from "react-native";
+import { Tabs, router } from "expo-router";
+import { Alert, Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 const { width, height } = Dimensions.get("window");
 
@@ -16,6 +16,34 @@ export default function ChildLayout() {
   // 🧩 Dummy user (no AuthContext)
   const user = {
     profilePic: "https://via.placeholder.com/40",
+  };
+
+  // 🚪 Logout Function with Confirmation
+  const handleLogout = () => {
+    Alert.alert(
+      "Log Out",
+      "Are you sure you want to log out?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Log Out",
+          style: "destructive",
+          onPress: () => {
+            // Here you would typically:
+            // 1. Clear authentication tokens
+            // 2. Clear async storage
+            // 3. Reset navigation state
+            console.log("User logged out");
+            
+            // Navigate to auth screen
+            router.replace("/(auth)/child-login");
+          },
+        },
+      ]
+    );
   };
 
   // 🎨 Reusable Tab Button Renderer
@@ -46,6 +74,16 @@ export default function ChildLayout() {
     );
   };
 
+  // 🎯 Logout Button Component for Header
+  const LogoutButton = () => (
+    <TouchableOpacity 
+      onPress={handleLogout}
+      style={styles.logoutButton}
+    >
+      <Ionicons name="log-out-outline" size={scaleW(20)} color="#ef4444" />
+    </TouchableOpacity>
+  );
+
   return (
     <Tabs
       screenOptions={{
@@ -66,6 +104,8 @@ export default function ChildLayout() {
             />
           </View>
         ),
+        // 🚪 Add logout button to all tabs
+        headerRight: () => <LogoutButton />,
       }}
     >
       <Tabs.Screen
@@ -172,5 +212,11 @@ const styles = StyleSheet.create({
   label: {
     fontFamily: "Poppins-SemiBold",
     fontSize: scaleW(7),
+  },
+  logoutButton: {
+    marginRight: scaleW(15),
+    padding: scaleW(5),
+    borderRadius: scaleW(8),
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
   },
 });
