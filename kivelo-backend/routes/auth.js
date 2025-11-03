@@ -47,7 +47,17 @@ const __dirname = path.dirname(__filename);
  *   post:
  *     summary: Register a new parent account
  *     tags: [Authentication]
- *     description: Creates a new parent account and sends verification email
+ *     description: |
+ *       Creates a new parent account with comprehensive validation and sends 6-digit verification code via email.
+ *       
+ *       **Registration Flow:**
+ *       1. User submits registration data with terms acceptance
+ *       2. System validates all fields and checks for duplicates
+ *       3. Creates parent account with family code
+ *       4. Sends 6-digit verification code via email
+ *       5. User verifies email using the code
+ *       
+ *       **Required Fields:** name, email, password, phone, dob, termsAccepted
  *     requestBody:
  *       required: true
  *       content:
@@ -55,10 +65,18 @@ const __dirname = path.dirname(__filename);
  *           schema:
  *             type: object
  *             required:
+ *               - name
  *               - email
  *               - password
- *               - name
+ *               - phone
+ *               - dob
+ *               - termsAccepted
  *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "John Doe"
+ *                 minLength: 2
+ *                 maxLength: 100
  *               email:
  *                 type: string
  *                 format: email
@@ -66,18 +84,35 @@ const __dirname = path.dirname(__filename);
  *               password:
  *                 type: string
  *                 format: password
- *                 minLength: 6
- *                 example: "password123"
- *               name:
- *                 type: string
- *                 example: "John Doe"
+ *                 minLength: 8
+ *                 pattern: "^(?=.*[A-Z])(?=.*\\d)[A-Za-z\\d]{8,}$"
+ *                 example: "Password123"
+ *                 description: "Must contain at least 8 characters, one uppercase letter, and one number"
  *               phone:
  *                 type: string
- *                 example: "+1234567890"
+ *                 pattern: "^\\+234[1-9]\\d{9}$"
+ *                 example: "+2348012345678"
+ *                 description: "Must be in +234XXXXXXXXXX format"
  *               dob:
  *                 type: string
  *                 format: date
+ *                 pattern: "^\\d{4}-\\d{2}-\\d{2}$"
  *                 example: "1990-01-01"
+ *                 description: "Date of birth in YYYY-MM-DD format"
+ *               termsAccepted:
+ *                 type: boolean
+ *                 example: true
+ *                 description: "Must be true to accept Terms & Conditions"
+ *           examples:
+ *             validRegistration:
+ *               summary: Valid parent registration
+ *               value:
+ *                 name: "John Doe"
+ *                 email: "parent@example.com"
+ *                 password: "Password123"
+ *                 phone: "+2348012345678"
+ *                 dob: "1990-01-01"
+ *                 termsAccepted: true
  *     responses:
  *       201:
  *         description: Parent registered successfully. Verification code sent to email.
@@ -89,6 +124,9 @@ const __dirname = path.dirname(__filename);
  *                 success:
  *                   type: boolean
  *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Check your email for the verification code."
  *                 user:
  *                   type: object
  *                   properties:
@@ -100,21 +138,41 @@ const __dirname = path.dirname(__filename);
  *                       type: string
  *                     role:
  *                       type: string
+ *                       example: "parent"
  *                     isVerified:
  *                       type: boolean
+ *                       example: false
  *                 parent:
  *                   type: object
  *                   properties:
  *                     familyCode:
  *                       type: string
- *                     subscription:
- *                       type: string
- *                 message:
- *                   type: string
  *       400:
  *         description: Validation error - invalid input data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "All fields are required."
  *       409:
- *         description: User already exists with this email
+ *         description: User already exists with this email or phone
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "This email is taken."
  *       500:
  *         description: Server error during registration
  */
@@ -126,7 +184,10 @@ router.post("/register-parent", registerParent);
  *   post:
  *     summary: Login user (Parent or Child)
  *     tags: [Authentication]
- *     description: Authenticate user and return JWT tokens
+ *     description: |
+ *       Authenticate user and return JWT tokens. 
+ *       Parent accounts require email verification before login.
+ *       Child accounts can login with one-time code or password.
  *     requestBody:
  *       required: true
  *       content:
@@ -145,6 +206,17 @@ router.post("/register-parent", registerParent);
  *                 type: string
  *                 format: password
  *                 example: "password123"
+ *           examples:
+ *             parentLogin:
+ *               summary: Parent login
+ *               value:
+ *                 email: "parent@example.com"
+ *                 password: "Password123"
+ *             childLogin:
+ *               summary: Child login
+ *               value:
+ *                 email: "child@example.com"
+ *                 password: "childpassword123"
  *     responses:
  *       200:
  *         description: Login successful
@@ -155,24 +227,54 @@ router.post("/register-parent", registerParent);
  *               properties:
  *                 success:
  *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Login successful"
  *                 accessToken:
  *                   type: string
  *                 refreshToken:
  *                   type: string
  *                 data:
  *                   type: object
- *                 message:
- *                   type: string
+ *                   properties:
+ *                     user:
+ *                       type: object
+ *                     familyCode:
+ *                       type: string
+ *                     subscription:
+ *                       type: string
+ *                     hasSetPassword:
+ *                       type: boolean
+ *                     parentId:
+ *                       type: string
  *       400:
  *         description: Missing email or password
  *       401:
  *         description: Invalid credentials
  *       403:
  *         description: Account not verified or deactivated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                 needsVerification:
+ *                   type: boolean
+ *                   example: true
+ *                 email:
+ *                   type: string
  *       500:
  *         description: Server error during login
  */
 router.post("/login", login);
+
+// ========================= PASSWORD RESET FLOW =========================
 
 /**
  * @swagger
@@ -183,8 +285,7 @@ router.post("/login", login);
  *     description: |
  *       Initiates password reset process by sending a 6-digit verification code to the user's email.
  *       
- *       **Security Note:** For security reasons, this endpoint always returns success (200) 
- *       even if the email doesn't exist to prevent email enumeration attacks.
+ *       **Security Note:** Returns success even if email doesn't exist to prevent email enumeration.
  *       
  *       **Flow:**
  *       1. User submits email address
@@ -192,7 +293,6 @@ router.post("/login", login);
  *       3. User enters code on verification page
  *       4. System verifies code validity
  *       5. User sets new password
- *     operationId: forgotPassword
  *     requestBody:
  *       required: true
  *       content:
@@ -205,24 +305,10 @@ router.post("/login", login);
  *               email:
  *                 type: string
  *                 format: email
- *                 description: The email address associated with the account
- *                 example: "jane.doe@example.com"
- *                 minLength: 5
- *                 maxLength: 255
- *           examples:
- *             validRequest:
- *               summary: Valid email request
- *               value:
- *                 email: "jane.doe@example.com"
- *             invalidEmail:
- *               summary: Invalid email format
- *               value:
- *                 email: "invalid-email"
+ *                 example: "user@example.com"
  *     responses:
  *       200:
- *         description: |
- *           Password reset code sent successfully. 
- *           Returns same message whether email exists or not for security.
+ *         description: Password reset code sent successfully
  *         content:
  *           application/json:
  *             schema:
@@ -234,65 +320,13 @@ router.post("/login", login);
  *                 message:
  *                   type: string
  *                   example: "If an account with that email exists, a password reset code has been sent."
- *             examples:
- *               successResponse:
- *                 summary: Standard success response
- *                 value:
- *                   success: true
- *                   message: "If an account with that email exists, a password reset code has been sent."
  *       400:
  *         description: Bad request - invalid input data
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *             examples:
- *               missingEmail:
- *                 summary: Email field missing
- *                 value:
- *                   success: false
- *                   message: "Email is required"
- *               invalidEmail:
- *                 summary: Invalid email format
- *                 value:
- *                   success: false
- *                   message: "Please provide a valid email address"
- *               unverifiedAccount:
- *                 summary: Account not verified
- *                 value:
- *                   success: false
- *                   message: "Please verify your email before resetting password"
  *       500:
  *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                 error:
- *                   type: string
- *             examples:
- *               serverError:
- *                 summary: Server error
- *                 value:
- *                   success: false
- *                   message: "Failed to process password reset request"
- *                   error: "Email service temporarily unavailable"
- *     security: []
  */
 router.post('/forgot-password', forgotPassword);
- 
+
 /**
  * @swagger
  * /api/auth/verify-reset-token:
@@ -301,11 +335,6 @@ router.post('/forgot-password', forgotPassword);
  *     tags: [Authentication]
  *     description: |
  *       Verifies that the 6-digit reset code received via email is valid and not expired.
- *       
- *       **Token Validity:** Reset codes expire after 1 hour from generation.
- *       
- *       **Next Steps:** After successful verification, proceed to reset password endpoint.
- *     operationId: verifyResetToken
  *     requestBody:
  *       required: true
  *       content:
@@ -319,102 +348,18 @@ router.post('/forgot-password', forgotPassword);
  *               email:
  *                 type: string
  *                 format: email
- *                 description: The email address associated with the account
- *                 example: "jane.doe@example.com"
+ *                 example: "user@example.com"
  *               resetToken:
  *                 type: string
- *                 description: The 6-digit reset code received via email
+ *                 pattern: '^[0-9]{6}$'
  *                 example: "123456"
- *                 minLength: 6
- *                 maxLength: 6
- *                 pattern: "^[0-9]{6}$"
- *           examples:
- *             validToken:
- *               summary: Valid token verification
- *               value:
- *                 email: "jane.doe@example.com"
- *                 resetToken: "123456"
- *             invalidToken:
- *               summary: Invalid or expired token
- *               value:
- *                 email: "jane.doe@example.com"
- *                 resetToken: "000000"
  *     responses:
  *       200:
  *         description: Reset token is valid and not expired
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Reset token is valid"
- *             examples:
- *               validToken:
- *                 summary: Token verification successful
- *                 value:
- *                   success: true
- *                   message: "Reset token is valid"
  *       400:
  *         description: Invalid, expired, or missing token/email
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *             examples:
- *               missingFields:
- *                 summary: Required fields missing
- *                 value:
- *                   success: false
- *                   message: "Email and reset token are required"
- *               invalidToken:
- *                 summary: Invalid or expired token
- *                 value:
- *                   success: false
- *                   message: "Invalid or expired reset token"
- *       404:
- *         description: User not found with the provided email
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *             examples:
- *               userNotFound:
- *                 summary: User not found
- *                 value:
- *                   success: false
- *                   message: "User not found"
  *       500:
  *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                 error:
- *                   type: string
- *     security: []
  */
 router.post('/verify-reset-token', verifyResetToken);
 
@@ -427,15 +372,7 @@ router.post('/verify-reset-token', verifyResetToken);
  *     description: |
  *       Resets the user's password using the verified reset token.
  *       
- *       **Password Requirements:**
- *       - Minimum 6 characters
- *       
- *       **Security Features:**
- *       - Reset token is invalidated after successful password reset
- *       - Confirmation email is sent to the user
- *       - Token automatically expires after 1 hour
- *       - Previous sessions are invalidated (user must log in again)
- *     operationId: resetPassword
+ *       **Password Requirements:** Minimum 6 characters
  *     requestBody:
  *       required: true
  *       content:
@@ -450,165 +387,23 @@ router.post('/verify-reset-token', verifyResetToken);
  *               email:
  *                 type: string
  *                 format: email
- *                 description: The email address associated with the account
- *                 example: "jane.doe@example.com"
+ *                 example: "user@example.com"
  *               resetToken:
  *                 type: string
- *                 description: The 6-digit reset code received via email
+ *                 pattern: '^[0-9]{6}$'
  *                 example: "123456"
- *                 minLength: 6
- *                 maxLength: 6
- *                 pattern: "^[0-9]{6}$"
  *               newPassword:
  *                 type: string
  *                 format: password
- *                 description: The new password (minimum 6 characters)
- *                 example: "newSecurePassword123"
  *                 minLength: 6
- *           examples:
- *             validReset:
- *               summary: Valid password reset
- *               value:
- *                 email: "jane.doe@example.com"
- *                 resetToken: "123456"
- *                 newPassword: "newSecurePassword123"
- *             weakPassword:
- *               summary: Password too short
- *               value:
- *                 email: "jane.doe@example.com"
- *                 resetToken: "123456"
- *                 newPassword: "123"
+ *                 example: "newSecurePassword123"
  *     responses:
  *       200:
  *         description: Password reset successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "Password has been reset successfully. You can now log in with your new password."
- *             examples:
- *               successReset:
- *                 summary: Password reset successful
- *                 value:
- *                   success: true
- *                   message: "Password has been reset successfully. You can now log in with your new password."
  *       400:
  *         description: Bad request - invalid input data
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *             examples:
- *               missingFields:
- *                 summary: Required fields missing
- *                 value:
- *                   success: false
- *                   message: "Email, reset token, and new password are required"
- *               invalidToken:
- *                 summary: Invalid or expired token
- *                 value:
- *                   success: false
- *                   message: "Invalid or expired reset token"
- *               weakPassword:
- *                 summary: Password too short
- *                 value:
- *                   success: false
- *                   message: "Password must be at least 6 characters long"
- *       404:
- *         description: User not found with the provided email
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *             examples:
- *               userNotFound:
- *                 summary: User not found
- *                 value:
- *                   success: false
- *                   message: "User not found"
  *       500:
  *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 message:
- *                   type: string
- *                 error:
- *                   type: string
- *             examples:
- *               serverError:
- *                 summary: Server error during password reset
- *                 value:
- *                   success: false
- *                   message: "Failed to reset password"
- *                   error: "Database connection failed"
- *     security: []
- */
-
-/**
- * @swagger
- * components:
- *   schemas:
- *     ErrorResponse:
- *       type: object
- *       properties:
- *         success:
- *           type: boolean
- *           example: false
- *         message:
- *           type: string
- *           example: "Error description"
- *         error:
- *           type: string
- *           example: "Detailed error message"
- * 
- *   responses:
- *     ValidationError:
- *       description: Validation error in request parameters
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               success:
- *                 type: boolean
- *                 example: false
- *               message:
- *                 type: string
- *                 example: "Validation failed"
- *               errors:
- *                 type: array
- *                 items:
- *                   type: string
- * 
- *   securitySchemes:
- *     bearerAuth:
- *       type: http
- *       scheme: bearer
- *       bearerFormat: JWT
  */
 router.post('/reset-password', resetPassword);
 
@@ -620,7 +415,9 @@ router.post('/reset-password', resetPassword);
  *   post:
  *     summary: Verify email with 6-digit code
  *     tags: [Email Verification]
- *     description: Verify user's email using the 6-digit code sent to their email
+ *     description: |
+ *       Verify user's email using the 6-digit code sent to their email.
+ *       This is the primary verification method used after parent registration.
  *     requestBody:
  *       required: true
  *       content:
@@ -642,10 +439,29 @@ router.post('/reset-password', resetPassword);
  *     responses:
  *       200:
  *         description: Email verified successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 accessToken:
+ *                   type: string
+ *                 refreshToken:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                 message:
+ *                   type: string
+ *                   example: "Email verified successfully! Your account is now active."
  *       400:
  *         description: Invalid or expired verification code
  *       404:
  *         description: User not found
+ *       500:
+ *         description: Server error during verification
  */
 router.post("/verify-email", verifyEmail);
 
@@ -655,7 +471,9 @@ router.post("/verify-email", verifyEmail);
  *   get:
  *     summary: Verify email with JWT token (via link)
  *     tags: [Email Verification]
- *     description: Verify email using JWT token from verification link
+ *     description: |
+ *       Alternative email verification using JWT token from verification link.
+ *       Used for verification link resends and external email clients.
  *     parameters:
  *       - in: path
  *         name: token
@@ -666,6 +484,20 @@ router.post("/verify-email", verifyEmail);
  *     responses:
  *       200:
  *         description: Email verified successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                 redirectUrl:
+ *                   type: string
  *       400:
  *         description: Invalid or expired token
  *       404:
@@ -681,7 +513,7 @@ router.get("/verify-email/:token", verifyEmailWithToken);
  *   post:
  *     summary: Generate new verification link
  *     tags: [Email Verification]
- *     description: Generate and send a new email verification link
+ *     description: Generate and send a new email verification link (JWT token based)
  *     requestBody:
  *       required: true
  *       content:
@@ -735,322 +567,78 @@ router.post("/generate-verification-link", generateVerificationLink);
  */
 router.post("/resend-verification", resendVerificationCode);
 
-/**
- * @swagger
- * /api/auth/verify-code-page:
- *   get:
- *     summary: Email verification page
- *     tags: [Email Verification]
- *     description: Serves the email verification page where users can enter their 6-digit code
- *     responses:
- *       200:
- *         description: HTML page served successfully
- */
-router.get("/verify-code-page", (req, res) => {
-  res.sendFile(path.join(__dirname, "../public/verify-code.html"));
-});
-
 // ========================= CHILD ACCOUNT ROUTES =========================
-
-/**
- * @swagger
- * components:
- *   schemas:
- *     GenerateCodeRequest:
- *       type: object
- *       required:
- *         - parentId
- *         - childEmail
- *         - childName
- *         - childDOB
- *       properties:
- *         parentId:
- *           type: string
- *           format: uuid
- *           description: Unique identifier of the parent creating the child account
- *           example: "123e4567-e89b-12d3-a456-426614174000"
- *         childEmail:
- *           type: string
- *           format: email
- *           description: Child's email address (must be unique)
- *           example: "child.student@example.com"
- *         childName:
- *           type: string
- *           description: Child's full name
- *           minLength: 2
- *           maxLength: 100
- *           example: "Emma Johnson"
- *         childDOB:
- *           type: string
- *           format: date
- *           description: Child's date of birth in YYYY-MM-DD format
- *           pattern: '^\d{4}-\d{2}-\d{2}$'
- *           example: "2015-08-15"
- *         childGender:
- *           type: string
- *           description: Child's gender identity
- *           enum:
- *             - male
- *             - female
- *             - non_binary
- *             - prefer_not_to_say
- *           default: "prefer_not_to_say"
- *           example: "female"
- * 
- *     GenerateCodeResponse:
- *       type: object
- *       properties:
- *         success:
- *           type: boolean
- *           description: Indicates if the operation was successful
- *           example: true
- *         code:
- *           type: string
- *           description: The generated one-time code for child registration
- *           minLength: 6
- *           maxLength: 8
- *           example: "A1B2C3"
- *         message:
- *           type: string
- *           description: Human-readable message describing the result
- *           example: "Child account created and one-time code generated successfully"
- *         expiresAt:
- *           type: string
- *           format: date-time
- *           description: Expiration timestamp of the one-time code
- *           example: "2024-01-15T14:30:00Z"
- * 
- *     ErrorResponse:
- *       type: object
- *       properties:
- *         success:
- *           type: boolean
- *           example: false
- *         message:
- *           type: string
- *           description: Error message describing what went wrong
- *           example: "Child email already exists"
- *         errorCode:
- *           type: string
- *           description: Machine-readable error code
- *           example: "CHILD_EMAIL_EXISTS"
- *         details:
- *           type: array
- *           items:
- *             type: object
- *             properties:
- *               field:
- *                 type: string
- *                 description: The field that caused the error
- *               message:
- *                 type: string
- *                 description: Field-specific error message
- * 
- *   securitySchemes:
- *     bearerAuth:
- *       type: http
- *       scheme: bearer
- *       bearerFormat: JWT
- *       description: JWT token obtained during parent authentication
- */
 
 /**
  * @swagger
  * /api/auth/generate-code:
  *   post:
  *     summary: Generate one-time registration code for child account
- *     description: |
- *       Allows authenticated parents to generate a one-time code for registering their child's account.
- *       
- *       ### Flow:
- *       1. Parent provides child's information
- *       2. System validates the data and checks for duplicates
- *       3. Generates a unique one-time code (expires in 1 hour)
- *       4. Returns the code for parent to share with child
- *       5. Child uses the code with their email to complete registration
- *       
- *       ### Business Rules:
- *       - Parent must be authenticated with a valid JWT token
- *       - Child email must be unique across the system
- *       - Child must be between 5-18 years old (based on DOB)
- *       - Parent can have maximum 5 child accounts
- *       - One-time codes expire after 1 hour
- *       
- *       ### Required Permissions:
- *       - User must have 'parent' role
- *       - Parent profile must be complete and verified
- *     tags: [Child Management]
+ *     tags: [Child Accounts]
  *     security:
  *       - bearerAuth: []
+ *     description: |
+ *       Allows authenticated parents to generate a one-time code for registering their child's account.
+ *       Can also regenerate codes for existing child accounts.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/GenerateCodeRequest'
- *           examples:
- *             typicalRequest:
- *               summary: Typical child registration
- *               value:
- *                 parentId: "123e4567-e89b-12d3-a456-426614174000"
- *                 childEmail: "emma.johnson@student.example.com"
- *                 childName: "Emma Johnson"
- *                 childDOB: "2015-08-15"
- *                 childGender: "female"
- *             minimalRequest:
- *               summary: Minimal required fields
- *               value:
- *                 parentId: "123e4567-e89b-12d3-a456-426614174000"
- *                 childEmail: "alex.wong@student.example.com"
- *                 childName: "Alex Wong"
- *                 childDOB: "2016-03-20"
+ *             type: object
+ *             required:
+ *               - childEmail
+ *               - childName
+ *               - childDOB
+ *             properties:
+ *               childEmail:
+ *                 type: string
+ *                 format: email
+ *                 example: "child@example.com"
+ *               childName:
+ *                 type: string
+ *                 example: "Emma Johnson"
+ *               childDOB:
+ *                 type: string
+ *                 format: date
+ *                 example: "2015-08-15"
+ *               childGender:
+ *                 type: string
+ *                 enum: [male, female, non_binary, prefer_not_to_say]
+ *                 default: prefer_not_to_say
+ *                 example: "female"
  *     responses:
  *       201:
- *         description: |
- *           One-time code generated successfully.
- *           
- *           The code should be shared with the child who will use it along with their email
- *           to complete the registration process and set their password.
+ *         description: One-time code generated successfully
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/GenerateCodeResponse'
- *             examples:
- *               successResponse:
- *                 summary: Code generated successfully
- *                 value:
- *                   success: true
- *                   code: "A1B2C3"
- *                   message: "Child account created and one-time code generated successfully"
- *                   expiresAt: "2024-01-15T14:30:00Z"
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 code:
+ *                   type: string
+ *                   example: "123456"
+ *                 expiresAt:
+ *                   type: string
+ *                   format: date-time
+ *                 childId:
+ *                   type: string
+ *                 message:
+ *                   type: string
+ *                   example: "One-time code generated for Emma"
+ *       200:
+ *         description: Code regenerated for existing child
  *       400:
- *         description: |
- *           Bad Request - Validation failed for the following reasons:
- *           - Missing required fields
- *           - Invalid email format
- *           - Invalid date of birth format
- *           - Child email already registered
- *           - Child is outside acceptable age range (5-18 years)
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *             examples:
- *               missingFields:
- *                 summary: Missing required fields
- *                 value:
- *                   success: false
- *                   message: "Child email, name, and DOB are required"
- *                   errorCode: "MISSING_REQUIRED_FIELDS"
- *                   details:
- *                     - field: "childEmail"
- *                       message: "Child email is required"
- *               invalidEmail:
- *                 summary: Invalid email format
- *                 value:
- *                   success: false
- *                   message: "Please enter a valid email address"
- *                   errorCode: "INVALID_EMAIL_FORMAT"
- *               emailExists:
- *                 summary: Email already registered
- *                 value:
- *                   success: false
- *                   message: "Child email already exists in the system"
- *                   errorCode: "CHILD_EMAIL_EXISTS"
- *       401:
- *         description: |
- *           Unauthorized - Authentication required
- *           - Invalid or missing JWT token
- *           - Token expired
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         description: Missing required fields or invalid data
  *       403:
- *         description: |
- *           Forbidden - Insufficient permissions
- *           - User does not have parent role
- *           - Parent profile not complete
- *           - Maximum child limit reached (5 children)
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *             examples:
- *               notParent:
- *                 summary: User is not a parent
- *                 value:
- *                   success: false
- *                   message: "Only parents can generate child registration codes"
- *                   errorCode: "INSUFFICIENT_PERMISSIONS"
- *               maxChildren:
- *                 summary: Maximum children limit reached
- *                 value:
- *                   success: false
- *                   message: "Maximum of 5 child accounts allowed per parent"
- *                   errorCode: "MAX_CHILDREN_LIMIT"
+ *         description: Only parents can generate codes
  *       404:
- *         description: |
- *           Not Found - Parent profile not found
- *           - Parent ID in token doesn't exist
- *           - Parent profile not fully set up
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       409:
- *         description: |
- *           Conflict - Child account already exists with this email
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       429:
- *         description: |
- *           Too Many Requests - Rate limit exceeded
- *           - Maximum 5 code generation attempts per hour
- *         headers:
- *           X-RateLimit-Limit:
- *             schema:
- *               type: integer
- *             description: Request limit per hour
- *           X-RateLimit-Remaining:
- *             schema:
- *               type: integer
- *             description: Remaining request count
- *           X-RateLimit-Reset:
- *             schema:
- *               type: integer
- *             description: Time when rate limit resets (Unix timestamp)
+ *         description: Parent profile not found
  *       500:
- *         description: |
- *           Internal Server Error - Unexpected server error
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- * 
- *     x-codeSamples:
- *       - lang: JavaScript
- *         label: 'Frontend Example'
- *         source: |
- *           const generateCode = async () => {
- *             const response = await fetch('/api/auth/generate-code', {
- *               method: 'POST',
- *               headers: {
- *                 'Content-Type': 'application/json',
- *                 'Authorization': `Bearer ${accessToken}`
- *               },
- *               body: JSON.stringify({
- *                 parentId: '123e4567-e89b-12d3-a456-426614174000',
- *                 childEmail: 'child@example.com',
- *                 childName: 'Alice Smith',
- *                 childDOB: '2015-05-15',
- *                 childGender: 'female'
- *               })
- *             });
- *             return await response.json();
- *           }
+ *         description: Server error while generating code
  */
 router.post("/generate-code", auth, generateOneTimeCode);
 
@@ -1081,10 +669,30 @@ router.post("/generate-code", auth, generateOneTimeCode);
  *     responses:
  *       200:
  *         description: Child login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 accessToken:
+ *                   type: string
+ *                 refreshToken:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     hasSetPassword:
+ *                       type: boolean
+ *                 message:
+ *                   type: string
+ *                   example: "Login successful with one-time code. Please set your password to continue."
  *       400:
- *         description: Missing email or code
+ *         description: Missing email or code, or invalid/expired code
  *       401:
- *         description: Invalid or expired code
+ *         description: Invalid email or code
  */
 router.post("/child-login", childLoginWithCode);
 
@@ -1107,7 +715,7 @@ router.post("/child-login", childLoginWithCode);
  *             properties:
  *               code:
  *                 type: string
- *                 example: "ABC123"
+ *                 example: "123456"
  *               email:
  *                 type: string
  *                 format: email
@@ -1118,6 +726,27 @@ router.post("/child-login", childLoginWithCode);
  *     responses:
  *       200:
  *         description: Child registration completed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 accessToken:
+ *                   type: string
+ *                 refreshToken:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     hasSetPassword:
+ *                       type: boolean
+ *                       example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Code verified successfully. Please set your password to continue."
  *       400:
  *         description: Invalid or expired code, or email mismatch
  */
@@ -1149,6 +778,21 @@ router.post("/register-child", registerChildWithCode);
  *     responses:
  *       200:
  *         description: Password set successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 accessToken:
+ *                   type: string
+ *                 refreshToken:
+ *                   type: string
+ *                 message:
+ *                   type: string
+ *                   example: "Password set successfully. You can now access your account."
  *       400:
  *         description: Invalid password or missing field
  *       403:
@@ -1219,8 +863,17 @@ router.post("/reset-child-password", auth, resetChildPassword);
  *     responses:
  *       200:
  *         description: Tokens refreshed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 accessToken:
+ *                   type: string
+ *                 refreshToken:
+ *                   type: string
  *       401:
- *         description: Refresh token required or invalid
+ *         description: Refresh token required
  *       403:
  *         description: Invalid refresh token
  */
@@ -1245,10 +898,12 @@ router.post("/refresh-token", refreshAccessToken);
  *               properties:
  *                 success:
  *                   type: boolean
+ *                   example: true
  *                 user:
  *                   type: object
  *                 message:
  *                   type: string
+ *                   example: "Token is valid"
  *       401:
  *         description: Invalid or expired token
  */
@@ -1266,6 +921,17 @@ router.get("/verify-token", auth, verifyToken);
  *     responses:
  *       200:
  *         description: Logged out successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Logged out successfully. Token removed from client storage."
  *       500:
  *         description: Server error during logout
  */
@@ -1303,8 +969,10 @@ router.post("/logout", auth, logout);
  *               properties:
  *                 success:
  *                   type: boolean
+ *                   example: true
  *                 message:
  *                   type: string
+ *                   example: "Body parsing test success"
  *                 received:
  *                   type: object
  */
