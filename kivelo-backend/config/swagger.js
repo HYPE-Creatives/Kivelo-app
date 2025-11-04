@@ -8,7 +8,7 @@ const options = {
         info: {
             title: 'Kivelo API',
             version: '1.0.0',
-            description: 'API documentation for Kivelo project',
+            description: 'API documentation for Kivelo project with an extra focus on Security Audit logs — allows fetching, creating, and exporting security audit records.',
         },
         servers: [
             {
