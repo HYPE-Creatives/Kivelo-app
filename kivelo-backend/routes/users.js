@@ -9,6 +9,7 @@ import {
   deleteProfilePicture
 } from '../controllers/userControllers.js';
 import auth from '../middleware/auth.js';
+import { auditLogger } from '../middleware/auditMiddleware.js';
 import upload from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
@@ -20,7 +21,7 @@ const router = express.Router();
  *   name: Users
  *   description: User management
  */
-router.get('/profile', auth, getProfile);
+router.get('/profile', auth, auditLogger("user.view.profile"), getProfile);
 
 /**
  * @swagger
@@ -47,7 +48,7 @@ router.get('/profile', auth, getProfile);
  *       400:
  *         description: Invalid request
  */
-router.put('/profile', auth, updateProfile);
+router.put('/profile', auth, auditLogger((req) => `user.update.profile:${req.user?._id}`), updateProfile);
 
 /**
  * @swagger
@@ -73,7 +74,7 @@ router.put('/profile', auth, updateProfile);
  *       400:
  *         description: Invalid request
  */
-router.put('/update-password', auth, updatePassword);
+router.put('/update-password', auth, auditLogger("user.update.password"), updatePassword);
 
 /** 
  * @swagger
@@ -88,7 +89,7 @@ router.put('/update-password', auth, updatePassword);
  *       400:
  *         description: Invalid request
  */
-router.put('/deactivate', auth, deactivateAccount);
+router.put('/deactivate', auth, auditLogger("user.deactivate"), deactivateAccount);
 
 /** 
  * @swagger
@@ -103,7 +104,7 @@ router.put('/deactivate', auth, deactivateAccount);
  *       400:
  *         description: Invalid request
  */
-router.get('/dashboard', auth, getDashboardStats);
+router.get('/dashboard', auth, auditLogger("user.view.dashboard"), getDashboardStats);
 
 /** 
  * @swagger
@@ -128,7 +129,7 @@ router.get('/dashboard', auth, getDashboardStats);
  *       400:
  *         description: Invalid request
  */
-router.post('/upload-avatar', auth, upload.single('avatar'), uploadProfilePicture);
+router.post('/upload-avatar', auth, upload.single('avatar'), auditLogger("user.upload.avatar"), uploadProfilePicture);
 
 /** 
  * @swagger
@@ -143,6 +144,6 @@ router.post('/upload-avatar', auth, upload.single('avatar'), uploadProfilePictur
  *       400:
  *         description: Invalid request
  */
-router.delete('/avatar', auth, deleteProfilePicture);
+router.delete('/avatar', auth, auditLogger("user.delete.avatar"), deleteProfilePicture);
 
 export default router;

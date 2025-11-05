@@ -17,6 +17,7 @@ import childRoutes from './routes/children.js';
 import activityRoutes from './routes/activity.js';
 import moodRoutes from "./routes/mood.js";
 import auditRoutes from "./routes/auditRoutes.js";
+import "./jobs/auditRetention.js";
 import morgan from "morgan";
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -89,6 +90,9 @@ app.use((req, res) => {
     path: req.originalUrl
   });
 });
+
+// Import daily audit retention cron
+import "./jobs/auditRetention.js";
 
 // Start server
 app.listen(PORT, () => {

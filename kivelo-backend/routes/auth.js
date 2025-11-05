@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import auth from "../middleware/auth.js";
+import { auditLogger } from "../middleware/auditMiddleware.js";
 import authControllers, {
   registerParent,
   login,
@@ -272,7 +273,7 @@ router.post("/register-parent", registerParent);
  *       500:
  *         description: Server error during login
  */
-router.post("/login", login);
+router.post("/login", auditLogger((req) => `user.login:email=${req.body.email}`), login);
 
 // ========================= PASSWORD RESET FLOW =========================
 
