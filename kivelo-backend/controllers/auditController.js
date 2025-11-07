@@ -4,7 +4,16 @@ import { Parser as Json2csvParser } from "json2csv";
 // ========================= CREATE AUDIT LOG =========================
 export const createAuditLog = async (req, res) => {
   try {
-    const { actor, action, resource, outcome, level, metadata } = req.body;
+    const { action, resource, outcome, level = "info", metadata } = req.body;
+
+    // Attach actor automatically from the admin making the call
+    const actor = req.admin
+      ? {
+          id: req.admin._id,
+          model: "Admin",
+          ip: req.ip || req.headers["x-forwarded-for"] || "unknown",
+        }
+      : req.body.actor || {};
 
     const newLog = await AuditLog.create({
       actor,
@@ -13,22 +22,52 @@ export const createAuditLog = async (req, res) => {
       outcome,
       level,
       metadata,
+      timestamp: new Date(),
     });
 
-    res.status(201).json(newLog);
+    res.status(201).json({
+      success: true,
+      message: "Audit log created successfully",
+      log: newLog,
+    });
   } catch (error) {
     console.error("Error creating audit log:", error);
-    res.status(500).json({ error: "Server error while creating audit log" });
+    res
+      .status(500)
+      .json({ success: false, error: "Server error while creating audit log" });
   }
 };
 
 // ========================= GET ALL AUDIT LOGS =========================
 export const getAuditLogs = async (req, res) => {
   try {
-    const logs = await AuditLog.find().sort({ timestamp: -1 }).limit(100);
-    res.json(logs);
+    const { page = 1, per_page = 50, action, level, from, to } = req.query;
+    const filter = {};
+
+    if (action) filter.action = action;
+    if (level) filter.level = level;
+    if (from || to) {
+      filter.timestamp = {};
+      if (from) filter.timestamp.$gte = new Date(from);
+      if (to) filter.timestamp.$lte = new Date(to);
+    }
+
+    const total = await AuditLog.countDocuments(filter);
+    const logs = await AuditLog.find(filter)
+      .sort({ timestamp: -1 })
+      .skip((page - 1) * per_page)
+      .limit(Number(per_page));
+
+    res.json({
+      success: true,
+      total,
+      page: Number(page),
+      per_page: Number(per_page),
+      items: logs,
+    });
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch audit logs" });
+    console.error("getAuditLogs:", error);
+    res.status(500).json({ success: false, error: "Failed to fetch audit logs" });
   }
 };
 
@@ -36,103 +75,78 @@ export const getAuditLogs = async (req, res) => {
 export const getAuditLogById = async (req, res) => {
   try {
     const log = await AuditLog.findById(req.params.id);
-    if (!log) return res.status(404).json({ error: "Audit log not found" });
-    res.json(log);
+    if (!log)
+      return res
+        .status(404)
+        .json({ success: false, error: "Audit log not found" });
+    res.json({ success: true, log });
   } catch (error) {
-    res.status(500).json({ error: "Server error" });
+    console.error("getAuditLogById:", error);
+    res.status(500).json({ success: false, error: "Server error" });
   }
 };
 
 // ========================= EXPORT AUDIT LOGS =========================
-/**
- * GET /api/audit/export?format=csv|json&from=&to=&action=
- * Admin only
- */
+
 export const exportAuditLogs = async (req, res) => {
   try {
     const format = (req.query.format || "csv").toLowerCase();
-    const filter = {}; // similar to listAuditLogs; keep it concise
-    if (req.query.action) filter.action = req.query.action;
-    if (req.query.from || req.query.to) {
+    const { action, from, to, level } = req.query;
+
+    const filter = {};
+    if (action) filter.action = action;
+    if (level) filter.level = level;
+    if (from || to) {
       filter.timestamp = {};
-      if (req.query.from) filter.timestamp.$gte = new Date(req.query.from);
-      if (req.query.to) filter.timestamp.$lte = new Date(req.query.to);
+      if (from) filter.timestamp.$gte = new Date(from);
+      if (to) filter.timestamp.$lte = new Date(to);
     }
 
-    const cursor = AuditLog.find(filter).sort({ timestamp: -1 }).cursor();
+    const logs = await AuditLog.find(filter).sort({ timestamp: -1 }).lean();
 
+    // If no logs found
+    if (!logs.length) {
+      return res
+        .status(404)
+        .json({ success: false, message: "No audit logs found for export" });
+    }
+
+    // Handle JSON format
     if (format === "json") {
       res.setHeader("Content-Type", "application/json");
-      res.setHeader("Content-Disposition", `attachment; filename="audit-${Date.now()}.json"`);
-      res.write("[");
-      let first = true;
-      for await (const doc of cursor) {
-        if (!first) res.write(",");
-        res.write(JSON.stringify(doc));
-        first = false;
-      }
-      res.write("]");
-      return res.end();
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename=audit-${Date.now()}.json`
+      );
+      return res.status(200).json(logs);
     }
 
-    // CSV stream (transform each doc)
-    const rows = [];
-    for await (const doc of cursor) {
-      rows.push({
-        timestamp: doc.timestamp,
-        actorId: doc.actor?.id,
-        actorModel: doc.actor?.model,
-        ip: doc.actor?.ip,
-        action: doc.action,
-        outcome: doc.outcome,
-        resourceType: doc.resource?.type,
-        resourceId: doc.resource?.id,
-        metadata: JSON.stringify(doc.metadata || {}),
-      });
-      // flush in batches if very large (left as exercise)
-    }
+    // Handle CSV format
+    const parser = new Json2csvParser({
+      header: true,
+      fields: [
+        { label: "Timestamp", value: "timestamp" },
+        { label: "Actor ID", value: "actor.id" },
+        { label: "Actor Model", value: "actor.model" },
+        { label: "IP", value: "actor.ip" },
+        { label: "Action", value: "action" },
+        { label: "Outcome", value: "outcome" },
+        { label: "Level", value: "level" },
+        { label: "Resource Type", value: "resource.type" },
+        { label: "Resource ID", value: "resource.id" },
+        { label: "Metadata", value: (row) => JSON.stringify(row.metadata || {}) },
+      ],
+    });
 
-    const parser = new Json2csvParser({ header: true });
-    const csv = parser.parse(rows);
+    const csv = parser.parse(logs);
     res.setHeader("Content-Type", "text/csv");
-    res.setHeader("Content-Disposition", `attachment; filename="audit-${Date.now()}.csv"`);
-    return res.send(csv);
-  } catch (err) {
-    console.error("exportAuditLogs:", err);
-    res.status(500).json({ error: "Failed to export audit logs" });
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=audit-${Date.now()}.csv`
+    );
+    return res.status(200).send(csv);
+  } catch (error) {
+    console.error("exportAuditLogs:", error);
+    res.status(500).json({ success: false, error: "Failed to export audit logs" });
   }
 };
-
-/**
- * GET /api/audit
- * Query params: page, per_page, action, actorId, level, from, to
- */
-export const listAuditLogs = async (req, res) => {
-  try {
-    const page = Math.max(1, parseInt(req.query.page || "1"));
-    const per_page = Math.min(1000, parseInt(req.query.per_page || "50"));
-    const filter = {};
-
-    if (req.query.action) filter.action = req.query.action;
-    if (req.query.actorId) filter["actor.id"] = req.query.actorId;
-    if (req.query.level) filter.level = req.query.level;
-    if (req.query.from || req.query.to) {
-      filter.timestamp = {};
-      if (req.query.from) filter.timestamp.$gte = new Date(req.query.from);
-      if (req.query.to) filter.timestamp.$lte = new Date(req.query.to);
-    }
-
-    const total = await AuditLog.countDocuments(filter);
-    const items = await AuditLog.find(filter)
-      .sort({ timestamp: -1 })
-      .skip((page - 1) * per_page)
-      .limit(per_page)
-      .lean();
-
-    res.json({ total, page, per_page, items });
-  } catch (err) {
-    console.error("listAuditLogs:", err);
-    res.status(500).json({ error: "Failed to fetch audit logs" });
-  }
-};
-

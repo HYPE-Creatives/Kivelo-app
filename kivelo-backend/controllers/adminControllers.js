@@ -34,7 +34,8 @@ export const setupSuperAdmin = async (req, res) => {
         children: true,
         activities: true,
         analytics: true,
-        settings: true
+        settings: true,
+        admins: true // Add admins permission for super admin
       }
     });
 
@@ -139,6 +140,19 @@ export const createAdmin = async (req, res) => {
       });
     }
 
+    // Ensure permissions object includes all fields with defaults
+    const adminPermissions = {
+      users: false,
+      parents: false,
+      children: false,
+      activities: false,
+      analytics: false,
+      settings: false,
+      admins: false,
+      audit: false,
+      ...permissions // Override with provided permissions
+    };
+
     const adminData = {
       email,
       password,
@@ -158,6 +172,25 @@ export const createAdmin = async (req, res) => {
 
   } catch (error) {
     console.error('Create admin error:', error);
+    
+    // Handle validation errors specifically
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors
+      });
+    }
+
+    // Handle duplicate email
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: 'Admin with this email already exists'
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Error creating admin'
@@ -246,6 +279,93 @@ export const updateAdmin = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error updating admin'
+    });
+  }
+};
+
+// Set admin permissions (Super Admin only)
+export const setAdminPermissions = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { permissions } = req.body;
+
+    // Validate permissions object
+    if (!permissions || typeof permissions !== 'object') {
+      return res.status(400).json({
+        success: false,
+        message: 'Valid permissions object is required'
+      });
+    }
+
+    // Check if admin exists
+    const admin = await Admin.findById(id);
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: 'Admin not found'
+      });
+    }
+
+    // Prevent modifying super admin permissions
+    if (admin.role === 'super_admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Cannot modify super admin permissions'
+      });
+    }
+
+    // Update permissions
+    admin.permissions = {
+      ...admin.permissions,
+      ...permissions
+    };
+
+    await admin.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Admin permissions updated successfully',
+      admin: admin.toSafeObject()
+    });
+
+  } catch (error) {
+    console.error('Set admin permissions error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error setting admin permissions'
+    });
+  }
+};
+
+// Get admin permissions (for specific admin)
+export const getAdminPermissions = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const admin = await Admin.findById(id).select('permissions role name email');
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: 'Admin not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      permissions: admin.permissions,
+      admin: {
+        _id: admin._id,
+        name: admin.name,
+        email: admin.email,
+        role: admin.role
+      }
+    });
+
+  } catch (error) {
+    console.error('Get admin permissions error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching admin permissions'
     });
   }
 };

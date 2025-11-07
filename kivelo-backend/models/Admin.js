@@ -22,7 +22,7 @@ const adminSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['super_admin', 'guest_admin'],
+    enum: ['super_admin', 'admin', 'guest_admin'],
     default: 'guest_admin',
     required: true
   },
@@ -32,22 +32,30 @@ const adminSchema = new mongoose.Schema({
     children: { type: Boolean, default: false },
     activities: { type: Boolean, default: false },
     analytics: { type: Boolean, default: false },
-    settings: { type: Boolean, default: false }
+    settings: { type: Boolean, default: false },
+    admins: { type: Boolean, default: false },
+    audit: { type: Boolean, default: false }
   },
   isActive: {
     type: Boolean,
     default: true
   },
-  lastLogin: Date,
+  lastLogin: { 
+    type: Date 
+  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Admin'
   },
   loginAttempts: {
     type: Number,
-    default: 0
+    default: 0,
+    select: false
   },
-  lockUntil: Date
+  lockUntil: {
+    type: Date,
+    select: false
+  } 
 }, {
   timestamps: true
 });
