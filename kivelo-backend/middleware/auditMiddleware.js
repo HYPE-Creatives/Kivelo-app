@@ -42,9 +42,13 @@ export const auditLogger = (actionNameOrFn) => {
         // Determine actor from req.user (set by your auth middleware)
         let actorId = null;
         let actorModel = "System";
+        
         if (req.user) {
           actorId = req.user._id;
-          actorModel = req.user.role || "User";
+          // CAPITALIZE the role to match AuditLog enum
+          actorModel = req.user.role 
+            ? req.user.role.charAt(0).toUpperCase() + req.user.role.slice(1)
+            : "User";
         } else if (req.parent) {
           actorId = req.parent._id;
           actorModel = "Parent";
@@ -54,10 +58,16 @@ export const auditLogger = (actionNameOrFn) => {
         }
 
         const action =
-          typeof actionNameOrFn === "function" ? actionNameOrFn(req, res) : actionNameOrFn || `${req.method} ${req.originalUrl}`;
+          typeof actionNameOrFn === "function" 
+            ? actionNameOrFn(req, res) 
+            : actionNameOrFn || `${req.method} ${req.originalUrl}`;
 
         const logDoc = {
-          actor: { id: actorId, model: actorModel, ip: req.ip || req.headers["x-forwarded-for"] || req.connection?.remoteAddress },
+          actor: { 
+            id: actorId, 
+            model: actorModel, 
+            ip: req.ip || req.headers["x-forwarded-for"] || req.connection?.remoteAddress 
+          },
           action,
           resource: {
             type: req.baseUrl ? req.baseUrl.replace("/api/", "").replace("/", "") : null,
@@ -71,6 +81,8 @@ export const auditLogger = (actionNameOrFn) => {
             request: capturedReq,
           },
         };
+
+        console.log('Creating audit log:', logDoc); // Debug log
 
         // Fire-and-forget: don't `await` — ensure we catch errors
         AuditLog.create(logDoc).catch((err) => {

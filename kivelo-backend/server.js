@@ -9,14 +9,17 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { swaggerDocs } from './config/swagger.js';
 import connectDB from './config/database.js';
+
 import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
 import userRoutes from './routes/users.js';
+import familyRoutes from './routes/familyRoutes.js';
 import parentRoutes from './routes/parents.js';
 import childRoutes from './routes/children.js';
 import activityRoutes from './routes/activity.js';
 import moodRoutes from "./routes/mood.js";
 import auditRoutes from "./routes/auditRoutes.js";
+import errorHandler from './middleware/errorHandler.js';
 import "./jobs/auditRetention.js";
 import morgan from "morgan";
 import path from 'path';
@@ -72,8 +75,12 @@ app.use('/api/parents', parentRoutes);
 app.use('/api/children', childRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/families', familyRoutes);
 app.use("/api/moods", moodRoutes);
 app.use("/api/audit", auditRoutes);
+
+// Error handling middleware (should be last)
+app.use(errorHandler);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

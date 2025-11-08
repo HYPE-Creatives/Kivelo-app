@@ -4,7 +4,7 @@ import { fileURLToPath } from "url";
 import auth from "../middleware/auth.js";
 import { auditLogger } from "../middleware/auditMiddleware.js";
 import authControllers, {
-  registerParent,
+  parentRegister,
   login,
   forgotPassword,
   verifyResetToken,
@@ -14,13 +14,13 @@ import authControllers, {
   generateVerificationLink,
   resendVerificationCode,
   generateOneTimeCode,
-  childLoginWithCode,
   registerChildWithCode,
-  setChildPassword,
-  resetChildPassword,
+  childLoginWithCode,
+  childSetPassword,
+  childResetPassword,
   refreshAccessToken,
   verifyToken,
-  logout,
+  logout
 } from "../controllers/authControllers.js";
 
 const router = express.Router();
@@ -177,7 +177,7 @@ const __dirname = path.dirname(__filename);
  *       500:
  *         description: Server error during registration
  */
-router.post("/register-parent", registerParent);
+router.post("/register-parent", parentRegister);
 
 /**
  * @swagger
@@ -799,7 +799,7 @@ router.post("/register-child", registerChildWithCode);
  *       403:
  *         description: Only child accounts can set password
  */
-router.post("/set-child-password", auth, setChildPassword);
+router.post("/set-child-password", auth, childSetPassword);
 
 /**
  * @swagger
@@ -838,7 +838,7 @@ router.post("/set-child-password", auth, setChildPassword);
  *       404:
  *         description: Child not found
  */
-router.post("/reset-child-password", auth, resetChildPassword);
+router.post("/reset-child-password", auth, childResetPassword);
 
 // ========================= TOKEN MANAGEMENT ROUTES =========================
 

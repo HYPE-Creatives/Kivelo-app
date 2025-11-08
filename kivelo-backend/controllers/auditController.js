@@ -9,10 +9,10 @@ export const createAuditLog = async (req, res) => {
     // Attach actor automatically from the admin making the call
     const actor = req.admin
       ? {
-          id: req.admin._id,
-          model: "Admin",
-          ip: req.ip || req.headers["x-forwarded-for"] || "unknown",
-        }
+        id: req.admin._id,
+        model: "Admin",
+        ip: req.ip || req.headers["x-forwarded-for"] || "unknown",
+      }
       : req.body.actor || {};
 
     const newLog = await AuditLog.create({

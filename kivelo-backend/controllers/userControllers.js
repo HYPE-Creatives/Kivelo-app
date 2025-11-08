@@ -1,4 +1,5 @@
 import User from '../models/User.js';
+import CloudinaryService from '../services/cloudinaryService.js';
 import Parent from '../models/Parent.js';
 import Child from '../models/Child.js';
 import Activity from '../models/Activity.js';
@@ -8,7 +9,7 @@ import bcrypt from 'bcryptjs';
 export const getProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select('-password');
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -17,7 +18,7 @@ export const getProfile = async (req, res) => {
     }
 
     let additionalData = {};
-    
+
     // Add role-specific data
     if (user.role === 'parent') {
       const parent = await Parent.findOne({ user: user._id });
@@ -67,12 +68,12 @@ export const getProfile = async (req, res) => {
 export const updateProfile = async (req, res) => {
   try {
     const { name, phone, dob } = req.body;
-    
+
     // Validation
-    if (!name && !phone && !dob) {
+    if (!name && !phone && !dob && !req.file) {
       return res.status(400).json({
         success: false,
-        message: 'At least one field (name, phone, or dob) is required to update'
+        message: 'At least one field (name, phone, dob, or avatar) is required to update'
       });
     }
 
@@ -81,12 +82,35 @@ export const updateProfile = async (req, res) => {
     if (phone) updateData.phone = phone.trim();
     if (dob) updateData.dob = dob;
 
+    // Handle avatar update if file is provided
+    if (req.file) {
+      const user = await User.findById(req.user._id);
+
+      // Upload new avatar to Cloudinary
+      const result = await CloudinaryService.uploadImage(req.file.path, 'kivelo-images/avatars');
+
+      updateData.avatar = {
+        url: result.secure_url,
+        public_id: result.public_id,
+      };
+
+      // Delete old avatar from Cloudinary if exists
+      if (user?.avatar?.public_id) {
+        try {
+          await CloudinaryService.deleteImage(user.avatar.public_id);
+        } catch (deleteError) {
+          console.error('Error deleting old avatar:', deleteError);
+          // Continue with update even if deletion fails
+        }
+      }
+    }
+
     const user = await User.findByIdAndUpdate(
       req.user._id,
       updateData,
-      { 
-        new: true, 
-        runValidators: true 
+      {
+        new: true,
+        runValidators: true
       }
     ).select('-password');
 
@@ -113,7 +137,7 @@ export const updateProfile = async (req, res) => {
 
   } catch (error) {
     console.error('Update profile error:', error);
-    
+
     if (error.name === 'ValidationError') {
       const errors = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({
@@ -122,7 +146,7 @@ export const updateProfile = async (req, res) => {
         errors
       });
     }
-    
+
     res.status(500).json({
       success: false,
       message: 'Server error while updating profile'
@@ -152,7 +176,7 @@ export const updatePassword = async (req, res) => {
 
     // Get user with password field
     const user = await User.findById(req.user._id).select('+password');
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -210,7 +234,7 @@ export const deactivateAccount = async (req, res) => {
 
     // Get user with password field
     const user = await User.findById(req.user._id).select('+password');
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -254,18 +278,19 @@ export const getDashboardStats = async (req, res) => {
     if (user.role === 'parent') {
       // Parent dashboard
       const parent = await Parent.findOne({ user: user._id }).populate('children');
-      
+
       const childrenStats = await Promise.all(
         (parent?.children || []).map(async (childId) => {
-          const child = await Child.findById(childId).populate('user', 'name email');
+          const child = await Child.findById(childId).populate('user', 'name email avatar');
           const completedActivities = await Activity.countDocuments({
             assignedTo: childId,
             completed: true
           });
-          
+
           return {
             id: child?._id,
             name: child?.user?.name,
+            avatar: child?.user?.avatar,
             points: child?.points || 0,
             completedActivities,
             level: child?.level || 1,
@@ -290,7 +315,7 @@ export const getDashboardStats = async (req, res) => {
     } else if (user.role === 'child') {
       // Child dashboard
       const child = await Child.findOne({ user: user._id });
-      
+
       const completedActivities = await Activity.countDocuments({
         assignedTo: child?._id,
         completed: true
@@ -335,65 +360,99 @@ export const getDashboardStats = async (req, res) => {
 };
 
 // ========================= UPLOAD PROFILE PICTURE =========================
+
 export const uploadProfilePicture = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: 'Please upload an image file'
+        message: "Please upload an image file",
       });
     }
 
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      { avatar: req.file.path },
-      { new: true }
-    ).select('-password');
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // 1️⃣ Delete old avatar if exists
+    if (user.avatar?.public_id) {
+      await CloudinaryService.deleteImage(user.avatar.public_id);
+    }
+
+    // 2️⃣ Upload new avatar
+    const result = req.file.path
+      ? await CloudinaryService.uploadImage(req.file.path, "avatars")
+      : await CloudinaryService.uploadBuffer(req.file.buffer, "avatars");
+
+    // 3️⃣ Save both url and public_id
+    user.avatar = {
+      url: result.secure_url,
+      public_id: result.public_id,
+    };
+    await user.save();
 
     res.status(200).json({
       success: true,
-      message: 'Profile picture uploaded successfully',
-      avatar: user.avatar
-    });
-
-  } catch (error) {
-    console.error('Upload profile picture error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error while uploading profile picture'
-    });
-  }
-};
-
-// ========================= DELETE PROFILE PICTURE =========================
-export const deleteProfilePicture = async (req, res) => {
-  try {
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      { avatar: null },
-      { new: true }
-    ).select('-password');
-
-    // Here you might want to delete the actual file from storage
-    // depending on your file storage solution
-
-    res.status(200).json({
-      success: true,
-      message: 'Profile picture removed successfully',
+      message: "Profile updated successfully",
       user: {
         id: user._id,
         email: user.email,
         name: user.name,
         role: user.role,
-        avatar: user.avatar
-      }
+        phone: user.phone,
+        dob: user.dob,
+        avatar: user.avatar,
+      },
     });
-
   } catch (error) {
-    console.error('Delete profile picture error:', error);
+    console.error("Upload profile picture error:", error);
     res.status(500).json({
       success: false,
-      message: 'Server error while removing profile picture'
+      message: "Server error while uploading profile picture",
+    });
+  }
+};
+
+// ========================= DELETE PROFILE PICTURE =========================
+
+export const deleteProfilePicture = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // ✅ Delete from Cloudinary using stored public_id
+    if (user.avatar?.public_id) {
+      await CloudinaryService.deleteImage(user.avatar.public_id);
+    }
+
+    // ✅ Clear from database
+    user.avatar = { url: null, public_id: null };
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Profile picture removed successfully",
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        phone: user.phone,
+        dob: user.dob,
+        avatar: user.avatar,
+      },
+    });
+  } catch (error) {
+    console.error("Delete profile picture error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while removing profile picture",
     });
   }
 };

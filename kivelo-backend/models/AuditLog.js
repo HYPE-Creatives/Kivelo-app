@@ -3,18 +3,31 @@ import mongoose from "mongoose";
 const auditLogSchema = new mongoose.Schema(
   {
     actor: {
-      id: { type: mongoose.Schema.Types.ObjectId, refPath: "actor.model", index: true },
+      id: { 
+        type: mongoose.Schema.Types.ObjectId, 
+        refPath: "actor.model", 
+        index: true 
+      },
       model: {
         type: String,
-        enum: ["User", "Parent", "Child", "System", "Service"],
+        enum: ["User", "Parent", "Child", "Admin", "System", "Service"],
         default: "User",
       },
       ip: { type: String },
     },
-    action: { type: String, required: true, index: true }, // e.g. "user.login", "parent.update"
+    action: { 
+      type: String, 
+      required: true, 
+      index: true 
+    }, // e.g. "user.login", "parent.update"
     resource: {
-      type: { type: String }, // e.g. "profile", "activity", "payment"
-      id: { type: String, default: null },
+      type: { 
+        type: String 
+      }, // e.g. "profile", "activity", "payment"
+      id: { 
+        type: String, 
+        default: null 
+      },
     },
     outcome: {
       type: String,
@@ -27,10 +40,19 @@ const auditLogSchema = new mongoose.Schema(
       default: "info",
       index: true,
     },
-    metadata: { type: Object }, // keep small; redact PII before writing if needed
-    archived: { type: Boolean, default: false }, // for retention/archive flows
+    metadata: { 
+      type: Object 
+    }, // keep small; redact PII before writing if needed
+    archived: { 
+      type: Boolean, 
+      default: false 
+    }, // for retention/archive flows
   },
-  { timestamps: { createdAt: "timestamp", updatedAt: false } } // createdAt => timestamp
+  { timestamps: { 
+      createdAt: "timestamp", 
+      updatedAt: false 
+    } 
+  } // createdAt => timestamp
 );
 
 // TTL index not created here; retention handled by cron/archive job

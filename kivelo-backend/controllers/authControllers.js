@@ -27,7 +27,7 @@ const createUserResponse = (user, additionalData = {}) => {
     dob: user.dob,
     isVerified: user.isVerified, // Added this
   };
-  
+
   return { ...baseUser, ...additionalData };
 };
 
@@ -101,7 +101,7 @@ export const verifyEmailWithToken = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Token verification error:', error);
-    
+
     if (error.name === 'TokenExpiredError') {
       return res.status(400).json({
         success: false,
@@ -109,7 +109,7 @@ export const verifyEmailWithToken = async (req, res) => {
         needsNewLink: true
       });
     }
-    
+
     if (error.name === 'JsonWebTokenError') {
       return res.status(400).json({
         success: false,
@@ -235,7 +235,7 @@ export const generateVerificationLink = async (req, res) => {
 };
 
 // ========================= PARENT REGISTRATION (WITH TERMS ENFORCEMENT) =========================
-export const registerParent = async (req, res) => {
+export const parentRegister = async (req, res) => {
   try {
     const { name, email, password, phone, dob, termsAccepted } = req.body;
 
@@ -291,7 +291,18 @@ export const registerParent = async (req, res) => {
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     const verificationCodeExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    // 6. CREATE USER (termsAcceptedAt HERE!)
+    // 6. GENERATE FAMILY CODE (using your existing method)
+    const familyCode = crypto.randomBytes(6).toString("hex").toUpperCase();
+
+    // 7. CREATE FAMILY WITH PARENT'S NAME
+    const family = await Family.create({
+      name: `${name.trim()}'s Family`,
+      description: `The ${name.trim()} family`,
+      createdBy: null, // Will set after user creation
+      members: []
+    });
+
+    // 8. CREATE USER (termsAcceptedAt HERE!)
     const user = await User.create({
       email: email.toLowerCase().trim(),
       password,
@@ -299,17 +310,22 @@ export const registerParent = async (req, res) => {
       phone: phone.trim(),
       dob,
       role: "parent",
+      family: family._id, // Link to the family
       isVerified: false,
       verificationCode,
       verificationCodeExpires,
-      termsAcceptedAt: new Date(), // ← MOVED HERE
+      termsAcceptedAt: new Date(),
     });
 
-    // 7. CREATE PARENT PROFILE
-    const familyCode = crypto.randomBytes(6).toString("hex").toUpperCase(); // ← NOW WORKS
+    // 9. UPDATE FAMILY WITH CREATOR
+    family.createdBy = user._id;
+    family.members.push(user._id);
+    await family.save();
+
+    // 10. CREATE PARENT PROFILE (using existing structure)
     await Parent.create({
       user: user._id,
-      familyCode,
+      familyCode, // Your existing familyCode generation
       subscription: "free",
       billing: { plan: "free", paymentMethod: "", billingAddress: {}, nextBillingDate: null },
       settings: {
@@ -317,9 +333,10 @@ export const registerParent = async (req, res) => {
         privacy: { shareProgress: false, showInSearch: false },
         limits: { dailyScreenTime: 120, maxActivitiesPerDay: 5 },
       },
+      children: []
     });
 
-    // 8. SEND EMAIL (safe)
+    // 11. SEND EMAIL (safe) - KEEPING YOUR EXISTING EMAIL TEMPLATE
     try {
       const baseUrl = process.env.NODE_ENV === "production"
         ? "https://family-wellness.onrender.com"
@@ -327,83 +344,96 @@ export const registerParent = async (req, res) => {
       const verificationPageLink = `${baseUrl}/verify?code=${verificationCode}&email=${user.email}`;
 
       await sendEmailViaSendGrid(
-            user.email,
-      "Verify Your Kivelo Account - Security Code",
-      `
-      <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
-        <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); overflow: hidden;">
-          <div style="background-color: #4CAF50; color: white; text-align: center; padding: 20px;">
-            <h1 style="margin: 0;">Kivelo</h1>
-            <p style="margin: 0; font-size: 14px;">Empowering Families with Technology</p>
-          </div>
-          <div style="padding: 30px;">
-            <h2 style="color: #333;">Hello ${user.name},</h2>
-            <p style="font-size: 15px; color: #555; line-height: 1.6;">
-              Thank you for joining <strong>Kivelo</strong>! To complete your registration, 
-              please use the following verification code:
-            </p>
+        user.email,
+        "Verify Your Kivelo Account - Security Code",
+        `
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
+          <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); overflow: hidden;">
+            <div style="background-color: #4CAF50; color: white; text-align: center; padding: 20px;">
+              <h1 style="margin: 0;">Kivelo</h1>
+              <p style="margin: 0; font-size: 14px;">Empowering Families with Technology</p>
+            </div>
+            <div style="padding: 30px;">
+              <h2 style="color: #333;">Hello ${user.name},</h2>
+              <p style="font-size: 15px; color: #555; line-height: 1.6;">
+                Thank you for joining <strong>Kivelo</strong>! To complete your registration, 
+                please use the following verification code:
+              </p>
 
-            <div style="text-align: center; margin: 30px 0;">
-              <div style="background-color: #4CAF50; color: #fff; padding: 12px 24px; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 24px; letter-spacing: 2px;">
-                ${verificationCode}
+              <div style="text-align: center; margin: 30px 0;">
+                <div style="background-color: #4CAF50; color: #fff; padding: 12px 24px; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 24px; letter-spacing: 2px;">
+                  ${verificationCode}
+                </div>
               </div>
-            </div>
 
-            <p style="font-size: 14px; color: #555; line-height: 1.6;">
-              Click the button below to go directly to the verification page where you can enter this code:
-            </p>
+              <p style="font-size: 14px; color: #555; line-height: 1.6;">
+                Click the button below to go directly to the verification page where you can enter this code:
+              </p>
 
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${verificationPageLink}" 
-                style="background-color: #4CAF50; color: #fff; text-decoration: none; 
-                      padding: 12px 24px; border-radius: 6px; font-weight: bold; 
-                      display: inline-block; font-size: 16px;">
-                Go to Verification Page
-              </a>
-            </div>
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${verificationPageLink}" 
+                  style="background-color: #4CAF50; color: #fff; text-decoration: none; 
+                        padding: 12px 24px; border-radius: 6px; font-weight: bold; 
+                        display: inline-block; font-size: 16px;">
+                  Go to Verification Page
+                </a>
+              </div>
 
-            <p style="font-size: 14px; color: #555; line-height: 1.6;">
-              Once on the verification page, enter your email and the code above. 
-              This code will expire in 24 hours.
-            </p>
+              <p style="font-size: 14px; color: #555; line-height: 1.6;">
+                Once on the verification page, enter your email and the code above. 
+                This code will expire in 24 hours.
+              </p>
 
-            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4CAF50;">
-              <p style="margin: 0; color: #666; font-size: 14px;">
-                <strong>Quick Steps:</strong><br>
-                1. Click the button above<br>
-                2. Enter the code: <strong>${verificationCode}</strong><br>
-                3. Click "Verify Email" to complete
+              <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4CAF50;">
+                <p style="margin: 0; color: #666; font-size: 14px;">
+                  <strong>Quick Steps:</strong><br>
+                  1. Click the button above<br>
+                  2. Enter the code: <strong>${verificationCode}</strong><br>
+                  3. Click "Verify Email" to complete
+                </p>
+              </div>
+
+              <p style="font-size: 12px; color: #777; background: #f8f9fa; padding: 10px; border-radius: 5px;">
+                <strong>Security Note:</strong> For your protection, we use one-time codes instead of clickable links with tokens to prevent exposure in browser URLs.
+              </p>
+
+              <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;" />
+
+              <p style="font-size: 13px; color: #777; text-align: center;">
+                Need help? Contact our support team at 
+                <a href="mailto:support@kivelo.com" style="color: #4CAF50; text-decoration: none;">support@kivelo.com</a>
               </p>
             </div>
-
-            <p style="font-size: 12px; color: #777; background: #f8f9fa; padding: 10px; border-radius: 5px;">
-              <strong>Security Note:</strong> For your protection, we use one-time codes instead of clickable links with tokens to prevent exposure in browser URLs.
-            </p>
-
-            <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;" />
-
-            <p style="font-size: 13px; color: #777; text-align: center;">
-              Need help? Contact our support team at 
-              <a href="mailto:support@kivelo.com" style="color: #4CAF50; text-decoration: none;">support@kivelo.com</a>
-            </p>
-          </div>
-          <div style="background-color: #f1f1f1; text-align: center; padding: 15px; font-size: 12px; color: #888;">
-            © ${new Date().getFullYear()} Kivelo. All rights reserved.
+            <div style="background-color: #f1f1f1; text-align: center; padding: 15px; font-size: 12px; color: #888;">
+              © ${new Date().getFullYear()} Kivelo. All rights reserved.
+            </div>
           </div>
         </div>
-      </div>
-      `
+        `
       );
     } catch (emailErr) {
       console.warn("Email failed (non-blocking):", emailErr.message);
     }
 
-    // 9. SUCCESS
+    // 12. SUCCESS - UPDATED RESPONSE TO INCLUDE FAMILY INFO
     return res.status(201).json({
       success: true,
       message: "Check your email for the verification code.",
-      user: createUserResponse ? createUserResponse(user) : { id: user._id, email: user.email },
-      parent: { familyCode },
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        // Include family info in response
+        family: {
+          id: family._id,
+          name: family.name,
+          familyCode: familyCode
+        }
+      },
+      parent: {
+        familyCode,
+        // Your existing parent response structure
+      },
     });
 
   } catch (error) {
@@ -413,6 +443,15 @@ export const registerParent = async (req, res) => {
       code: error.code,
       stack: error.stack?.split("\n").slice(0, 3),
     });
+
+    // Cleanup: If user was created but family creation failed, delete the user
+    if (error.name === "ValidationError" && req.body.email) {
+      try {
+        await User.deleteOne({ email: req.body.email.toLowerCase().trim() });
+      } catch (deleteError) {
+        console.warn("Cleanup failed:", deleteError.message);
+      }
+    }
 
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern)[0];
@@ -434,42 +473,42 @@ export const verifyEmail = async (req, res) => {
     const { email, verificationCode } = req.body;
 
     if (!email || !verificationCode) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Email and verification code are required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Email and verification code are required'
       });
     }
 
     // Find user
     const user = await User.findOne({ email: email.toLowerCase().trim() });
     if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'User not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
       });
     }
 
     // Check if already verified
     if (user.isVerified) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Account is already verified' 
+      return res.status(400).json({
+        success: false,
+        message: 'Account is already verified'
       });
     }
 
     // Check verification code
     if (user.verificationCode !== verificationCode) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid verification code' 
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid verification code'
       });
     }
 
     // Check if code expired
     if (user.verificationCodeExpires < new Date()) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Verification code has expired' 
+      return res.status(400).json({
+        success: false,
+        message: 'Verification code has expired'
       });
     }
 
@@ -492,10 +531,10 @@ export const verifyEmail = async (req, res) => {
 
   } catch (error) {
     console.error('Verification error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Verification failed', 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      message: 'Verification failed',
+      error: error.message
     });
   }
 };
@@ -506,24 +545,24 @@ export const resendVerificationCode = async (req, res) => {
     const { email } = req.body;
 
     if (!email) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Email is required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
       });
     }
 
     const user = await User.findOne({ email: email.toLowerCase().trim() });
     if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'User not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
       });
     }
 
     if (user.isVerified) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Account is already verified' 
+      return res.status(400).json({
+        success: false,
+        message: 'Account is already verified'
       });
     }
 
@@ -544,7 +583,7 @@ export const resendVerificationCode = async (req, res) => {
     user.verificationCodeExpires = verificationCodeExpires;
     await user.save();
 
-   // In registerParent function - use this simplified email
+    // In registerParent function - use this simplified email
     await sendEmailViaSendGrid(
       user.email,
       "Verify Your Kivelo Account - Security Code",
@@ -597,10 +636,10 @@ export const resendVerificationCode = async (req, res) => {
 
   } catch (error) {
     console.error('Resend verification code error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to resend verification code', 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      message: 'Failed to resend verification code',
+      error: error.message
     });
   }
 };
@@ -611,27 +650,27 @@ export const login = async (req, res) => {
     const { email, password } = req.body;
     // Validation
     if (!email || !password) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Email and password are required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required'
       });
     }
 
     // Find user with password field
     const user = await User.findOne({ email: email.toLowerCase().trim() }).select('+password');
-    
+
     if (!user) {
       console.warn(`Login failed: No user found for ${email}`);
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Invalid email or password' 
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password'
       });
     }
 
     // Check if user is verified
     if (!user.isVerified) {
-      return res.status(403).json({ 
-        success: false, 
+      return res.status(403).json({
+        success: false,
         message: 'Please verify your email before logging in. Check your email for the verification code.',
         needsVerification: true,
         email: user.email
@@ -640,9 +679,9 @@ export const login = async (req, res) => {
 
     // Check account status
     if (!user.isActive) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Account is deactivated. Please contact support.' 
+      return res.status(403).json({
+        success: false,
+        message: 'Account is deactivated. Please contact support.'
       });
     }
 
@@ -650,9 +689,9 @@ export const login = async (req, res) => {
     const isPasswordValid = await bcrypt.compare(password.trim(), user.password);
     if (!isPasswordValid) {
       console.warn(`Login failed: Invalid password for ${email}`);
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Invalid email or password' 
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password'
       });
     }
 
@@ -668,26 +707,26 @@ export const login = async (req, res) => {
     if (user.role === 'parent') {
       const parent = await Parent.findOne({ user: user._id });
       if (!parent) {
-        return res.status(404).json({ 
-          success: false, 
-          message: 'Parent profile not found' 
+        return res.status(404).json({
+          success: false,
+          message: 'Parent profile not found'
         });
       }
-      roleData = { 
-        familyCode: parent.familyCode, 
-        subscription: parent.subscription 
+      roleData = {
+        familyCode: parent.familyCode,
+        subscription: parent.subscription
       };
     } else if (user.role === 'child') {
       const child = await Child.findOne({ user: user._id });
       if (!child) {
-        return res.status(404).json({ 
-          success: false, 
-          message: 'Child profile not found' 
+        return res.status(404).json({
+          success: false,
+          message: 'Child profile not found'
         });
       }
-      roleData = { 
-        hasSetPassword: child.hasSetPassword || false, 
-        parentId: child.parent 
+      roleData = {
+        hasSetPassword: child.hasSetPassword || false,
+        parentId: child.parent
       };
     }
 
@@ -705,9 +744,9 @@ export const login = async (req, res) => {
 
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error during login. Please try again.' 
+    res.status(500).json({
+      success: false,
+      message: 'Server error during login. Please try again.'
     });
   }
 };
@@ -846,7 +885,7 @@ export const verifyResetToken = async (req, res) => {
       });
     }
 
-    const user = await User.findOne({ 
+    const user = await User.findOne({
       email: email.toLowerCase().trim(),
       resetPasswordToken: resetToken,
       resetPasswordExpires: { $gt: new Date() }
@@ -899,7 +938,7 @@ export const resetPassword = async (req, res) => {
     }
 
     // Find user with valid reset token
-    const user = await User.findOne({ 
+    const user = await User.findOne({
       email: email.toLowerCase().trim(),
       resetPasswordToken: resetToken,
       resetPasswordExpires: { $gt: new Date() }
@@ -1007,7 +1046,7 @@ export const refreshAccessToken = async (req, res) => {
   }
 };
 
-  // ========================= GENERATE / REGENERATE ONE-TIME CODE =========================
+// ========================= GENERATE / REGENERATE ONE-TIME CODE =========================
 export const generateOneTimeCode = async (req, res) => {
   try {
     const { childEmail, childName, childDOB, childGender } = req.body;
@@ -1015,7 +1054,7 @@ export const generateOneTimeCode = async (req, res) => {
 
     if (req.user.role !== 'parent')
       return res.status(403).json({ success: false, message: 'Only parents can generate codes' });
-    if (!childEmail || !childName || !childDOB )
+    if (!childEmail || !childName || !childDOB)
       return res.status(400).json({ success: false, message: 'Child email, name, and DOB are required' });
     if (!validateEmail(childEmail))
       return res.status(400).json({ success: false, message: 'Please provide a valid child email address' });
@@ -1091,17 +1130,17 @@ export const childLoginWithCode = async (req, res) => {
     const { email, code } = req.body;
 
     if (!email || !code) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Email and code are required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Email and code are required'
       });
     }
 
     const user = await User.findOne({ email: email.toLowerCase().trim() });
     if (!user || user.role !== 'child') {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Invalid email or code' 
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or code'
       });
     }
 
@@ -1113,9 +1152,9 @@ export const childLoginWithCode = async (req, res) => {
     });
 
     if (!child) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid or expired code' 
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired code'
       });
     }
 
@@ -1135,9 +1174,9 @@ export const childLoginWithCode = async (req, res) => {
 
   } catch (error) {
     console.error('Child login with code error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error during child login with code' 
+    res.status(500).json({
+      success: false,
+      message: 'Server error during child login with code'
     });
   }
 };
@@ -1146,11 +1185,11 @@ export const childLoginWithCode = async (req, res) => {
 export const registerChildWithCode = async (req, res) => {
   try {
     const { code, email, name } = req.body;
-    
+
     if (!code || !email) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Code and email are required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Code and email are required'
       });
     }
 
@@ -1161,16 +1200,16 @@ export const registerChildWithCode = async (req, res) => {
     }).populate('user');
 
     if (!child) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid or expired code' 
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired code'
       });
     }
 
     if (child.user.email !== email.toLowerCase().trim()) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Email does not match the code registration' 
+      return res.status(400).json({
+        success: false,
+        message: 'Email does not match the code registration'
       });
     }
 
@@ -1194,71 +1233,96 @@ export const registerChildWithCode = async (req, res) => {
 
   } catch (error) {
     console.error('Child registration error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error during registration. Please try again.' 
+    res.status(500).json({
+      success: false,
+      message: 'Server error during registration. Please try again.'
     });
   }
 };
 
 // ========================= SET CHILD PASSWORD =========================
-export const setChildPassword = async (req, res) => {
+export const childSetPassword = async (req, res) => {
   try {
     const { password } = req.body;
 
     if (!password) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Password field is required in the request body' 
+      return res.status(400).json({
+        success: false,
+        message: 'Password field is required in the request body'
       });
     }
 
     if (!validatePassword(password)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Password must be at least 6 characters long' 
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long'
       });
     }
 
     if (req.user.role !== 'child') {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Only child accounts can set password' 
+      return res.status(403).json({
+        success: false,
+        message: 'Only child accounts can set password'
       });
     }
 
     // Update password (will be hashed by pre-save hook)
-    const user = await User.findById(req.user._id);
-    if (!user) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'User not found' 
+    const childUser = await User.findById(req.user._id);
+    if (!childUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'Child profile not found'
       });
     }
 
-    user.password = password;
-    await user.save();
+    childUser.password = password;
+    await childUser.save();
 
-    // Update child record
-    await Child.findOneAndUpdate(
-      { user: req.user._id }, 
-      { hasSetPassword: true }
+    // Update child record - with better error handling
+    const childProfile = await Child.findOneAndUpdate(
+      { user: req.user._id },
+      { hasSetPassword: true },
+      { new: true } // Return updated document
     );
+
+    if (!childProfile) {
+      return res.status(404).json({
+        success: false,
+        message: 'Child profile record not found'
+      });
+    }
 
     const { accessToken, refreshToken } = generateToken(req.user._id, req.user.role);
 
-    res.json({ 
-      success: true, 
-      accessToken, 
-      refreshToken, 
-      message: 'Password set successfully. You can now access your account.' 
+    res.json({
+      success: true,
+      accessToken,
+      refreshToken,
+      message: 'Password set successfully. You can now access your account.',
+      user: {
+        id: childUser._id,
+        email: childUser.email,
+        name: childUser.name,
+        role: childUser.role,
+        hasSetPassword: true,
+        family: childUser.family // Include family info if available
+      }
     });
 
   } catch (error) {
     console.error('Password set error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error while setting password. Please try again.' 
+
+    // Handle specific errors
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid password format'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Server error while setting password. Please try again.'
     });
   }
 };
@@ -1272,9 +1336,9 @@ export const verifyToken = async (req, res) => {
       message: 'Token is valid'
     });
   } catch (error) {
-    res.status(401).json({ 
-      success: false, 
-      message: 'Invalid token' 
+    res.status(401).json({
+      success: false,
+      message: 'Invalid token'
     });
   }
 };
@@ -1287,49 +1351,49 @@ export const logout = async (req, res) => {
       user.refreshToken = null;
       await user.save();
     }
-    res.json({ 
-      success: true, 
-      message: 'Logged out successfully. Token removed from client storage.' 
+    res.json({
+      success: true,
+      message: 'Logged out successfully. Token removed from client storage.'
     }); // Token removed from client storage.' 
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error during logout' 
+    res.status(500).json({
+      success: false,
+      message: 'Server error during logout'
     });
   }
 };
 
 // ========================= RESET CHILD PASSWORD =========================
-export const resetChildPassword = async (req, res) => {
+export const childResetPassword = async (req, res) => {
   try {
     const { childId, newPassword } = req.body;
 
     if (req.user.role !== 'parent') {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Only parents can reset a child\'s password' 
+      return res.status(403).json({
+        success: false,
+        message: 'Only parents can reset a child\'s password'
       });
     }
 
     if (!childId || !newPassword) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Child ID and new password are required' 
+      return res.status(400).json({
+        success: false,
+        message: 'Child ID and new password are required'
       });
     }
 
     if (!validatePassword(newPassword)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'New password must be at least 6 characters long' 
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 6 characters long'
       });
     }
 
     const child = await Child.findById(childId).populate('user');
     if (!child) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Child not found' 
+      return res.status(404).json({
+        success: false,
+        message: 'Child not found'
       });
     }
 
@@ -1341,36 +1405,36 @@ export const resetChildPassword = async (req, res) => {
     child.hasSetPassword = true;
     await child.save();
 
-    res.json({ 
-      success: true, 
-      message: 'Child password has been reset successfully' 
+    res.json({
+      success: true,
+      message: 'Child password has been reset successfully'
     });
 
   } catch (error) {
     console.error('Reset child password error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error while resetting child password' 
+    res.status(500).json({
+      success: false,
+      message: 'Server error while resetting child password'
     });
   }
 };
 
 // ========================= DEFAULT EXPORT =========================
 export default {
-  registerParent,
+  parentRegister,
   login,
   forgotPassword,
   verifyResetToken,
   resetPassword,
   verifyEmail, // NEW: Added email verification with code
-  verifyEmailWithToken, 
+  verifyEmailWithToken,
   generateVerificationLink,
   resendVerificationCode, // NEW: Added resend verification code
   generateOneTimeCode,
-  childLoginWithCode,
   registerChildWithCode,
-  setChildPassword,
-  resetChildPassword,
+  childLoginWithCode,
+  childSetPassword,
+  childResetPassword,
   refreshAccessToken,
   verifyToken,
   logout

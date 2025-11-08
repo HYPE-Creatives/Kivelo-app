@@ -34,7 +34,10 @@ const userSchema = new mongoose.Schema({
     enum: ['male', 'female', 'other', 'prefer-not-to-say'],
     default: null
   },
-  avatar: String,
+  avatar: {
+    url: String,
+    public_id: String
+  },
   isActive: {
     type: Boolean,
     default: true,
@@ -61,6 +64,12 @@ const userSchema = new mongoose.Schema({
   // Reset password fields 
   resetPasswordToken: String,
   resetPasswordExpires: Date,
+
+  // Reference to Family model
+  family: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'Family'
+  },
 
   // Parent-specific fields
   parent: {
