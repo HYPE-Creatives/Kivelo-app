@@ -69,6 +69,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (req, res) => {
   res.send('Welcome to Kivelo API');
 });
+app.get('/api', (req, res) => {
+  res.send('Welcome to Kivelo API');
+});
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/parents', parentRoutes);

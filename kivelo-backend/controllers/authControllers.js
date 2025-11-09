@@ -1,6 +1,7 @@
 import User from '../models/User.js';
 import Parent from '../models/Parent.js';
 import Child from '../models/Child.js';
+import Family from '../models/Family.js';
 import sendEmailViaSendGrid from '../utils/sendEmail.js';
 import jwt from 'jsonwebtoken';
 import generateToken from '../utils/generateToken.js';
@@ -237,48 +238,35 @@ export const generateVerificationLink = async (req, res) => {
 // ========================= PARENT REGISTRATION (WITH TERMS ENFORCEMENT) =========================
 export const parentRegister = async (req, res) => {
   try {
+    console.log("✅ Step 1: Validation passed");
+    console.log("🔍 Backend - Registration started:", req.body);
     const { name, email, password, phone, dob, termsAccepted } = req.body;
-
     console.log("Incoming payload:", { name, email, phone, dob, termsAccepted });
-
-    // 1. REQUIRED FIELDS
+    
+    // 1️⃣ VALIDATION (your existing validation code)
     if (!name?.trim() || !email?.trim() || !password || !phone?.trim() || !dob?.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "All fields are required.",
-      });
+      return res.status(400).json({ success: false, message: "All fields are required." });
     }
 
-    // 2. TERMS ACCEPTED
     if (termsAccepted !== true) {
-      return res.status(400).json({
-        success: false,
-        message: "You must agree to the Terms & Conditions.",
-      });
+      return res.status(400).json({ success: false, message: "You must agree to the Terms & Conditions." });
     }
 
-    // 3. VALIDATIONS
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({ success: false, message: "Invalid email" });
-    }
-
-    const passwordRegex = /^(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$/;
-    if (!passwordRegex.test(password)) {
-      return res.status(400).json({ success: false, message: "Password too weak" });
-    }
-
+    // Must contain at least one uppercase, one lowercase, one digit, one special char, and 8+ total
+    const passwordRegex = /^(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,}$/;
     const phoneRegex = /^\+234[1-9]\d{9}$/;
-    if (!phoneRegex.test(phone)) {
-      return res.status(400).json({ success: false, message: "Phone must be +234XXXXXXXXXX" });
-    }
-
     const dobRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dobRegex.test(dob)) {
-      return res.status(400).json({ success: false, message: "DOB must be YYYY-MM-DD" });
-    }
 
-    // 4. DUPLICATE CHECK
+    if (!emailRegex.test(email)) return res.status(400).json({ success: false, message: "Invalid email" });
+    if (!passwordRegex.test(password)) return res.status(400).json({ success: false, message: "Password too weak" });
+    if (!phoneRegex.test(phone)) return res.status(400).json({ success: false, message: "Phone must be +234XXXXXXXXXX" });
+    if (!dobRegex.test(dob)) return res.status(400).json({ success: false, message: "DOB must be YYYY-MM-DD" });
+
+    console.log("✅ Backend - Validation passed");
+
+    // 2️⃣ CHECK FOR EXISTING USER
+    console.log("✅ Step 2: Checking duplicates");
     const existing = await User.findOne({
       $or: [{ email: email.toLowerCase().trim() }, { phone: phone.trim() }],
     });
@@ -287,22 +275,23 @@ export const parentRegister = async (req, res) => {
       return res.status(409).json({ success: false, message: `This ${field} is taken.` });
     }
 
-    // 5. VERIFICATION CODE
+    // 3️⃣ GENERATE VERIFICATION + FAMILY CODES
+    console.log("✅ Step 3: Generating codes");
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     const verificationCodeExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-    // 6. GENERATE FAMILY CODE (using your existing method)
     const familyCode = crypto.randomBytes(6).toString("hex").toUpperCase();
 
-    // 7. CREATE FAMILY WITH PARENT'S NAME
+    // 4️⃣ CREATE FAMILY FIRST
+    console.log("✅ Step 4: Creating Family");
     const family = await Family.create({
       name: `${name.trim()}'s Family`,
       description: `The ${name.trim()} family`,
-      createdBy: null, // Will set after user creation
-      members: []
+      createdBy: null, // Will update after user creation
+      members: [],
     });
 
-    // 8. CREATE USER (termsAcceptedAt HERE!)
+    // 5️⃣ CREATE USER (PARENT)
+    console.log("✅ Step 5: Creating User");
     const user = await User.create({
       email: email.toLowerCase().trim(),
       password,
@@ -310,37 +299,46 @@ export const parentRegister = async (req, res) => {
       phone: phone.trim(),
       dob,
       role: "parent",
-      family: family._id, // Link to the family
+      family: family._id, // ✅ Now family exists!
       isVerified: false,
       verificationCode,
       verificationCodeExpires,
       termsAcceptedAt: new Date(),
     });
 
-    // 9. UPDATE FAMILY WITH CREATOR
+    // 6️⃣ UPDATE FAMILY → link creator + member
+    console.log("✅ Step 6: Updating Family");
     family.createdBy = user._id;
     family.members.push(user._id);
     await family.save();
 
-    // 10. CREATE PARENT PROFILE (using existing structure)
+    // 7️⃣ CREATE PARENT PROFILE
+    console.log("✅ Step 7: Creating Parent Profile");
     await Parent.create({
       user: user._id,
-      familyCode, // Your existing familyCode generation
+      familyCode,
       subscription: "free",
-      billing: { plan: "free", paymentMethod: "", billingAddress: {}, nextBillingDate: null },
+      billing: {
+        plan: "free",
+        paymentMethod: "",
+        billingAddress: {},
+        nextBillingDate: null,
+      },
       settings: {
         notifications: { email: true, push: true, activityReminders: true, progressReports: true },
         privacy: { shareProgress: false, showInSearch: false },
         limits: { dailyScreenTime: 120, maxActivitiesPerDay: 5 },
       },
-      children: []
+      children: [],
     });
 
-    // 11. SEND EMAIL (safe) - KEEPING YOUR EXISTING EMAIL TEMPLATE
+    // 8️⃣ SEND VERIFICATION EMAIL
     try {
-      const baseUrl = process.env.NODE_ENV === "production"
-        ? "https://family-wellness.onrender.com"
-        : "http://localhost:5000";
+      const baseUrl =
+        process.env.NODE_ENV === "production"
+          ? "https://family-wellness.onrender.com"
+          : "http://localhost:5000";
+
       const verificationPageLink = `${baseUrl}/verify?code=${verificationCode}&email=${user.email}`;
 
       await sendEmailViaSendGrid(
@@ -348,7 +346,8 @@ export const parentRegister = async (req, res) => {
         "Verify Your Kivelo Account - Security Code",
         `
         <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
-          <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); overflow: hidden;">
+          <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 10px; 
+                      box-shadow: 0 4px 8px rgba(0,0,0,0.05); overflow: hidden;">
             <div style="background-color: #4CAF50; color: white; text-align: center; padding: 20px;">
               <h1 style="margin: 0;">Kivelo</h1>
               <p style="margin: 0; font-size: 14px;">Empowering Families with Technology</p>
@@ -356,52 +355,20 @@ export const parentRegister = async (req, res) => {
             <div style="padding: 30px;">
               <h2 style="color: #333;">Hello ${user.name},</h2>
               <p style="font-size: 15px; color: #555; line-height: 1.6;">
-                Thank you for joining <strong>Kivelo</strong>! To complete your registration, 
-                please use the following verification code:
+                Thank you for joining <strong>Kivelo</strong>! Please verify your account with this code:
               </p>
-
               <div style="text-align: center; margin: 30px 0;">
-                <div style="background-color: #4CAF50; color: #fff; padding: 12px 24px; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 24px; letter-spacing: 2px;">
+                <div style="background-color: #4CAF50; color: #fff; padding: 12px 24px; border-radius: 6px; 
+                            font-weight: bold; display: inline-block; font-size: 24px; letter-spacing: 2px;">
                   ${verificationCode}
                 </div>
               </div>
-
-              <p style="font-size: 14px; color: #555; line-height: 1.6;">
-                Click the button below to go directly to the verification page where you can enter this code:
-              </p>
-
-              <div style="text-align: center; margin: 30px 0;">
+              <p style="text-align:center">
                 <a href="${verificationPageLink}" 
-                  style="background-color: #4CAF50; color: #fff; text-decoration: none; 
-                        padding: 12px 24px; border-radius: 6px; font-weight: bold; 
-                        display: inline-block; font-size: 16px;">
+                   style="background-color: #4CAF50; color: #fff; text-decoration: none; 
+                          padding: 12px 24px; border-radius: 6px; font-weight: bold; display: inline-block;">
                   Go to Verification Page
                 </a>
-              </div>
-
-              <p style="font-size: 14px; color: #555; line-height: 1.6;">
-                Once on the verification page, enter your email and the code above. 
-                This code will expire in 24 hours.
-              </p>
-
-              <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4CAF50;">
-                <p style="margin: 0; color: #666; font-size: 14px;">
-                  <strong>Quick Steps:</strong><br>
-                  1. Click the button above<br>
-                  2. Enter the code: <strong>${verificationCode}</strong><br>
-                  3. Click "Verify Email" to complete
-                </p>
-              </div>
-
-              <p style="font-size: 12px; color: #777; background: #f8f9fa; padding: 10px; border-radius: 5px;">
-                <strong>Security Note:</strong> For your protection, we use one-time codes instead of clickable links with tokens to prevent exposure in browser URLs.
-              </p>
-
-              <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;" />
-
-              <p style="font-size: 13px; color: #777; text-align: center;">
-                Need help? Contact our support team at 
-                <a href="mailto:support@kivelo.com" style="color: #4CAF50; text-decoration: none;">support@kivelo.com</a>
               </p>
             </div>
             <div style="background-color: #f1f1f1; text-align: center; padding: 15px; font-size: 12px; color: #888;">
@@ -415,55 +382,27 @@ export const parentRegister = async (req, res) => {
       console.warn("Email failed (non-blocking):", emailErr.message);
     }
 
-    // 12. SUCCESS - UPDATED RESPONSE TO INCLUDE FAMILY INFO
+    // 9️⃣ SUCCESS RESPONSE
     return res.status(201).json({
       success: true,
       message: "Check your email for the verification code.",
       user: {
         id: user._id,
-        email: user.email,
         name: user.name,
-        // Include family info in response
-        family: {
-          id: family._id,
-          name: family.name,
-          familyCode: familyCode
-        }
+        email: user.email,
       },
-      parent: {
+      family: {
+        id: family._id,
+        name: family.name,
         familyCode,
-        // Your existing parent response structure
       },
     });
-
   } catch (error) {
-    console.error("REGISTER CRASH:", {
-      message: error.message,
-      name: error.name,
-      code: error.code,
-      stack: error.stack?.split("\n").slice(0, 3),
+    console.error("REGISTER CRASH:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Server error. Check logs.",
     });
-
-    // Cleanup: If user was created but family creation failed, delete the user
-    if (error.name === "ValidationError" && req.body.email) {
-      try {
-        await User.deleteOne({ email: req.body.email.toLowerCase().trim() });
-      } catch (deleteError) {
-        console.warn("Cleanup failed:", deleteError.message);
-      }
-    }
-
-    if (error.code === 11000) {
-      const field = Object.keys(error.keyPattern)[0];
-      return res.status(409).json({ success: false, message: `This ${field} is taken.` });
-    }
-
-    if (error.name === "ValidationError") {
-      const msgs = Object.values(error.errors).map(e => e.message);
-      return res.status(400).json({ success: false, message: "Invalid data", errors: msgs });
-    }
-
-    return res.status(500).json({ success: false, message: "Server error. Check logs." });
   }
 };
 
