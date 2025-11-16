@@ -9,9 +9,9 @@ const auth = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'Access denied. No token provided.' });
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    if (!token) {
-      return res.status(401).json({ success: false, message: 'Token missing or malformed.' });
+    const [scheme, token] = authHeader.split(" ");
+    if (scheme !== "Bearer" || !token) {
+      return res.status(401).json({ success: false, message: 'Token missing or malformed - Invalid authorization format.' });
     }
 
     // Verify token

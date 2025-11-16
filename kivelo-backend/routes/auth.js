@@ -50,6 +50,9 @@ const __dirname = path.dirname(__filename);
  *     tags: [Authentication]
  *     description: |
  *       Creates a new parent account with comprehensive validation and sends 6-digit verification code via email.
+ *       After verification, they will receive:
+ *       - **accessToken** (JSON response)
+ *       - **refreshToken in secure HTTP-only cookie**
  *       
  *       **Registration Flow:**
  *       1. User submits registration data with terms acceptance
@@ -187,6 +190,15 @@ router.post("/register-parent", parentRegister);
  *     tags: [Authentication]
  *     description: |
  *       Authenticate user and return JWT tokens. 
+ *       Logs in a user.  
+ *       
+ *       Returns:
+ *       - **accessToken** in JSON  
+ *       - **refreshToken** stored **automatically in secure cookie**  
+ *       
+ *       Frontend must call `/refresh-token` to obtain new access tokens.
+ *
+ *       **NOTE:** No refreshToken is ever exposed to client JS.
  *       Parent accounts require email verification before login.
  *       Child accounts can login with one-time code or password.
  *     requestBody:
@@ -840,55 +852,51 @@ router.post("/set-child-password", auth, childSetPassword);
  */
 router.post("/reset-child-password", auth, childResetPassword);
 
-// ========================= TOKEN MANAGEMENT ROUTES =========================
+// ========================= TOKEN MANAGEMENT ROUTES (COOKIE VERSION)=========================
 
 /**
  * @swagger
  * /api/auth/refresh-token:
- *   post:
- *     summary: Refresh access token
+ *   get:
+ *     summary: Refresh access token (HTTP-only cookie based)
  *     tags: [Authentication]
- *     description: Generate new access token using refresh token
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - refreshToken
- *             properties:
- *               refreshToken:
- *                 type: string
- *                 example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *     description: |
+ *       This endpoint reads the **refresh token from secure HTTP-only cookie**  
+ *       (no request body required).
+
+ *       Returns a **new accessToken**.  
+ *       If refresh token is invalid/expired → cookie is cleared automatically.
+ *
+ *       **Frontend usage:**  
+ *       ```js
+ *       axios.get("/api/auth/refresh-token", { withCredentials: true })
+ *       ```
  *     responses:
  *       200:
- *         description: Tokens refreshed successfully
+ *         description: Returns new access token.
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 accessToken:
- *                   type: string
- *                 refreshToken:
- *                   type: string
+ *                 success: { type: boolean }
+ *                 accessToken: { type: string }
  *       401:
- *         description: Refresh token required
+ *         description: No refresh cookie found.
  *       403:
- *         description: Invalid refresh token
+ *         description: Invalid or expired refresh token.
  */
-router.post("/refresh-token", refreshAccessToken);
+router.get("/refresh-token", refreshAccessToken);
 
 /**
  * @swagger
  * /api/auth/verify-token:
  *   get:
- *     summary: Verify JWT token validity
+ *     summary: Verify access JWT token validity
  *     tags: [Authentication]
  *     security:
  *       - bearerAuth: []
- *     description: Check if the provided JWT token is valid and return user data
+ *     description: Check if the provided access JWT token is valid and return user data
  *     responses:
  *       200:
  *         description: Token is valid
@@ -918,7 +926,13 @@ router.get("/verify-token", auth, verifyToken);
  *     tags: [Authentication]
  *     security:
  *       - bearerAuth: []
- *     description: Logout user and invalidate refresh token
+ *     description: |
+ *        Logout user and invalidate refresh session or clears refresh token cookie
+ *        After Logout:
+ *            - Refresh token cookie is cleared from the client
+ *            - User's refresh token in the database is invalidated
+ *            - User's session is terminated
+ *            - User must login again to obtain new tokens
  *     responses:
  *       200:
  *         description: Logged out successfully
