@@ -175,7 +175,7 @@ export const parentRegister = async (req, res) => {
     if (!emailRegex.test(email)) return res.status(400).json({ success: false, message: 'Invalid email' });
     if (!passwordRegex.test(password)) return res.status(400).json({ success: false, message: 'Password too weak' });
     if (!phoneRegex.test(phone)) return res.status(400).json({ success: false, message: 'Phone must be +234XXXXXXXXXX' });
-    if (!dobRegex.test(dob)) return res.status(400).json({ success: false, message: 'DOB must be YYYY-MM-DD' });
+    if (dob && !dobRegex.test(dob)) return res.status(400).json({ success: false, message: 'DOB must be YYYY-MM-DD' });
 
     const existing = await User.findOne({
       $or: [{ email: email.toLowerCase().trim() }, { phone: phone.trim() }],

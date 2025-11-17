@@ -307,7 +307,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: email.trim().toLowerCase(),
         password: password,
         phone: phone.trim(),
-        dob: dob ? dob.trim() : null,
+        dob: dob || null,
         termsAccepted: true
       };
 
