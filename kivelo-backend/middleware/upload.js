@@ -1,22 +1,15 @@
-import multer from 'multer';
-import { storage } from '../config/cloudinary.js';
+import multer from "multer";
+
+const storage = multer.memoryStorage(); // <-- FIXED
 
 const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
-  },
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed!'));
-    }
+    if (file.mimetype.startsWith("image/")) cb(null, true);
+    else cb(new Error("Only images allowed"));
   },
 });
 
-export const uploadSingle = (fieldName) => upload.single(fieldName);
-export const uploadArray = (fieldName, maxCount) => upload.array(fieldName, maxCount);
-export const uploadFields = (fields) => upload.fields(fields);
-
+export const uploadSingle = (field) => upload.single(field);
 export default upload;

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   View,
   TouchableOpacity,
@@ -15,16 +15,15 @@ import {
   Checkbox,
   useTheme,
 } from "react-native-paper";
-import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-const REGISTER_URL = "https://family-wellness.onrender.com/api/auth/register-parent";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Register() {
   const { colors } = useTheme();
   const router = useRouter();
+  const { registerParent, isLoading } = useAuth();
 
   // Form state
   const [name, setName] = useState("");
@@ -33,14 +32,12 @@ export default function Register() {
   const [phone, setPhone] = useState("+234");
   const [dob, setDob] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [loading, setLoading] = useState(false);
 
   // Validation states
   const [emailValid, setEmailValid] = useState(true);
   const [passwordValid, setPasswordValid] = useState(true);
 
-  // === VALIDATION HELPERS ===
+  // Validation helpers
   const validateEmail = (text: string) => {
     const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text);
     setEmail(text);
@@ -75,21 +72,18 @@ export default function Register() {
     setDob(formatted);
   };
 
-  // === SUBMIT HANDLER ===
   const handleRegister = async () => {
-    // 1. Basic required fields
-    if (!name.trim() || !email.trim() || !password || !phone.trim() || !dob.trim()) {
+    // Basic validation
+    if (!name.trim() || !email.trim() || !password || !phone.trim()) {
       Alert.alert("Missing Fields", "Please fill all required fields.");
       return;
     }
 
-    // 2. Terms acceptance
     if (!termsAccepted) {
       Alert.alert("Terms Required", "You must agree to the Terms & Conditions.");
       return;
     }
 
-    // 3. Local validation (same as backend)
     if (!emailValid || !passwordValid) {
       Alert.alert("Invalid Input", "Please fix email or password format.");
       return;
@@ -100,54 +94,37 @@ export default function Register() {
       return;
     }
 
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
+    if (dob && !/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
       Alert.alert("Invalid DOB", "Use format: YYYY-MM-DD");
       return;
     }
 
-    setLoading(true);
-
     try {
-      console.log("Sending registration:", { name, email, phone, dob });
-
-      const response = await fetch(REGISTER_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          email: email.trim(),
-          password,
-          phone,
-          dob,
-          termsAccepted: true, // ← REQUIRED BY BACKEND
-        }),
-      });
-
-      const data = await response.json();
-      console.log("Response:", data);
-
-      if (!response.ok) {
-        const msg = data.message || "Registration failed. Try again.";
-        if (response.status === 409) {
-          Alert.alert("Already Registered", msg);
-        } else {
-          Alert.alert("Error", msg);
-        }
-        return;
-      }
-
-      // Success: Save email & navigate
-      await AsyncStorage.setItem("pending_email", email);
-      Alert.alert(
-        "Success!",
-        "Account created! Check your email for the verification code.",
-        [{ text: "OK", onPress: () => router.push("/(auth)/parent-verify-email") }]
+      console.log("🔄 Starting registration...");
+      const result = await registerParent(
+        email.trim(),
+        password,
+        name.trim(),
+        phone,
+        dob || null,
+        true
       );
+
+      console.log("📨 Registration result:", result);
+
+      if (result.success) {
+        await AsyncStorage.setItem("pending_email", email);
+        Alert.alert(
+          "Success!",
+          "Account created! Check your email for the verification code.",
+          [{ text: "OK", onPress: () => router.push("/(auth)/parent-verify-email") }]
+        );
+      } else {
+        Alert.alert("Registration Failed", result.message || "Please try again.");
+      }
     } catch (err: any) {
-      console.error("Network error:", err);
-      Alert.alert("Network Error", "Please check your internet and try again.");
-    } finally {
-      setLoading(false);
+      console.error("Registration error:", err);
+      Alert.alert("Error", "Registration failed. Please try again.");
     }
   };
 
@@ -257,32 +234,12 @@ export default function Register() {
         <Button
           mode="contained"
           onPress={handleRegister}
-          disabled={loading}
+          disabled={isLoading}
           contentStyle={{ paddingVertical: 8 }}
           style={{ marginBottom: 16 }}
         >
-          {loading ? <ActivityIndicator color="#fff" /> : "Create Account"}
+          {isLoading ? <ActivityIndicator color="#fff" /> : "Create Account"}
         </Button>
-
-        {/* Social Login */}
-        <View style={{ flexDirection: "row", justifyContent: "center", gap: 16, marginBottom: 20 }}>
-          <Button
-            mode="outlined"
-            icon="google"
-            onPress={() => Alert.alert("Google Sign-In", "Coming soon!")}
-            compact
-          >
-            Google
-          </Button>
-          <Button
-            mode="outlined"
-            icon="apple"
-            onPress={() => Alert.alert("Apple Sign-In", "Coming soon!")}
-            compact
-          >
-            Apple
-          </Button>
-        </View>
 
         {/* Login Link */}
         <TouchableOpacity onPress={() => router.push("/(auth)/login")}>

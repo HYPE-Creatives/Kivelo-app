@@ -162,7 +162,7 @@ export const parentRegister = async (req, res) => {
   try {
     // (existing validation and creation logic unchanged)
     const { name, email, password, phone, dob, termsAccepted } = req.body;
-    if (!name?.trim() || !email?.trim() || !password || !phone?.trim() || !dob?.trim()) {
+    if (!name?.trim() || !email?.trim() || !password || !phone?.trim()) {
       return res.status(400).json({ success: false, message: 'All fields are required.' });
     }
     if (termsAccepted !== true) {
@@ -196,12 +196,15 @@ export const parentRegister = async (req, res) => {
       members: [],
     });
 
+    const dobValue = dob ? new Date(dob) : null;
+
+    // Create new user
     const user = await User.create({
       email: email.toLowerCase().trim(),
       password,
       name: name.trim(),
       phone: phone.trim(),
-      dob,
+      dob: dobValue,
       role: 'parent',
       family: family._id,
       isVerified: false,

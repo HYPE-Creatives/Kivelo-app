@@ -16,7 +16,7 @@ export const createFamily = async (req, res) => {
 
     // Upload family photo if provided
     if (req.file) {
-      const result = await CloudinaryService.uploadImage(req.file.path, 'kivelo-images/families');
+      const result = await CloudinaryService.uploadBuffer(req.file.buffer, 'families');
       familyData.familyPhoto = {
         url: result.secure_url,
         public_id: result.public_id,
@@ -53,7 +53,7 @@ export const updateFamily = async (req, res) => {
 
     // If there's a new family photo
     if (req.file) {
-      const result = await CloudinaryService.uploadImage(req.file.path, 'kivelo-images/families');
+      const result = await CloudinaryService.uploadBuffer(req.file.buffer, 'families');
       
       updateData.familyPhoto = {
         url: result.secure_url,

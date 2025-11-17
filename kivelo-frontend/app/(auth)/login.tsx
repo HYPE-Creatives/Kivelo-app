@@ -9,46 +9,47 @@ import {
   ScrollView,
   Text,
   Image,
+  ActivityIndicator,
 } from "react-native";
 import { TextInput as PaperTextInput, Button } from "react-native-paper";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
-import { useGoogleAuth } from "../../hooks/useGoogleAuth";
-import { LoginModeToggle } from "../../components/LoginModeToggle";
-import { GoogleLoginButton } from "../../components/GoogleLoginButton";
-import { loginWithGoogle, validateForm } from "../../services/authService";
-import { LoginMode, LoginFormData } from "../../types/auth";
+
+type LoginMode = "password" | "oneTimeCode";
 
 export default function LoginScreen() {
   const router = useRouter();
   const { login, loginWithOneTimeCode, isLoading } = useAuth();
   
   const [mode, setMode] = useState<LoginMode>("password");
-  const [formData, setFormData] = useState<LoginFormData>({
-    email: "",
-    password: "",
-    code: ""
-  });
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  const { googleLoading, googleRequest, handleGoogleLogin } = useGoogleAuth(
-    async (accessToken: string) => {
-      const result = await loginWithGoogle(accessToken);
-      
-      if (result.success) {
-        console.log("✅ Google login successful");
-      } else {
-        Alert.alert("Google Login Failed", result.message || "Failed to login with Google");
-      }
+  const validateForm = () => {
+    if (!email.trim()) {
+      return "Email is required";
     }
-  );
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return "Please enter a valid email";
+    }
 
-  const updateFormData = (field: keyof LoginFormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    if (mode === "password" && !password) {
+      return "Password is required";
+    }
+
+    if (mode === "oneTimeCode" && !code) {
+      return "One-time code is required";
+    }
+
+    return null;
   };
 
   const handleLogin = async () => {
-    const validationError = validateForm(mode, formData.email, formData.password, formData.code);
+    const validationError = validateForm();
     if (validationError) {
       Alert.alert("Error", validationError);
       return;
@@ -58,22 +59,20 @@ export default function LoginScreen() {
       let result;
 
       if (mode === "password") {
-        result = await login(formData.email, formData.password);
+        result = await login(email, password);
       } else {
-        result = await loginWithOneTimeCode(formData.email, formData.code);
+        result = await loginWithOneTimeCode(email, code);
       }
 
       if (result.success) {
-        if (mode === "password") {
-          Alert.alert("Success", result.message || "Login successful!");
-        }
         console.log("✅ Login successful");
+        // Navigation will happen automatically via AuthContext
       } else {
         Alert.alert("Login Failed", result.message || "Invalid credentials");
       }
     } catch (err: any) {
       console.error("Login Error:", err);
-      Alert.alert("Error", err.message || "Something went wrong while logging in");
+      Alert.alert("Error", "Something went wrong while logging in");
     }
   };
 
@@ -87,19 +86,15 @@ export default function LoginScreen() {
 
   const handleForgotPassword = () => {
     Alert.alert('Forgot Password', 
-      "Parents: Please use your email and password to login.\n\nChildren: Ask your parent to generate a new one-time code in their settings."
+      "Parents: Please use your email and password to login.\n\nChildren: Ask your parent to generate a new one-time code."
     );
   };
 
   const toggleMode = () => {
     const newMode: LoginMode = mode === "password" ? "oneTimeCode" : "password";
     setMode(newMode);
-    // Clear the unused field when switching modes
-    setFormData(prev => ({
-      ...prev,
-      password: newMode === "oneTimeCode" ? "" : prev.password,
-      code: newMode === "password" ? "" : prev.code
-    }));
+    setPassword("");
+    setCode("");
   };
 
   return (
@@ -123,14 +118,31 @@ export default function LoginScreen() {
         </View>
 
         {/* Login Mode Toggle */}
-        <LoginModeToggle mode={mode} onModeChange={setMode} />
+        <View style={styles.modeToggle}>
+          <TouchableOpacity 
+            style={[styles.modeButton, mode === "password" && styles.activeModeButton]}
+            onPress={() => setMode("password")}
+          >
+            <Text style={[styles.modeText, mode === "password" && styles.activeModeText]}>
+              Parent Login
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.modeButton, mode === "oneTimeCode" && styles.activeModeButton]}
+            onPress={() => setMode("oneTimeCode")}
+          >
+            <Text style={[styles.modeText, mode === "oneTimeCode" && styles.activeModeText]}>
+              Child Login
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.formContainer}>
           {/* Email Input */}
           <PaperTextInput
             label="Email"
-            value={formData.email}
-            onChangeText={(value) => updateFormData('email', value)}
+            value={email}
+            onChangeText={setEmail}
             style={styles.input}
             autoCapitalize="none"
             keyboardType="email-address"
@@ -143,8 +155,8 @@ export default function LoginScreen() {
           {mode === "password" ? (
             <PaperTextInput
               label="Password"
-              value={formData.password}
-              onChangeText={(value) => updateFormData('password', value)}
+              value={password}
+              onChangeText={setPassword}
               style={styles.input}
               secureTextEntry={!showPassword}
               right={
@@ -160,8 +172,8 @@ export default function LoginScreen() {
           ) : (
             <PaperTextInput
               label="One-Time Code"
-              value={formData.code}
-              onChangeText={(value) => updateFormData('code', value)}
+              value={code}
+              onChangeText={setCode}
               style={styles.input}
               keyboardType="numeric"
               mode="outlined"
@@ -189,25 +201,6 @@ export default function LoginScreen() {
             {isLoading ? "Signing In..." : "Sign In"}
           </Button>
 
-          {/* Divider */}
-          <View style={styles.dividerContainer}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          {/* Social Login */}
-          <View style={styles.socialLoginContainer}>
-            <Text style={styles.socialLoginTitle}>Continue with</Text>
-            <View style={styles.socialButtonsContainer}>
-              <GoogleLoginButton 
-                onPress={handleGoogleLogin}
-                loading={googleLoading}
-                disabled={googleLoading || !googleRequest}
-              />
-            </View>
-          </View>
-
           {/* Register Link */}
           <View style={styles.registerContainer}>
             <Text style={styles.registerText}>Don't have an account?</Text>
@@ -231,7 +224,6 @@ export default function LoginScreen() {
   );
 }
 
-// Styles remain the same as your original
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -277,6 +269,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#666",
     textAlign: "center",
+  },
+  modeToggle: {
+    flexDirection: 'row',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 8,
+    padding: 4,
+    marginBottom: 20,
+  },
+  modeButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  activeModeButton: {
+    backgroundColor: '#2E8B57',
+  },
+  modeText: {
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  activeModeText: {
+    color: 'white',
+    fontWeight: '600',
   },
   formContainer: {
     backgroundColor: "white",
@@ -339,35 +356,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#1565c0",
     lineHeight: 20,
-  },
-  dividerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#e2e8f0',
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    color: '#64748b',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  socialLoginContainer: {
-    marginBottom: 16,
-  },
-  socialLoginTitle: {
-    textAlign: 'center',
-    color: '#64748b',
-    fontSize: 14,
-    marginBottom: 16,
-    fontWeight: '500',
-  },
-  socialButtonsContainer: {
-    flexDirection: 'row',
-    gap: 12,
   },
 });

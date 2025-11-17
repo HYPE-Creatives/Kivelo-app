@@ -10,13 +10,13 @@ cloudinary.config({
 // Configure storage
 export const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: {
-    folder: 'kivelo-images',
-    format: 'jpeg',
-    public_id: (req, file) => {
-      return `${Date.now()}-${file.originalname.split('.')[0]}`;
-    },
+  params: (req, file) => {
+    return {
+      folder: "kivelo-temp", // temporary folder
+      resource_type: "image",
+    };
   },
 });
+
 
 export default cloudinary;
