@@ -4,30 +4,43 @@ import Parent from '../models/Parent.js';
 import Child from '../models/Child.js';
 import Activity from '../models/Activity.js';
 import generateToken from '../utils/generateToken.js';
+import jwt from 'jsonwebtoken';
+import { setRefreshCookie, clearRefreshCookie, ADMIN_COOKIE } from "../utils/tokenCookies.js";
 import bcrypt from 'bcryptjs';
 
 // ========================= ADMIN AUTHENTICATION =========================
-
 // Super Admin Initial Setup (Run once to create first super admin)
 export const setupSuperAdmin = async (req, res) => {
   try {
-    // Check if any super admin already exists
-    const existingSuperAdmin = await Admin.findOne({ role: 'super_admin' });
+    const { email, password, name } = req.body;
+
+    // 1️⃣ Check if a super admin already exists
+    const existingSuperAdmin = await Admin.findOne({ role: "super_admin" });
     if (existingSuperAdmin) {
       return res.status(400).json({
         success: false,
-        message: 'Super admin already exists'
+        message: "Super admin already exists",
       });
     }
 
-    const { email, password, name } = req.body;
+    // 2️⃣ Prevent duplicate email clash
+    const existingEmail = await Admin.findOne({
+      email: email.toLowerCase().trim(),
+    });
 
-    // Create super admin with all permissions
+    if (existingEmail) {
+      return res.status(409).json({
+        success: false,
+        message: "Email already in use by an existing admin",
+      });
+    }
+
+    // 3️⃣ Create super admin
     const superAdmin = await Admin.create({
-      email,
+      email: email.toLowerCase().trim(),
       password,
       name,
-      role: 'super_admin',
+      role: "super_admin",
       permissions: {
         users: true,
         parents: true,
@@ -35,24 +48,26 @@ export const setupSuperAdmin = async (req, res) => {
         activities: true,
         analytics: true,
         settings: true,
-        admins: true // Add admins permission for super admin
-      }
+        admins: true,
+        audit: true,
+      },
     });
 
-    const token = generateToken(superAdmin._id, 'admin');
+    // 4️⃣ JWT — access token only (no refresh cookie here)
+    const { accessToken } = generateToken(superAdmin._id, "super_admin");
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
-      message: 'Super admin created successfully',
-      token,
-      admin: superAdmin.toSafeObject()
+      message: "Super admin created successfully",
+      accessToken,
+      admin: superAdmin.toSafeObject(),
     });
 
   } catch (error) {
-    console.error('Setup super admin error:', error);
-    res.status(500).json({
+    console.error("Setup super admin error:", error);
+    return res.status(500).json({
       success: false,
-      message: 'Error setting up super admin'
+      message: "Error setting up super admin",
     });
   }
 };
@@ -65,58 +80,165 @@ export const adminLogin = async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Email and password are required'
+        message: "Email and password are required",
       });
     }
 
-    // Find admin with password
-    const admin = await Admin.findOne({ email: email.toLowerCase().trim() }).select('+password');
-    
+    const admin = await Admin.findOne({
+      email: email.toLowerCase().trim(),
+    }).select("+password +refreshToken");
+
     if (!admin) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: "Invalid email or password",
       });
     }
 
     if (!admin.isActive) {
-      return res.status(401).json({
+      return res.status(403).json({
         success: false,
-        message: 'Admin account is deactivated'
+        message: "Admin account is deactivated",
       });
     }
 
-    // Check password
-    const isPasswordValid = await admin.comparePassword(password);
-    if (!isPasswordValid) {
+    // Validate password
+    const valid = await admin.comparePassword(password);
+    if (!valid) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: "Invalid email or password",
       });
     }
 
-    // Update last login
+    // Generate tokens
+    const { accessToken, refreshToken } = generateToken(admin._id, admin.role);
+
+    // Save refreshToken to DB
+    admin.refreshToken = refreshToken;
     admin.lastLogin = new Date();
     await admin.save();
 
-    const token = generateToken(admin._id, 'admin');
+    // Set cookie
+    setRefreshCookie(res, ADMIN_COOKIE, refreshToken, "/api/admin/refresh");
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message: 'Admin login successful',
-      token,
-      admin: admin.toSafeObject()
+      message: "Admin login successful",
+      accessToken,
+      admin: admin.toSafeObject(),
     });
-
   } catch (error) {
-    console.error('Admin login error:', error);
-    res.status(500).json({
+    console.error("Admin login error:", error);
+    return res.status(500).json({
       success: false,
-      message: 'Server error during admin login'
+      message: "Server error during admin login",
     });
   }
 };
 
+// Refresh admin token
+export const refreshAdminToken = async (req, res) => {
+  try {
+    const refreshToken = req.cookies?.kivelo_admin_refresh;
+
+    if (!refreshToken) {
+      return res.status(401).json({
+        success: false,
+        message: "Refresh token missing",
+      });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    } catch (err) {
+      res.clearCookie("kivelo_admin_refresh", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        path: "/api/admin/refresh",
+      });
+
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or expired refresh token",
+      });
+    }
+
+    const admin = await Admin.findById(decoded.id).select("+refreshToken");
+
+    if (!admin || admin.refreshToken !== refreshToken) {
+      res.clearCookie("kivelo_admin_refresh", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        path: "/api/admin/refresh",
+      });
+
+      return res.status(401).json({
+        success: false,
+        message: "Refresh token mismatch",
+      });
+    }
+
+    // ROTATE TOKENS
+    const { accessToken, refreshToken: newRefresh } = generateToken(
+      admin._id,
+      admin.role // super_admin / admin / guest_admin
+    );
+
+    admin.refreshToken = newRefresh;
+    await admin.save();
+
+    res.cookie("kivelo_admin_refresh", newRefresh, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      path: "/api/admin/refresh",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return res.json({
+      success: true,
+      accessToken,
+    });
+
+  } catch (error) {
+    console.error("Admin refresh error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Admin refresh operation failed",
+    });
+  }
+};
+
+
+// Admin Logout
+export const adminLogout = async (req, res) => {
+  try {
+    if (req.admin) {
+      const admin = await Admin.findById(req.admin._id);
+      if (admin) {
+        admin.refreshToken = null;
+        await admin.save();
+      }
+    }
+
+    clearRefreshCookie(res, ADMIN_COOKIE, "/api/admin/refresh");
+
+    return res.status(200).json({
+      success: true,
+      message: "Admin logged out successfully.",
+    });
+  } catch (error) {
+    console.error("Admin logout error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Logout failed.",
+    });
+  }
+};
 // ========================= ADMIN MANAGEMENT =========================
 
 // Create new admin (Super Admin only)
@@ -776,3 +898,4 @@ export const changeAdminPassword = async (req, res) => {
     });
   }
 };
+

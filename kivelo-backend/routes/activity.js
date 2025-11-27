@@ -11,6 +11,22 @@ const router = express.Router();
 
 /**
  * @swagger
+ * components:
+ *   securitySchemes:
+ *     ApiKeyAuth:
+ *       type: "apiKey"
+ *       in: "header"
+ *       name: "x-api-key"
+ *       description: "API key required for all backend access"
+ *     bearerAuth:
+ *       type: "http"
+ *       scheme: "bearer"
+ *       bearerFormat: "JWT"
+ *       description: "JWT Authorization header using the Bearer scheme"
+ */
+
+/**
+ * @swagger
  * tags:
  *   name: Activities
  *   description: User activity management
@@ -23,6 +39,7 @@ const router = express.Router();
  *     summary: Get all user activities
  *     tags: [Activities]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     responses:
  *       200:
@@ -58,6 +75,7 @@ router.get('/', auth, getUserActivities);
  *     summary: Create a new activity
  *     tags: [Activities]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
@@ -92,6 +110,7 @@ router.post('/', auth, createActivity);
  *     summary: Update an existing activity
  *     tags: [Activities]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -130,6 +149,7 @@ router.put('/:id', auth, updateActivity);
  *     summary: Delete an activity
  *     tags: [Activities]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path

@@ -6,9 +6,25 @@ const router = express.Router();
 
 /**
  * @swagger
+ * components:
+ *   securitySchemes:
+ *     ApiKeyAuth:
+ *       type: "apiKey"
+ *       in: "header"
+ *       name: "x-api-key"
+ *       description: "API key required for all backend access"
+ *     bearerAuth:
+ *       type: "http"
+ *       scheme: "bearer"
+ *       bearerFormat: "JWT"
+ *       description: "JWT Authorization header using the Bearer scheme"
+ */
+
+/**
+ * @swagger
  * tags:
  *   - name: Moods
- *     description: Manage and track children’s mood records
+ *     description: Manage and track children's mood records
  */
 
 /**
@@ -18,6 +34,7 @@ const router = express.Router();
  *     summary: Record a child's mood
  *     tags: [Moods]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     description: Record a mood entry for a specific child. Accessible by authenticated parents or the child user.
  *     requestBody:
@@ -70,6 +87,7 @@ router.post("/record", auth, recordMood);
  *     summary: Get all moods recorded for a specific child
  *     tags: [Moods]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path

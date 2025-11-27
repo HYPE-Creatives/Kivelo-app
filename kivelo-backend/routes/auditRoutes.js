@@ -13,6 +13,11 @@ const router = express.Router();
  * @swagger
  * components:
  *   securitySchemes:
+ *     ApiKeyAuth:
+ *       type: "apiKey"
+ *       in: "header"
+ *       name: "x-api-key"
+ *       description: "API key required for all backend access"
  *     bearerAuth:
  *       type: http
  *       scheme: bearer
@@ -120,6 +125,7 @@ const router = express.Router();
  *     description: Returns system audit logs with filtering and pagination. Accessible by all admins with audit permission.
  *     tags: [Audit]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
@@ -240,6 +246,7 @@ router.get("/", requireAdminAuth, requirePermission('audit'), getAuditLogs);
  *     description: Export filtered audit logs for download. Accessible by all admins with audit permission.
  *     tags: [Audit]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
@@ -308,6 +315,7 @@ router.get("/export", requireAdminAuth, requirePermission('audit'), exportAuditL
  *     description: Fetch the complete details of a specific audit log entry. Accessible by all admins with audit permission.
  *     tags: [Audit]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -352,6 +360,7 @@ router.get("/:id", requireAdminAuth, requirePermission('audit'), getAuditLogById
  *     description: Manually create a new audit log entry. Typically used for internal system events. Automatically captures the admin making the request.
  *     tags: [Audit]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     requestBody:
  *       required: true

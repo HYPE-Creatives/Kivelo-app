@@ -40,8 +40,15 @@ const adminSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-  lastLogin: { 
-    type: Date 
+  lastLogin: {
+    type: Date
+  },
+
+  // For session management - refresh tokens
+  refreshToken: {
+    type: String,
+    default: null,
+    select: false,
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -55,7 +62,7 @@ const adminSchema = new mongoose.Schema({
   lockUntil: {
     type: Date,
     select: false
-  } 
+  }
 }, {
   timestamps: true
 });
@@ -65,15 +72,18 @@ const adminSchema = new mongoose.Schema({
 // adminSchema.index({ role: 1 });  // REMOVE THIS - not necessary unless compound index
 // adminSchema.index({ isActive: 1 }); // REMOVE THIS - not necessary unless compound index
 
+// Keep only necessary indexes
+adminSchema.index({ refreshToken: 1 });
+
 // Virtual for checking if account is locked
-adminSchema.virtual('isLocked').get(function() {
+adminSchema.virtual('isLocked').get(function () {
   return !!(this.lockUntil && this.lockUntil > Date.now());
 });
 
 // Hash password before saving
-adminSchema.pre('save', async function(next) {
+adminSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
-  
+
   try {
     const salt = await bcrypt.genSalt(12);
     this.password = await bcrypt.hash(this.password, salt);
@@ -84,13 +94,13 @@ adminSchema.pre('save', async function(next) {
 });
 
 // Compare password method
-adminSchema.methods.comparePassword = async function(candidatePassword) {
+adminSchema.methods.comparePassword = async function (candidatePassword) {
   if (this.isLocked) {
     throw new Error('Account is temporarily locked due to too many failed login attempts');
   }
-  
+
   const isMatch = await bcrypt.compare(candidatePassword, this.password);
-  
+
   if (!isMatch) {
     this.loginAttempts += 1;
     if (this.loginAttempts >= 5) {
@@ -99,29 +109,33 @@ adminSchema.methods.comparePassword = async function(candidatePassword) {
     await this.save();
     return false;
   }
-  
+
   // Reset login attempts on successful login
   if (this.loginAttempts > 0) {
     this.loginAttempts = 0;
     this.lockUntil = undefined;
     await this.save();
   }
-  
+
   return true;
 };
 
 // Method to check permission
-adminSchema.methods.hasPermission = function(permission) {
+adminSchema.methods.hasPermission = function (permission) {
   if (this.role === 'super_admin') return true;
   return this.permissions[permission] === true;
 };
 
 // Method to get safe admin data (without sensitive info)
-adminSchema.methods.toSafeObject = function() {
+adminSchema.methods.toSafeObject = function () {
   const admin = this.toObject();
   delete admin.password;
   delete admin.loginAttempts;
   delete admin.lockUntil;
+  delete admin.refreshToken;
+
+  // Mongoose internal fields cleanup (optional but good practice)
+  delete admin.__v;
   return admin;
 };
 

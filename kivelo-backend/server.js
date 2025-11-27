@@ -4,10 +4,14 @@ import User from './models/User.js';
 import dotenv from 'dotenv';
 dotenv.config();
 
+import compression from 'compression';
 import helmet from 'helmet';
 import express from 'express';
+import getProDashboard from "./utils/proDashboard.js";
 import cors from 'cors';
-import rateLimit from 'express-rate-limit';
+import { apiKeyMiddleware } from './middleware/apiKey.js';
+import { rateLimiter } from "./middleware/rateLimiter.js";
+// import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';   // ✅ ADDED
 import { swaggerDocs } from './config/swagger.js';
 import connectDB from './config/database.js';
@@ -18,6 +22,7 @@ import userRoutes from './routes/users.js';
 import familyRoutes from './routes/familyRoutes.js';
 import parentRoutes from './routes/parents.js';
 import childRoutes from './routes/children.js';
+import aiRoutes from "./routes/ai.js";
 import activityRoutes from './routes/activity.js';
 import moodRoutes from "./routes/mood.js";
 import auditRoutes from "./routes/auditRoutes.js";
@@ -40,6 +45,10 @@ const app = express();
 
 // ========================= SECURITY HEADERS =========================
 app.use(helmet());
+
+// ========================= COMPRESSION =========================
+// Enable gzip compression for responses
+app.use(compression());
 
 // ========================= COOKIE PARSER =========================
 // MUST BE ADDED BEFORE ROUTES
@@ -66,13 +75,25 @@ app.use(
   })
 );
 
+// Protect entire backend - Allow swagger access without API key
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api-docs") || req.path.startsWith("/api/ai") || req.path.startsWith("/") || req.path.startsWith("/api/")) {
+    return next();
+  }
+  apiKeyMiddleware(req, res, next);
+});
+
+
+// Apply rate limits globally
+app.use(rateLimiter);
+
 // ========================= RATE LIMIT =========================
-app.use(
-  rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
-  })
-);
+// app.use(
+//   rateLimit({
+//     windowMs: 15 * 60 * 1000,  // 15 minutes
+//     max: 100,
+//   })
+// );
 
 // ========================= BODY PARSERS =========================
 app.use(express.json());
@@ -90,12 +111,22 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use(express.static(path.join(__dirname, "public")));
 
 // ========================= ROUTES =========================
+// app.get("/", (req, res) => {
+//   res.send("Welcome to Kivelo API");
+// });
+// app.get("/api", (req, res) => {
+//   res.send("Welcome to Kivelo API");
+// });
+//========================== PRO DASHBOARD =========================
+
 app.get("/", (req, res) => {
-  res.send("Welcome to Kivelo API");
+  res.send(getProDashboard("KIVELO API – Home"));
 });
+
 app.get("/api", (req, res) => {
-  res.send("Welcome to Kivelo API");
+  res.send(getProDashboard("KIVELO API – API Overview"));
 });
+
 
 app.use("/api/auth", authRoutes);      // <-- refresh route will read secure cookie
 app.use("/api/admin", adminRoutes);
@@ -104,6 +135,7 @@ app.use("/api/children", childRoutes);
 app.use("/api/activity", activityRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/families", familyRoutes);
+app.use("/api/ai", aiRoutes);
 app.use("/api/moods", moodRoutes);
 app.use("/api/audit", auditRoutes);
 

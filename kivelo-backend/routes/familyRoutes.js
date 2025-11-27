@@ -94,6 +94,11 @@ const router = express.Router();
  *         family:
  *           $ref: '#/components/schemas/Family'
  *   securitySchemes:
+ *     ApiKeyAuth:
+ *       type: "apiKey"
+ *       in: "header"
+ *       name: "x-api-key"
+ *       description: "API key required for all backend access"
  *     bearerAuth:
  *       type: http
  *       scheme: bearer
@@ -108,6 +113,7 @@ const router = express.Router();
  *     description: Create a new family with optional family photo. The authenticated user becomes the family admin.
  *     tags: [Families]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
@@ -189,6 +195,7 @@ router.post('/', auth, uploadSingle('familyPhoto'), createFamily);
  *     description: Update family details and/or photo. Only the family admin can update the family.
  *     tags: [Families]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -274,6 +281,7 @@ router.put('/:id', auth, uploadSingle('familyPhoto'), updateFamily);
  *     description: Remove the family photo. Only the family admin can delete the photo.
  *     tags: [Families]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path

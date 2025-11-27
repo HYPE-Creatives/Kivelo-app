@@ -24,6 +24,22 @@ import {
 
 /**
  * @swagger
+ * components:
+ *   securitySchemes:
+ *     ApiKeyAuth:
+ *       type: "apiKey"
+ *       in: "header"
+ *       name: "x-api-key"
+ *       description: "API key required for all backend access"
+ *     bearerAuth:
+ *       type: "http"
+ *       scheme: "bearer"
+ *       bearerFormat: "JWT"
+ *       description: "JWT Authorization header using the Bearer scheme"
+ */
+
+/**
+ * @swagger
  * tags:
  *   - name: Parents
  *     description: Manage parent profiles, children, billing, subscriptions, and family dashboard
@@ -36,6 +52,7 @@ import {
  *     summary: Get parent profile
  *     tags: [Parents]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     description: Retrieve the logged-in parent's profile information.
  *     responses:
@@ -53,6 +70,7 @@ router.get('/', auth, getParentProfile);
  *     summary: Update parent profile
  *     tags: [Parents]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
@@ -77,6 +95,7 @@ router.put('/', auth, updateParentProfile);
  *     summary: Get list of children
  *     tags: [Parents]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     responses:
  *       200:
@@ -91,6 +110,7 @@ router.get('/children-list', auth, getChildrenList);
  *     summary: Add a new child
  *     tags: [Parents]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
@@ -121,6 +141,7 @@ router.post('/children-list', auth, addChild);
  *     summary: Update child information
  *     tags: [Parents]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -150,6 +171,7 @@ router.put('/children-list/:childId', auth, updateChild);
  *     summary: Remove child from family
  *     tags: [Parents]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -170,6 +192,7 @@ router.delete('/children-list/:childId', auth, removeChild);
  *     summary: Get family dashboard
  *     tags: [Parents]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     description: Get parent dashboard with family summary, children stats, and notifications.
  *     responses:
@@ -185,6 +208,7 @@ router.get('/dashboard', auth, getFamilyDashboard);
  *     summary: Get activity reports for all children
  *     tags: [Parents]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     responses:
  *       200:
@@ -199,6 +223,7 @@ router.get('/reports', auth, getActivityReports);
  *     summary: Get billing information
  *     tags: [Parents]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     responses:
  *       200:
@@ -213,6 +238,7 @@ router.get('/billing', auth, getBillingInfo);
  *     summary: Update billing information
  *     tags: [Parents]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
@@ -236,6 +262,7 @@ router.put('/billing', auth, updateBillingInfo);
  *     summary: Get subscription details
  *     tags: [Parents]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     responses:
  *       200:
@@ -250,6 +277,7 @@ router.get('/subscription', auth, getSubscription);
  *     summary: Update subscription plan
  *     tags: [Parents]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
@@ -272,6 +300,7 @@ router.put('/subscription', auth, updateSubscription);
  *     summary: Get parent notifications
  *     tags: [Parents]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     responses:
  *       200:
@@ -286,6 +315,7 @@ router.get('/notifications', auth, getNotifications);
  *     summary: Mark a notification as read
  *     tags: [Parents]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -307,6 +337,7 @@ router.put('/notifications/:notificationId/read', auth, markNotificationAsRead);
  *     summary: Get family settings
  *     tags: [Parents]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     responses:
  *       200:
@@ -321,6 +352,7 @@ router.get('/settings', auth, getFamilySettings);
  *     summary: Update family settings
  *     tags: [Parents]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
@@ -343,6 +375,7 @@ router.put('/settings', auth, updateFamilySettings);
  *     summary: Get mood data for a specific child
  *     tags: [Parents]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -364,6 +397,7 @@ router.get('/moods/:childId', auth, getChildMoods);
  *     summary: Get mood summary for a specific child
  *     tags: [Parents]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path

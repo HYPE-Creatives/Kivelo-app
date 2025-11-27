@@ -60,18 +60,38 @@ const router = express.Router();
  *           items:
  *             type: string
  *   securitySchemes:
+ *     ApiKeyAuth:
+ *       type: "apiKey"
+ *       in: "header"
+ *       name: "x-api-key"
+ *       description: "API key required for all backend access"
  *     bearerAuth:
  *       type: http
  *       scheme: bearer
  *       bearerFormat: JWT
  */
 
-// All routes are authed
 /**
  * @swagger
  * tags:
  *   name: Users
  *   description: User management and profile operations
+ */
+
+/**
+ * @swagger
+ * /api/users/profile:
+ *   get:
+ *     summary: Get user profile
+ *     tags: [Users]
+ *     security:
+ *       - ApiKeyAuth: []
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Profile retrieved successfully
+ *       401:
+ *         description: Unauthorized
  */
 router.get('/profile', auth, auditLogger("user.view.profile"), getProfile);
 
@@ -82,6 +102,7 @@ router.get('/profile', auth, auditLogger("user.view.profile"), getProfile);
  *     summary: Update user profile with optional avatar
  *     tags: [Users]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
@@ -115,6 +136,7 @@ router.put('/profile', auth, uploadSingle('avatar'), auditLogger((req) => `user.
  *     summary: Update user password
  *     tags: [Users]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
@@ -138,7 +160,38 @@ router.put('/profile', auth, uploadSingle('avatar'), auditLogger((req) => `user.
  */
 router.put('/update-password', auth, auditLogger("user.update.password"), updatePassword);
 
+/**
+ * @swagger
+ * /api/users/deactivate:
+ *   put:
+ *     summary: Deactivate user account
+ *     tags: [Users]
+ *     security:
+ *       - ApiKeyAuth: []
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Account deactivated successfully
+ *       401:
+ *         description: Unauthorized
+ */
 router.put('/deactivate', auth, auditLogger("user.deactivate"), deactivateAccount);
+
+/**
+ * @swagger
+ * /api/users/dashboard:
+ *   get:
+ *     summary: Get user dashboard statistics
+ *     tags: [Users]
+ *     security:
+ *       - ApiKeyAuth: []
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Dashboard statistics retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ */
 router.get('/dashboard', auth, auditLogger("user.view.dashboard"), getDashboardStats);
 
 /** 
@@ -148,6 +201,7 @@ router.get('/dashboard', auth, auditLogger("user.view.dashboard"), getDashboardS
  *     summary: Upload user avatar to Cloudinary
  *     tags: [Users]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
@@ -188,6 +242,7 @@ router.post('/avatar', auth, uploadSingle('avatar'), auditLogger("user.upload.av
  *     description: Permanently removes avatar image from Cloudinary storage and user profile
  *     tags: [Users]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     responses:
  *       200:

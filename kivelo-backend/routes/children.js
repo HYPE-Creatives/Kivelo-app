@@ -15,6 +15,22 @@ import {
 
 /**
  * @swagger
+ * components:
+ *   securitySchemes:
+ *     ApiKeyAuth:
+ *       type: "apiKey"
+ *       in: "header"
+ *       name: "x-api-key"
+ *       description: "API key required for all backend access"
+ *     bearerAuth:
+ *       type: "http"
+ *       scheme: "bearer"
+ *       bearerFormat: "JWT"
+ *       description: "JWT Authorization header using the Bearer scheme"
+ */
+
+/**
+ * @swagger
  * tags:
  *   - name: Children
  *     description: Manage child profiles, activities, and progress
@@ -27,6 +43,7 @@ import {
  *     summary: Get child profile
  *     tags: [Children]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     description: Retrieve the logged-in child's profile (accessible to Child or Parent).
  *     responses:
@@ -63,6 +80,7 @@ router.get('/', auth, getChildProfile);
  *     summary: Update child profile
  *     tags: [Children]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     description: Update profile details of the logged-in child (accessible to Child or Parent).
  *     requestBody:
@@ -90,8 +108,9 @@ router.put('/', auth, updateChildProfile);
  *     summary: Get child dashboard data
  *     tags: [Children]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
- *     description: Retrieve child’s personalized dashboard information such as recent activities, goals, and progress summary.
+ *     description: Retrieve child's personalized dashboard information such as recent activities, goals, and progress summary.
  *     responses:
  *       200:
  *         description: Dashboard data retrieved successfully
@@ -107,6 +126,7 @@ router.get('/dashboard', auth, getChildDashboard);
  *     summary: Get child activities
  *     tags: [Children]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     description: Retrieve all activities for a child (accessible by Child or Parent).
  *     responses:
@@ -124,6 +144,7 @@ router.get('/activities', auth, getChildActivities);
  *     summary: Add a new activity for a child
  *     tags: [Children]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     description: Add a new activity to a child's record (Parent only).
  *     requestBody:
@@ -157,6 +178,7 @@ router.post('/activities', auth, addChildActivity);
  *     summary: Update a child's activity
  *     tags: [Children]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -191,6 +213,7 @@ router.put('/activities/:activityId', auth, updateChildActivity);
  *     summary: Delete a child's activity
  *     tags: [Children]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -216,6 +239,7 @@ router.delete('/activities/:activityId', auth, deleteChildActivity);
  *     summary: Get child progress reports
  *     tags: [Children]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     description: Retrieve progress and performance reports for a child (accessible by Parent only).
  *     responses:
@@ -233,6 +257,7 @@ router.get('/progress', auth, getChildProgress);
  *     summary: Update child preferences
  *     tags: [Children]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     description: Update a child's preferences (Child only).
  *     requestBody:

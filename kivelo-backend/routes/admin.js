@@ -3,6 +3,8 @@ import {
   // Auth
   setupSuperAdmin,
   adminLogin,
+  refreshAdminToken,
+  adminLogout,
 
   // Admin Management
   createAdmin,
@@ -40,6 +42,11 @@ const router = express.Router();
  * @swagger
  * components:
  *   securitySchemes:
+ *     ApiKeyAuth:
+ *       type: "apiKey"
+ *       in: "header"
+ *       name: "x-api-key"
+ *       description: "API key required for all backend access"
  *     bearerAuth:
  *       type: http
  *       scheme: bearer
@@ -67,6 +74,9 @@ const router = express.Router();
  *         permissions:
  *           type: object
  *           properties:
+ *             audit:
+ *               type: boolean
+ *               example: true
  *             users:
  *               type: boolean
  *               example: true
@@ -99,6 +109,10 @@ const router = express.Router();
  *     Permissions:
  *       type: object
  *       properties:
+ *         audit:
+ *           type: boolean
+ *           description: Permission to view audit logs 
+ *           example: true
  *         users:
  *           type: boolean
  *           description: Permission to manage users
@@ -163,7 +177,12 @@ const router = express.Router();
  *   post:
  *     summary: Initialize system by creating the first Super Admin
  *     tags: [Admin Auth]
- *     description: Run once to create the first Super Admin. Intended to be executed via Postman or setup script.
+ *     security:
+ *       - ApiKeyAuth: []
+ *     description: |
+ *       Run once to create the first Super Admin. Intended to be executed via Postman or setup script.
+ *       
+ *       **Note:** This endpoint only requires API key authentication, not JWT.
  *     requestBody:
  *       required: true
  *       content:
@@ -198,7 +217,7 @@ const router = express.Router();
  *                 message:
  *                   type: string
  *                   example: "Super admin created successfully"
- *                 token:
+ *                 accessToken:
  *                   type: string
  *                   example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
  *                 admin:
@@ -209,6 +228,8 @@ const router = express.Router();
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Error'
+ *       409:
+ *         description: Email already in use
  *       500:
  *         description: Internal server error
  *         content:
@@ -224,6 +245,16 @@ router.post('/setup-super-admin', setupSuperAdmin);
  *   post:
  *     summary: Login an admin
  *     tags: [Admin Auth]
+ *     security:
+ *       - ApiKeyAuth: []
+ *     description: |
+ *       Authenticate admin and return JWT tokens.
+ *       
+ *       **Returns:**
+ *       - **accessToken** in JSON response
+ *       - **refreshToken** in secure HTTP-only cookie (`kivelo_admin_refresh`)
+ *       
+ *       **Note:** This endpoint only requires API key authentication, not JWT.
  *     requestBody:
  *       required: true
  *       content:
@@ -254,9 +285,12 @@ router.post('/setup-super-admin', setupSuperAdmin);
  *                 message:
  *                   type: string
  *                   example: "Admin login successful"
- *                 token:
+ *                 accessToken:
  *                   type: string
  *                   example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *                 setCookie:
+ *                   type: string
+ *                   example: "Refresh token sent via HttpOnly cookie (kivelo_admin_refresh)"
  *                 admin:
  *                   $ref: '#/components/schemas/Admin'
  *       400:
@@ -266,11 +300,9 @@ router.post('/setup-super-admin', setupSuperAdmin);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  *       401:
- *         description: Invalid credentials or deactivated account
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ *         description: Invalid credentials
+ *       403:
+ *         description: Admin account is deactivated
  *       500:
  *         description: Internal server error
  *         content:
@@ -279,6 +311,94 @@ router.post('/setup-super-admin', setupSuperAdmin);
  *               $ref: '#/components/schemas/Error'
  */
 router.post('/login', adminLogin);
+
+/**
+ * @swagger
+ * /api/admin/refresh:
+ *   post:
+ *     summary: Refresh admin access token using cookie
+ *     tags: [Admin Auth]
+ *     security:
+ *       - ApiKeyAuth: []
+ *     description: |
+ *       Refreshes the admin's access token using the secure HTTP-only  
+ *       `kivelo_admin_refresh` cookie that was set during login.  
+ *
+ *       **No refresh token should be sent in the request body or headers.**  
+ *       Swagger UI may show an API key input, but leave it empty.
+ *
+ *       **Note:** This endpoint only requires API key authentication, not JWT.
+ *     responses:
+ *       200:
+ *         description: New access token generated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 accessToken:
+ *                   type: string
+ *                   example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *                 message:
+ *                   type: string
+ *                   example: "New admin access token generated"
+ *       401:
+ *         description: Missing or invalid refresh cookie
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Refresh token not found"
+ *       500:
+ *         description: Server error while refreshing token
+ */
+router.post('/refresh', refreshAdminToken);
+
+/**
+ * @swagger
+ * /api/admin/logout:
+ *   post:
+ *     summary: Logout admin user
+ *     tags: [Admin Auth]
+ *     security:
+ *       - ApiKeyAuth: []
+ *       - bearerAuth: []
+ *     description: |
+ *       Logout admin and invalidate refresh token.
+ *       
+ *       **After Logout:**
+ *       - Refresh token cookie is cleared from the client
+ *       - Admin's refresh token in the database is invalidated
+ *       - Admin's session is terminated
+ *     responses:
+ *       200:
+ *         description: Admin logged out successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Admin logged out successfully"
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error during logout
+ */
+router.post('/logout', requireAdminAuth, adminLogout);
 
 // ==================== ADMIN MANAGEMENT ROUTES ====================
 
@@ -289,6 +409,7 @@ router.post('/login', adminLogin);
  *     summary: Create a new admin (Super Admin only)
  *     tags: [Admin Management]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
@@ -350,6 +471,7 @@ router.post('/admins', requireAdminAuth, requireSuperAdmin, createAdmin);
  *     summary: Get all admins with pagination (Super Admin only)
  *     tags: [Admin Management]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
@@ -370,10 +492,9 @@ router.post('/admins', requireAdminAuth, requireSuperAdmin, createAdmin);
  *       - in: query
  *         name: role
  *         schema:
- *           AdminRole:
- *             type: string
- *             enum: [super_admin, admin, guest_admin]
- *             example: "admin"
+ *           type: string
+ *           enum: [super_admin, admin, guest_admin]
+ *           example: "admin"
  *         description: Filter by admin role
  *       - in: query
  *         name: isActive
@@ -423,6 +544,7 @@ router.get('/admins', requireAdminAuth, requireSuperAdmin, getAdmins);
  *     summary: Update admin details
  *     tags: [Admin Management]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -485,6 +607,7 @@ router.put('/admins/:id', requireAdminAuth, requireSuperAdmin, updateAdmin);
  *     summary: Set admin permissions (Super Admin only)
  *     tags: [Admin Permissions]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -544,6 +667,7 @@ router.patch('/admins/:id/permissions', requireAdminAuth, requireSuperAdmin, set
  *     summary: Get admin permissions
  *     tags: [Admin Permissions]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -596,6 +720,7 @@ router.get('/admins/:id/permissions', requireAdminAuth, getAdminPermissions);
  *     summary: Delete an admin (Super Admin only)
  *     tags: [Admin Management]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -640,6 +765,7 @@ router.delete('/admins/:id', requireAdminAuth, requireSuperAdmin, deleteAdmin);
  *     summary: Get all users with filtering and pagination
  *     tags: [User Management]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
@@ -716,6 +842,7 @@ router.get('/users', requireAdminAuth, requirePermission('users'), getUsers);
  *     summary: Get user details including parent/child specific data
  *     tags: [User Management]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -756,6 +883,7 @@ router.get('/users/:id', requireAdminAuth, requirePermission('users'), getUserDe
  *     summary: Update user account status
  *     tags: [User Management]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
@@ -813,6 +941,7 @@ router.put('/users/:id/status', requireAdminAuth, requirePermission('users'), up
  *     summary: Get admin dashboard overview with statistics
  *     tags: [Analytics]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     responses:
  *       200:
@@ -870,6 +999,7 @@ router.get('/dashboard', requireAdminAuth, requirePermission('analytics'), getAd
  *     summary: Get system analytics data including growth metrics
  *     tags: [Analytics]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     responses:
  *       200:
@@ -912,6 +1042,7 @@ router.get('/analytics', requireAdminAuth, requirePermission('analytics'), getSy
  *     summary: Retrieve current system settings (Super Admin only)
  *     tags: [System Management]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     responses:
  *       200:
@@ -958,6 +1089,7 @@ router.get('/settings', requireAdminAuth, requireSuperAdmin, getSystemSettings);
  *     summary: Update system settings (Super Admin only)
  *     tags: [System Management]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
@@ -1003,6 +1135,7 @@ router.put('/settings', requireAdminAuth, requireSuperAdmin, updateSystemSetting
  *     summary: Update admin profile information
  *     tags: [System Management]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
@@ -1049,6 +1182,7 @@ router.put('/profile', requireAdminAuth, updateAdminProfile);
  *     summary: Change admin password
  *     tags: [System Management]
  *     security:
+ *       - ApiKeyAuth: []
  *       - bearerAuth: []
  *     requestBody:
  *       required: true
@@ -1089,4 +1223,36 @@ router.put('/profile', requireAdminAuth, updateAdminProfile);
  */
 router.put('/change-password', requireAdminAuth, changeAdminPassword);
 
+/**
+ * @swagger
+ * /api/admin/debug:
+ *   get:
+ *     summary: Debug endpoint to check admin role and permissions
+ *     tags: [Admin Auth]
+ *     security:
+ *       - ApiKeyAuth: []
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Current admin details
+ */
+router.get('/debug', requireAdminAuth, (req, res) => {
+  console.log('=== ADMIN DEBUG INFO ===');
+  console.log('Admin ID:', req.admin._id);
+  console.log('Admin Role:', req.admin.role);
+  console.log('Admin Permissions:', req.admin.permissions);
+  console.log('JWT Decoded Role:', req.admin.role); // This comes from the token verification
+  
+  res.json({
+    success: true,
+    admin: {
+      _id: req.admin._id,
+      name: req.admin.name,
+      email: req.admin.email,
+      role: req.admin.role,
+      permissions: req.admin.permissions,
+      isActive: req.admin.isActive
+    }
+  });
+});
 export default router;

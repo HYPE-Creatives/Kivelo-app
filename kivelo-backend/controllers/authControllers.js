@@ -551,6 +551,7 @@ export const refreshAccessToken = async (req, res) => {
 };
 
 // ========================= GENERATE / REGENERATE ONE-TIME CODE =========================
+// For parents to generate codes for their children
 export const generateOneTimeCode = async (req, res) => {
   try {
     const { childEmail, childName, childDOB, childGender } = req.body;

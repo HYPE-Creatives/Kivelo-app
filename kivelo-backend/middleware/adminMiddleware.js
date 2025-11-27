@@ -1,14 +1,13 @@
 import jwt from "jsonwebtoken";
 import Admin from "../models/Admin.js";
 
-/**
- * Middleware: Authenticate Admin using JWT
- */
+// ===============================
+// AUTHENTICATE ADMIN ACCESS TOKEN
+// ===============================
 export const requireAdminAuth = async (req, res, next) => {
   try {
     let token;
 
-    // Extract token from "Authorization" header
     if (req.headers.authorization?.startsWith("Bearer ")) {
       token = req.headers.authorization.split(" ")[1];
     }
@@ -16,86 +15,77 @@ export const requireAdminAuth = async (req, res, next) => {
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: "Access denied. No admin token provided.",
+        message: "No admin access token provided",
       });
     }
 
-    // Verify token signature
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    // Fetch admin from DB
-    const admin = await Admin.findById(decoded.id).select("+password");
-    if (!admin) {
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
       return res.status(401).json({
         success: false,
-        message: "Admin not found.",
+        message: "Invalid or expired admin token",
       });
     }
 
-    // Check account status
+    // ROLE MUST BE ADMIN TYPE
+    if (!["admin", "super_admin", "guest_admin"].includes(decoded.role)) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized role for admin access",
+      });
+    }
+
+    const admin = await Admin.findById(decoded.id);
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: "Admin not found",
+      });
+    }
+
     if (!admin.isActive) {
       return res.status(403).json({
         success: false,
-        message: "Admin account is deactivated.",
+        message: "Admin account is deactivated",
       });
     }
 
-    // Attach verified admin to request
     req.admin = admin;
     next();
+
   } catch (error) {
     console.error("Admin auth error:", error);
-
-    // Handle common JWT errors
-    if (error.name === "TokenExpiredError") {
-      return res.status(401).json({
-        success: false,
-        message: "Admin token expired. Please log in again.",
-      });
-    }
-
-    if (error.name === "JsonWebTokenError") {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid admin token.",
-      });
-    }
-
-    // Default catch-all
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: "Server error during admin authentication.",
+      message: "Server error during admin authentication",
     });
   }
 };
 
-/**
- * Middleware: Check specific admin permission
- */
+// ===============================
+// SPECIFIC PERMISSION CHECK
+// ===============================
 export const requirePermission = (permission) => {
   return (req, res, next) => {
-    if (!req.admin) {
+    const admin = req.admin;
+
+    if (!admin) {
       return res.status(401).json({
         success: false,
-        message: "Admin authentication required.",
-      });
-    }
-     // Super admin has all permissions
-    if (req.admin.role === 'super_admin') {
-      return next();
-    }
-    
-    if (typeof req.admin.hasPermission !== "function") {
-      return res.status(500).json({
-        success: false,
-        message: "Admin permissions not configured properly.",
+        message: "Admin authentication required",
       });
     }
 
-    if (!req.admin.hasPermission(permission)) {
+    if (admin.role === "super_admin") {
+      return next(); // super admin always allowed
+    }
+
+    if (!admin.permissions || !admin.permissions[permission]) {
       return res.status(403).json({
         success: false,
-        message: `Insufficient permissions. Required: ${permission}`,
+        message: `Permission '${permission}' is required`,
       });
     }
 
@@ -103,21 +93,23 @@ export const requirePermission = (permission) => {
   };
 };
 
-/**
- * Middleware: Restrict route to Super Admin only
- */
+// ===============================
+// SUPER ADMIN ONLY
+// ===============================
 export const requireSuperAdmin = (req, res, next) => {
-  if (!req.admin) {
+  const admin = req.admin;
+
+  if (!admin) {
     return res.status(401).json({
       success: false,
-      message: "Admin authentication required.",
+      message: "Admin authentication required",
     });
-  }
+    }
 
-  if (!["superadmin", "super_admin"].includes(req.admin.role)) {
+  if (admin.role !== "super_admin") {
     return res.status(403).json({
       success: false,
-      message: "Super admin access required.",
+      message: "Super admin access required",
     });
   }
 
