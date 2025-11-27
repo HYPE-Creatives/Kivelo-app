@@ -1,5 +1,3 @@
-// utils/proDashboard.js
-
 const getProDashboard = (title) => {
   return `
   <!DOCTYPE html>
@@ -13,13 +11,23 @@ const getProDashboard = (title) => {
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
       <style>
-        body {
+        * {
           margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+
+        body {
           font-family: "Inter", sans-serif;
           background: linear-gradient(135deg, #0f0f29, #1b1b3a, #24243e);
           background-size: 400% 400%;
           animation: gradientBG 12s ease infinite;
           color: white;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          min-height: 100vh;
+          padding: 20px;
         }
 
         @keyframes gradientBG {
@@ -28,10 +36,11 @@ const getProDashboard = (title) => {
           100% { background-position: 0% 50%; }
         }
 
-        .container {
+        .wrapper {
+          max-width: 650px;
+          width: 100%;
           text-align: center;
-          padding: 80px 20px;
-          animation: fadeIn 1.2s ease;
+          animation: fadeIn 1.2s ease-in-out;
         }
 
         @keyframes fadeIn {
@@ -40,79 +49,115 @@ const getProDashboard = (title) => {
         }
 
         h1 {
-          font-size: 52px;
+          font-size: clamp(32px, 6vw, 52px);
           font-weight: 700;
           margin-bottom: 10px;
+          line-height: 1.2;
         }
 
         p.subtitle {
-          font-size: 18px;
+          font-size: clamp(16px, 3.5vw, 20px);
           opacity: 0.8;
-          margin-bottom: 40px;
+          margin-bottom: 35px;
         }
 
         .glass-card {
-          width: 500px;
-          margin: 0 auto;
-          padding: 30px;
-          border-radius: 20px;
+          width: 100%;
+          padding: 30px 22px;
+          border-radius: 18px;
           background: rgba(255, 255, 255, 0.08);
           backdrop-filter: blur(14px);
           box-shadow: 0 8px 32px rgba(0,0,0,0.25);
-          animation: fadeIn 1.6s ease;
+          margin-bottom: 30px;
         }
 
         .glass-card h3 {
-          margin-top: 0;
-          font-size: 22px;
-          margin-bottom: 20px;
+          font-size: 20px;
+          margin-bottom: 18px;
         }
 
         .info-row {
           display: flex;
           justify-content: space-between;
-          margin: 10px 0;
           font-size: 16px;
+          margin: 10px 0;
+          opacity: 0.9;
+        }
+
+        .btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          background: #6dd5fa;
+          color: #0f0f29;
+          padding: 14px 22px;
+          font-size: 16px;
+          font-weight: 600;
+          text-decoration: none;
+          border-radius: 12px;
+          transition: 0.3s ease;
+        }
+
+        .btn i {
+          font-size: 18px;
+        }
+
+        .btn:hover {
+          background: #a6e8ff;
+          transform: translateY(-3px);
         }
 
         .footer {
-          margin-top: 40px;
-          opacity: 0.6;
+          margin-top: 20px;
           font-size: 14px;
+          opacity: 0.6;
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 500px) {
+          .info-row {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+          }
         }
       </style>
   </head>
 
   <body>
-    <div class="container">
-        <h1><i class="fa-solid fa-server icon"></i> KIVELO API</h1>
+    <div class="wrapper">
+        <h1><i class="fa-solid fa-server"></i> KIVELO API</h1>
         <p class="subtitle">Powering the next generation of wellness technology.</p>
 
         <div class="glass-card">
             <h3><i class="fa-solid fa-circle-info"></i> System Information</h3>
 
             <div class="info-row">
-                <span>Environment:</span>
-                <span>${process.env.NODE_ENV || "development"}</span>
+              <span>Environment:</span>
+              <span>${process.env.NODE_ENV || "development"}</span>
             </div>
 
             <div class="info-row">
-                <span>Status:</span>
-                <span style="color:#4cd137; font-weight:600;">Running</span>
+              <span>Status:</span>
+              <span style="color:#4cd137; font-weight:600;">Running</span>
             </div>
 
             <div class="info-row">
-                <span>Timestamp:</span>
-                <span>${new Date().toLocaleString()}</span>
+              <span>Timestamp:</span>
+              <span>${new Date().toLocaleString()}</span>
             </div>
 
             <div class="info-row">
-                <span>API Base URL:</span>
-                <span>/api</span>
+              <span>API Docs:</span>
+              <span><a href="/api-docs" style="color:#6dd5fa; text-decoration:none;">Swagger</a></span>
             </div>
         </div>
 
-        <div class="footer">© ${new Date().getFullYear()} Kivelo — All rights reserved.</div>
+        <a href="/api-docs" class="btn">
+          <i class="fa-solid fa-book"></i> Open API Documentation
+        </a>
+
+        <div class="footer">© ${new Date().getFullYear()} KIVELO — All rights reserved.</div>
     </div>
   </body>
   </html>`;
