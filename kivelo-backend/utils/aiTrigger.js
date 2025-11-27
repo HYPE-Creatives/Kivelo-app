@@ -9,47 +9,54 @@ let aiServiceStatus = {
   lastError: null
 };
 
-// Mock response generator
-const getMockResponse = (prompt) => {
-  const userMessage = prompt.replace('User:', '').replace('AI:', '').trim();
-  
+// --- MOCK RESPONSE (updated to support object payload) ---
+const getMockResponse = (data) => {
+  const userMessage = data?.message || "your message";
+
   const mockResponses = [
-    `I understand you're asking about "${userMessage}". Currently, I'm operating in mock mode as the AI service is temporarily unavailable.`,
-    `Thanks for your message! I'd normally provide a detailed response to "${userMessage}", but the AI service is currently being maintained.`,
-    `I've received your question about "${userMessage}". Please check back later when the AI service is restored for full functionality.`,
-    `Mock response: I'm processing your input "${userMessage}". The actual AI service will provide more comprehensive answers when available.`,
-    `I can see you mentioned "${userMessage}". For now, I'm providing basic responses while the AI system undergoes maintenance.`,
-    `Your message about "${userMessage}" has been received. The advanced AI features will be available again shortly.`
+    `Mock mode active: I received your message "${userMessage}". The AI service is temporarily unavailable.`,
+    `Thanks for your message "${userMessage}". I'm in mock mode until the AI service returns.`,
+    `I understand you're asking about "${userMessage}". Real AI responses will resume when the service is back online.`,
+    `Mock response: "${userMessage}" noted. The AI server is currently offline.`,
+    `Your request "${userMessage}" is being processed in mock mode due to service downtime.`
   ];
-  
-  const randomResponse = mockResponses[Math.floor(Math.random() * mockResponses.length)];
-  
+
+  const random = mockResponses[Math.floor(Math.random() * mockResponses.length)];
+
   return {
-    text: randomResponse,
-    output: randomResponse,
-    generated_text: randomResponse,
+    reply: random,
+    text: random,
+    output: random,
+    generated_text: random,
     isMock: true
   };
 };
 
-export const askKivelo = async (prompt) => {
-  // If AI endpoint is not configured, use mock immediately
+// --- MAIN AI CALLER ---
+export const askKivelo = async (data) => {
+  // Validate input is object
+  if (typeof data !== "object") {
+    console.warn("⚠ askKivelo expected object but received:", data);
+    return getMockResponse({ message: String(data) });
+  }
+
+  // If no endpoint configured → mock
   if (!MODEL_URL) {
-    console.warn("🤖 AI_ENDPOINT not set, using mock responses");
-    return getMockResponse(prompt);
+    console.warn("🤖 AI_ENDPOINT not set — using mock responses");
+    return getMockResponse(data);
   }
 
   try {
-    const res = await axios.post(
+    const response = await axios.post(
       MODEL_URL,
-      { prompt },
-      { 
+      data, // <-- send { username, message }
+      {
         headers: { "Content-Type": "application/json" },
-        timeout: 10000 // 10 second timeout
+        timeout: 15000
       }
     );
 
-    // Update service status on success
+    // Successful response
     aiServiceStatus = {
       lastChecked: new Date(),
       isAvailable: true,
@@ -57,9 +64,10 @@ export const askKivelo = async (prompt) => {
     };
 
     console.log("✅ AI service responded successfully");
-    return res.data; 
+    return response.data;
+
   } catch (err) {
-    // Update service status on error
+    // Update service status
     aiServiceStatus = {
       lastChecked: new Date(),
       isAvailable: false,
@@ -67,43 +75,41 @@ export const askKivelo = async (prompt) => {
     };
 
     console.warn(`🤖 AI service unavailable, using mock response. Error: ${err.message}`);
-    
-    // Return mock response instead of throwing error
-    return getMockResponse(prompt);
+
+    // Return mock instead of throwing
+    return getMockResponse(data);
   }
 };
 
+// --- SEND MOOD CHECK-IN TO AI (unchanged, cleaned up) ---
 export const sendToAI = async (checkin) => {
   try {
-    const aiEndpoint = process.env.AI_ENDPOINT;
-
-    if (!aiEndpoint) {
-      console.warn("🤖 AI_ENDPOINT not set in .env file - skipping AI notification");
+    if (!MODEL_URL) {
+      console.warn("🤖 AI_ENDPOINT not set — skipping AI mood check-in");
       return { success: false, message: "AI endpoint not configured", isMock: true };
     }
 
-    const response = await axios.post(aiEndpoint, {
-      moodId: checkin._id,
-      childId: checkin.childId,
-      moodEmoji: checkin.moodEmoji,
-      intensity: checkin.intensity,
-      notes: checkin.notes || "",
-      createdAt: checkin.createdAt,
-    }, {
-      timeout: 10000
-    });
+    const response = await axios.post(
+      MODEL_URL,
+      {
+        moodId: checkin._id,
+        childId: checkin.childId,
+        moodEmoji: checkin.moodEmoji,
+        intensity: checkin.intensity,
+        notes: checkin.notes || "",
+        createdAt: checkin.createdAt,
+      },
+      { timeout: 15000 }
+    );
 
-    console.log("✅ Sent mood check-in to AI service successfully.");
+    console.log("✅ Sent mood check-in to AI successfully.");
     return { success: true, data: response.data };
+
   } catch (err) {
-    console.warn(`🤖 AI notification failed, using mock mode. Error: ${err.message}`);
-    return { 
-      success: false, 
-      message: "AI service unavailable - using mock mode",
-      isMock: true 
-    };
+    console.warn(`🤖 Mood check-in failed, using mock mode. Error: ${err.message}`);
+    return { success: false, message: "AI unavailable — mock mode", isMock: true };
   }
 };
 
-// Export service status for monitoring
+// --- SERVICE STATUS (for monitoring endpoints) ---
 export const getAIServiceStatus = () => aiServiceStatus;
