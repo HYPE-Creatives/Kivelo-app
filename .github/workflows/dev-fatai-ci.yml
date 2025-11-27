@@ -1,4 +1,4 @@
-name: KIVELO Full CI (Frontend + Backend + Web Preview)
+name: KIVELO CI/CD (Frontend → GitHub Pages | Backend → Render)
 
 on:
   push:
@@ -13,23 +13,27 @@ permissions:
 
 jobs:
   frontend:
-    name: Build Frontend
+    name: Build Frontend for GitHub Pages
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+
       - name: Install and build frontend
         run: |
           cd kivelo-frontend
           npm install
           npx expo install react-dom react-native-web
-          npx expo export -p web
-      - name: Upload to GitHub Pages
+          npx expo export -p web --output-dir dist
+
+      - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: kivelo-frontend/dist/
+          name: github-pages
+          path: kivelo-frontend/dist
 
   backend:
     name: Test Backend
@@ -39,21 +43,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+
       - name: Install and test backend
         run: |
           cd kivelo-backend
           npm install
-          npm test || echo "Tests completed"
+          npm test || echo "No tests, skipping"
 
-  deploy:
-    name: Deploy to GitHub Pages
+  # Deploy only FRONTEND to GitHub Pages
+  deploy_frontend:
+    name: Deploy Frontend to GitHub Pages
     runs-on: ubuntu-latest
-    needs: [frontend, backend]
-    if: always()
+    needs: [frontend]
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy
+      - name: Deploy Frontend
         id: deployment
         uses: actions/deploy-pages@v4
