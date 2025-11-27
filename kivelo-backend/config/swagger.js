@@ -130,8 +130,12 @@ const options = {
 
         ChatRequest: {
           type: "object",
-          required: ["message"],
+          required: ["username", "message"],
           properties: {
+            username: {
+              type: "string",
+              example: "Fatai"
+            },
             message: {
               type: "string",
               example: "Hello, how are you?",
@@ -142,47 +146,46 @@ const options = {
         ChatResponse: {
           type: "object",
           properties: {
-            success: { type: "boolean", example: true },
-            response: {
+            reply: {
               type: "string",
-              example: "I'm doing great, thanks for asking!",
-            },
-          },
+              example: "I'm doing great, thanks for asking!"
+            }
+          }
         },
 
         ErrorResponse: {
           type: "object",
           properties: {
-            success: { type: "boolean", example: false },
-            error: {
-              type: "string",
-              example: "An unexpected error occurred",
-            },
-          },
+            error: { type: "string", example: "message is required" }
+          }
         },
 
         HistoryItem: {
           type: "object",
           properties: {
-            user: { type: "string", example: "Hi there" },
-            ai: { type: "string", example: "Hello! How can I help today?" },
+            username: { type: "string", example: "Fatai" },
+            user: { type: "string", example: "What's my assignment?" },
+            ai: { type: "string", example: "Your assignment is Mathematics." },
             time: {
               type: "string",
               format: "date-time",
-              example: "2025-02-20T10:00:00.000Z",
+              example: "2025-02-24T12:45:00Z"
             },
-          },
+            isMock: { type: "boolean", example: false }
+          }
         },
 
         HistoryResponse: {
           type: "object",
           properties: {
             success: { type: "boolean", example: true },
+            count: { type: "number", example: 2 },
+            containsMockResponses: { type: "boolean", example: false },
             history: {
               type: "array",
-              items: { $ref: "#/components/schemas/HistoryItem" },
-            },
-          },
+              items: { $ref: "#/components/schemas/HistoryItem" }
+            }
+          }
         },
 
         ClearHistoryResponse: {
@@ -191,9 +194,9 @@ const options = {
             success: { type: "boolean", example: true },
             message: {
               type: "string",
-              example: "Chat history cleared successfully",
-            },
-          },
+              example: "Chat history cleared (4 messages removed)"
+            }
+          }
         },
 
         InsightRequest: {

@@ -77,7 +77,7 @@ app.use(
 
 // Protect entire backend - Allow swagger access without API key
 app.use((req, res, next) => {
-  if (req.path.startsWith("/api-docs") || req.path.startsWith("/api/ai") || req.path.startsWith("/") || req.path.startsWith("/api/")) {
+  if (req.path.startsWith("/api-docs") || req.path.startsWith("/api/ai") || req.path==="/" || req.path ==="/api/" ) {
     return next();
   }
   apiKeyMiddleware(req, res, next);

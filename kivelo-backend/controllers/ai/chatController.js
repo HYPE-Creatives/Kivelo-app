@@ -1,15 +1,12 @@
 import { askKivelo } from "../../utils/aiTrigger.js";
 
-// In-memory history (you can replace with DB later)
 let chatHistory = [];
 
-/**
- * Handle chat messages between user and AI
- */
 export const chat = async (req, res) => {
   try {
     const { username, message } = req.body;
 
+    // Input validation
     if (!username) {
       return res.status(400).json({ error: "username is required" });
     }
@@ -18,22 +15,21 @@ export const chat = async (req, res) => {
       return res.status(400).json({ error: "message is required" });
     }
 
-    // Send EXACT schema expected by AI service
+    // Payload expected by AI model
     const payload = { username, message };
 
-    // AI response (or mock)
+    // Call AI
     const aiResponse = await askKivelo(payload);
 
-    // AI team response shape:
-    // { reply: "string" }
+    // AI team standard output: { reply: "string" }
     const reply =
-      aiResponse.reply || 
-      aiResponse.text || 
-      aiResponse.output || 
-      aiResponse.generated_text || 
+      aiResponse.reply ||
+      aiResponse.text ||
+      aiResponse.output ||
+      aiResponse.generated_text ||
       "";
 
-    // Save to history
+    // Save history
     chatHistory.push({
       username,
       user: message,
@@ -42,45 +38,38 @@ export const chat = async (req, res) => {
       isMock: aiResponse.isMock || false,
     });
 
-    // Trim history
+    // Keep memory optimized
     if (chatHistory.length > 50) {
       chatHistory = chatHistory.slice(-25);
     }
 
-    // 🎯 RETURN EXACT AI TEAM FORMAT
+    // Return EXACT AI format
     return res.json({ reply });
 
   } catch (err) {
     console.error("Chat controller error:", err);
 
     return res.status(503).json({
-      reply: "AI service unavailable. Please try again later."
+      reply: "AI service unavailable. Please try again later.",
     });
   }
 };
 
-/**
- * Retrieve complete chat history
- */
 export const getHistory = (req, res) => {
-  return res.json({
+  res.json({
     success: true,
     history: chatHistory,
     count: chatHistory.length,
-    containsMockResponses: chatHistory.some((item) => item.isMock),
+    containsMockResponses: chatHistory.some((msg) => msg.isMock),
   });
 };
 
-/**
- * Clear chat history
- */
 export const clearHistory = (req, res) => {
   const removed = chatHistory.length;
   chatHistory = [];
 
-  return res.json({
+  res.json({
     success: true,
-    message: `Chat history cleared successfully. Removed ${removed} messages.`,
-    previousCount: removed,
+    message: `Chat history cleared (${removed} messages removed)`,
   });
 };
