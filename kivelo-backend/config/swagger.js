@@ -163,7 +163,7 @@ const options = {
         HistoryItem: {
           type: "object",
           properties: {
-            username: { type: "string", example: "Fatai" },
+            username: { type: "string", example: "MrDOF" },
             user: { type: "string", example: "What's my assignment?" },
             ai: { type: "string", example: "Your assignment is Mathematics." },
             time: {
