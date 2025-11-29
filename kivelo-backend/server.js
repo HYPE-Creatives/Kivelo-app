@@ -8,11 +8,12 @@ import compression from 'compression';
 import helmet from 'helmet';
 import express from 'express';
 import getProDashboard from "./utils/proDashboard.js";
+import getNotFoundPage from './utils/notFoundPage.js';
+import { logRequests } from "./middleware/logRequests.js";
 import cors from 'cors';
 import { apiKeyMiddleware } from './middleware/apiKey.js';
 import { rateLimiter } from "./middleware/rateLimiter.js";
-// import rateLimit from 'express-rate-limit';
-import cookieParser from 'cookie-parser';   // ✅ ADDED
+import cookieParser from 'cookie-parser';
 import { swaggerDocs } from './config/swagger.js';
 import connectDB from './config/database.js';
 
@@ -35,90 +36,126 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Environment variable for port
-const PORT = process.env.PORT || 5000;
+// ========================= CONFIGURATION =========================
+const config = {
+  environment: process.env.NODE_ENV || 'development',
+  port: process.env.PORT || 5000,
+  cors: {
+    origins: process.env.ALLOWED_ORIGINS 
+      ? process.env.ALLOWED_ORIGINS.split(',') 
+      : [
+          "http://localhost:3000",
+          "http://localhost:5173",
+          "http://localhost:8081",
+          "http://localhost:5000",
+          "https://kivelo.app",
+          "https://family-wellness.onrender.com",
+          "http://10.0.2.2:3000",
+          "http://10.94.166.34:8081",
+        ]
+  },
+  security: {
+    sessionSecret: process.env.SESSION_SECRET || 'fallback-secret-change-in-production',
+    cookieSecure: process.env.NODE_ENV === 'production'
+  },
+  logging: {
+    level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'combined' : 'dev')
+  }
+};
 
-// Connect to database
+const PORT = config.port;
+
+// ========================= DATABASE CONNECTION =========================
 connectDB();
 
 const app = express();
 
 // ========================= SECURITY HEADERS =========================
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  }
+}));
 
 // ========================= COMPRESSION =========================
-// Enable gzip compression for responses
-app.use(compression());
+app.use(compression({
+  level: 6,
+  threshold: 1024,
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) return false;
+    return compression.filter(req, res);
+  }
+}));
 
 // ========================= COOKIE PARSER =========================
-// MUST BE ADDED BEFORE ROUTES
-app.use(cookieParser()); // ✅ REQUIRED FOR SECURE TOKEN REFRESH FLOW
+app.use(cookieParser());
 
-// ========================= CORS CONFIG FOR COOKIES =========================
-// ❗ You cannot use origin: "*" when using cookies.
-// Replace "*" with allowed frontends (React Native WebView or your domain)
+// ========================= ENHANCED CORS =========================
 app.use(
   cors({
-    origin: [
-      "http://localhost:3000",
-      "http://localhost:5173",
-      "http://localhost:8081",
-      "http://localhost:5000",
-      "https://kivelo.app",
-      "https://family-wellness.onrender.com",
-      "http://10.0.2.2:3000",
-      "http://10.94.166.34:8081",     // Android emulator
-    ],
-    credentials: true,            // ✅ ALLOWS COOKIES
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (config.cors.origins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.warn(`🚫 CORS Blocked: ${origin}`);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-API-Key"],
+    maxAge: 86400 
   })
 );
 
-// Protect entire backend - Allow swagger access without API key
-app.use((req, res, next) => {
-  if (req.path.startsWith("/api-docs") || req.path.startsWith("/api/ai") || req.path==="/" || req.path ==="/api/" ) {
-    return next();
-  }
-  apiKeyMiddleware(req, res, next);
-});
-
-
-// Apply rate limits globally
+// ========================= RATE LIMITING =========================
 app.use(rateLimiter);
 
-// ========================= RATE LIMIT =========================
-// app.use(
-//   rateLimit({
-//     windowMs: 15 * 60 * 1000,  // 15 minutes
-//     max: 100,
-//   })
-// );
-
 // ========================= BODY PARSERS =========================
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-app.use(morgan("dev"));
+// ========================= LOGGING =========================
+app.use(morgan(config.logging.level));
 
-app.use((req, res, next) => {
-  console.log("Incoming request body:", req.body);
-  next();
-});
+if (config.environment === 'development') {
+  app.use((req, res, next) => {
+    console.log("🔍 Incoming request body:", req.body);
+    next();
+  });
+}
 
 // ========================= STATIC FILES =========================
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-app.use(express.static(path.join(__dirname, "public")));
+app.use("/uploads", express.static(path.join(__dirname, "uploads"), {
+  maxAge: config.environment === 'production' ? '7d' : '0',
+  etag: true,
+  lastModified: true
+}));
 
-// ========================= ROUTES =========================
-// app.get("/", (req, res) => {
-//   res.send("Welcome to Kivelo API");
-// });
-// app.get("/api", (req, res) => {
-//   res.send("Welcome to Kivelo API");
-// });
-//========================== PRO DASHBOARD =========================
+app.use(express.static(path.join(__dirname, "public"), {
+  maxAge: config.environment === 'production' ? '1d' : '0',
+  etag: true,
+  lastModified: true
+}));
 
+// ========================= PUBLIC ROUTES =========================
 app.get("/", (req, res) => {
   res.send(getProDashboard("KIVELO API – Home"));
 });
@@ -127,8 +164,20 @@ app.get("/api", (req, res) => {
   res.send(getProDashboard("KIVELO API – API Overview"));
 });
 
+app.get("/api/health", (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    environment: config.environment,
+    uptime: process.uptime()
+  });
+});
 
-app.use("/api/auth", authRoutes);      // <-- refresh route will read secure cookie
+// ========================= REQUEST LOGGING MIDDLEWARE =========================
+app.use(logRequests);
+
+// ========================= API ROUTES =========================
+app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/parents", parentRoutes);
 app.use("/api/children", childRoutes);
@@ -139,36 +188,106 @@ app.use("/api/ai", aiRoutes);
 app.use("/api/moods", moodRoutes);
 app.use("/api/audit", auditRoutes);
 
+// ===============================================================
+// 🔒 STRICT SWAGGER PROTECTION (fixed)
+// ===============================================================
+app.use((req, res, next) => {
+  const p = req.path || "";
+
+  if (p === "/api-docs" || p === "/api-docs/") return next();
+
+  if (p.startsWith("/api-docs/")) {
+    const allowed = [
+      "/swagger-ui.css",
+      "/swagger-ui-init.js",
+      "/swagger-ui-bundle.js",
+      "/swagger-ui-standalone-preset.js",
+      "/favicon-32x32.png",
+      "/favicon-16x16.png"
+    ];
+
+    const asset = p.replace("/api-docs", "");
+
+    if (allowed.includes(asset)) return next();
+
+    return res.status(404).send(getNotFoundPage(req.originalUrl));
+  }
+
+  next();
+});
+
+// ===============================================================
+// 🔍 Extract ALL registered routes (deep routing)
+// ===============================================================
+const getAllRoutes = (app) => {
+  const routes = [];
+
+  app._router.stack.forEach((layer) => {
+    if (layer.route && layer.route.path) routes.push(layer.route.path);
+
+    if (layer.name === "router" && layer.handle.stack) {
+      layer.handle.stack.forEach((nested) => {
+        if (nested.route && nested.route.path) {
+          routes.push(nested.route.path);
+        }
+      });
+    }
+  });
+
+  return routes;
+};
+
+// ===============================================================
+// 🔐 API KEY PROTECTION (fixed & correct)
+// ===============================================================
+const PUBLIC_ROUTES = [
+  "/",
+  "/api",
+  "/api/health",
+  "/api/auth/login",
+  "/api/auth/register",
+  "/api/auth/refresh",
+  "/api-docs"
+];
+
+app.use((req, res, next) => {
+  const p = req.path || "";
+
+  if (PUBLIC_ROUTES.some((r) => p.startsWith(r))) {
+    return next();
+  }
+
+  const all = getAllRoutes(app);
+  const isKnown = all.some((route) => p.startsWith(route));
+
+  if (!isKnown) {
+    return res.status(404).send(getNotFoundPage(req.originalUrl));
+  }
+
+  return apiKeyMiddleware(req, res, next);
+});
+
 // ========================= ERROR HANDLER =========================
 app.use(errorHandler);
 
-// ========================= HEALTH CHECK =========================
-app.get("/api/health", (req, res) => {
-  res.json({ message: "Server is running!" });
-});
-
-// ========================= SWAGGER =========================
+// ========================= SWAGGER DOCS =========================
 swaggerDocs(app, PORT);
 
-// ========================= 404 HANDLER =========================
+// ========================= FINAL 404 HANDLER =========================
 app.use((req, res) => {
-  res.status(404).json({
-    error: "Route not found",
-    path: req.originalUrl,
-  });
+  res.status(404).send(getNotFoundPage(req.originalUrl));
 });
 
-// ========================= CRON FOR RETENTION =========================
+// ========================= CRON JOBS =========================
 import "./jobs/auditRetention.js";
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
-
-// ========================= CLEANUP JOB FOR UNVERIFIED PARENTS =========================
-cron.schedule("0 0 * * *", async () => {
+// Cleanup job
+let isCleanupRunning = false;
+const cleanupUnverifiedUsers = async () => {
+  if (isCleanupRunning) return;
+  
   try {
+    isCleanupRunning = true;
     const now = new Date();
     const result = await User.deleteMany({
       role: "parent",
@@ -176,13 +295,30 @@ cron.schedule("0 0 * * *", async () => {
       verificationExpires: { $lt: now },
     });
     if (result.deletedCount > 0) {
-      console.log(
-        `[CLEANUP JOB] Deleted ${result.deletedCount} unverified parent accounts.`
-      );
-    } else {
-      console.log("[CLEANUP JOB] No unverified parents to delete.");
+      console.log(`[CLEANUP JOB] Deleted ${result.deletedCount} unverified parent accounts.`);
     }
   } catch (err) {
-    console.error("[CLEANUP JOB ERROR]", err);
+    console.error('[CLEANUP JOB ERROR]', err);
+  } finally {
+    isCleanupRunning = false;
   }
+};
+
+cron.schedule("0 0 * * *", cleanupUnverifiedUsers, {
+  scheduled: true,
+  timezone: "America/New_York"
 });
+
+// ========================= START SERVER =========================
+const server = app.listen(PORT, () => {
+  console.log(`
+🚀 Kivelo Server Started
+📍 Port: ${PORT}
+🌍 Environment: ${config.environment}
+📅 Started: ${new Date().toISOString()}
+🔒 Security: Enhanced
+💾 CORS Origins: ${config.cors.origins.length} configured
+  `);
+});
+
+export default app;

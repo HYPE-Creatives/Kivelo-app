@@ -1,11 +1,12 @@
 import express from "express";
+import auth from '../middleware/auth.js';
 import {
   chat,
   getHistory,
   clearHistory,
   getServiceStatus
 } from "../controllers/ai/chatController.js";
-
+import { requireBodyFields } from "../middleware/validators.js";
 import { askKivelo } from "../utils/aiTrigger.js";
 
 const router = express.Router();
@@ -58,7 +59,7 @@ const router = express.Router();
  *       503:
  *         description: AI service unavailable
  */
-router.post("/chat", chat);
+router.post("/chat", auth, chat, requireBodyFields("message"));
 
 /**
  * @swagger
@@ -101,7 +102,7 @@ router.post("/chat", chat);
  *                 totalMockResponses:
  *                   type: number
  */
-router.get("/chat/history", getHistory);
+router.get("/chat/history", auth, getHistory);
 
 /**
  * @swagger
@@ -124,7 +125,7 @@ router.get("/chat/history", getHistory);
  *                   type: string
  *                   example: "Chat history cleared (5 messages removed)"
  */
-router.delete("/chat/clear-history", clearHistory);
+router.delete("/chat/clear-history", auth, clearHistory);
 
 /**
  * @swagger

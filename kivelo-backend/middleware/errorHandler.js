@@ -1,43 +1,55 @@
-const errorHandler = (error, req, res, next) => {
-  console.error('Error handler caught:', error);
+const errorHandler = (err, req, res, next) => {
+  console.error("🔥 Error handler caught:", err);
 
-  // Handle cases where error is completely undefined
-  if (!error) {
+  // ========== 1. Handle unexpected undefined errors ==========
+  if (!err) {
     return res.status(500).json({
-      message: 'Unknown error occurred'
+      success: false,
+      message: "An unexpected error occurred",
     });
   }
 
-  const errorMessage = error.message || '';
-  const errorCode = error.code;
+  // Normalize message and status
+  const message = err.message || "Internal server error";
+  const status = err.status || err.statusCode || 500;
 
-  // Cloudinary errors
-  if (typeof errorMessage === 'string' && errorMessage.includes('Cloudinary')) {
+  // ========== 2. Handle Cloudinary errors ==========
+  if (message.includes("Cloudinary")) {
     return res.status(500).json({
-      message: 'Image upload failed',
-      error: errorMessage
+      success: false,
+      message: "Image upload failed",
+      error: process.env.NODE_ENV === "production" ? {} : message,
     });
   }
 
-  // Multer errors
-  if (errorCode === 'LIMIT_FILE_SIZE') {
+  // ========== 3. Handle Multer Upload errors ==========
+  if (err.code === "LIMIT_FILE_SIZE") {
     return res.status(400).json({
-      message: 'File too large. Maximum size is 5MB'
+      success: false,
+      message: "File too large. Maximum size is 5MB",
     });
   }
 
-  if (errorMessage === 'Only image files are allowed!') {
+  if (message === "Only image files are allowed!") {
     return res.status(400).json({
-      message: 'Only image files are allowed'
+      success: false,
+      message: "Only image files are allowed",
     });
   }
 
-  // Use the error's status code if provided, otherwise 500
-  const statusCode = error.status || error.statusCode || 500;
+  // ========== 4. Handle invalid JSON body (bad request body) ==========
+  if (err instanceof SyntaxError && err.status === 400 && "body" in err) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid JSON body",
+    });
+  }
 
-  res.status(statusCode).json({
-    message: errorMessage || 'Internal server error',
-    error: process.env.NODE_ENV === 'production' ? {} : errorMessage
+  // ========== 5. Default server error handler ==========
+  return res.status(status).json({
+    success: false,
+    message,
+    error: process.env.NODE_ENV === "production" ? {} : err.stack,
   });
 };
 
