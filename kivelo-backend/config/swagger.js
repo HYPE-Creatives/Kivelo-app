@@ -134,7 +134,7 @@ const options = {
           properties: {
             username: {
               type: "string",
-              example: "Fatai"
+              example: "YourName",
             },
             message: {
               type: "string",

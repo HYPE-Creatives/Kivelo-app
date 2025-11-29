@@ -2,10 +2,11 @@ import express from "express";
 import {
   chat,
   getHistory,
-  clearHistory
+  clearHistory,
+  getServiceStatus
 } from "../controllers/ai/chatController.js";
 
-import { askKivelo, getAIServiceStatus } from "../utils/aiTrigger.js";
+import { askKivelo } from "../utils/aiTrigger.js";
 
 const router = express.Router();
 
@@ -15,32 +16,47 @@ const router = express.Router();
  *   post:
  *     summary: Send a message to the AI model
  *     tags: [AI Chat]
- *     description: Sends { username, message } to the AI model and returns { reply }
+ *     description: Sends { username, message } to the AI model and returns the raw AI response
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: "#/components/schemas/ChatRequest"
+ *             type: object
+ *             required:
+ *               - username
+ *               - message
+ *             properties:
+ *               username:
+ *                 type: string
+ *                 example: "john_doe"
+ *               message:
+ *                 type: string
+ *                 example: "Hello, how are you?"
  *     responses:
  *       200:
- *         description: AI successful reply
+ *         description: AI response (raw from model)
  *         content:
  *           application/json:
  *             schema:
- *               $ref: "#/components/schemas/ChatResponse"
+ *               type: object
+ *               properties:
+ *                 reply:
+ *                   type: string
+ *                   description: AI generated response
+ *                 isMock:
+ *                   type: boolean
+ *                   description: Indicates if this is a mock response
+ *                 note:
+ *                   type: string
+ *                   description: Additional info about the response
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
  *       400:
  *         description: Invalid request input
- *         content:
- *           application/json:
- *             schema:
- *               $ref: "#/components/schemas/ErrorResponse"
  *       503:
- *         description: AI service unavailable (mock mode)
- *         content:
- *           application/json:
- *             schema:
- *               $ref: "#/components/schemas/ChatResponse"
+ *         description: AI service unavailable
  */
 router.post("/chat", chat);
 
@@ -56,7 +72,34 @@ router.post("/chat", chat);
  *         content:
  *           application/json:
  *             schema:
- *               $ref: "#/components/schemas/HistoryResponse"
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 history:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       username:
+ *                         type: string
+ *                       user:
+ *                         type: string
+ *                       ai:
+ *                         type: object
+ *                         description: Full AI response object
+ *                       time:
+ *                         type: string
+ *                         format: date-time
+ *                       isMock:
+ *                         type: boolean
+ *                 count:
+ *                   type: number
+ *                 containsMockResponses:
+ *                   type: boolean
+ *                 totalMockResponses:
+ *                   type: number
  */
 router.get("/chat/history", getHistory);
 
@@ -72,7 +115,14 @@ router.get("/chat/history", getHistory);
  *         content:
  *           application/json:
  *             schema:
- *               $ref: "#/components/schemas/ClearHistoryResponse"
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Chat history cleared (5 messages removed)"
  */
 router.delete("/chat/clear-history", clearHistory);
 
@@ -82,6 +132,12 @@ router.delete("/chat/clear-history", clearHistory);
  *   get:
  *     summary: Check AI service availability and health
  *     tags: [AI Chat]
+ *     parameters:
+ *       - in: query
+ *         name: refresh
+ *         schema:
+ *           type: boolean
+ *         description: Whether to perform a fresh health check
  *     responses:
  *       200:
  *         description: AI health status
@@ -92,49 +148,29 @@ router.delete("/chat/clear-history", clearHistory);
  *               properties:
  *                 success:
  *                   type: boolean
- *                   example: true
  *                 aiService:
  *                   type: object
  *                   properties:
  *                     isAvailable:
  *                       type: boolean
- *                       example: false
  *                     lastChecked:
  *                       type: string
  *                       format: date-time
  *                     lastError:
  *                       type: string
- *                       example: "socket hang up"
  *                     environment:
  *                       type: string
- *                       example: "AI_BASE + AI_ROUTE configured"
+ *                     endpoint:
+ *                       type: string
+ *                     hasValidEndpoint:
+ *                       type: boolean
+ *                     status:
+ *                       type: string
+ *                       enum: [Operational, Unavailable, Not Configured]
  *                 message:
  *                   type: string
- *                   example: "AI service is operational"
  */
-router.get("/status", async (req, res) => {
-  const status = getAIServiceStatus();
-
-  res.json({
-    success: true,
-    aiService: {
-      isAvailable: status.isAvailable,
-      lastChecked: status.lastChecked,
-      lastError: status.lastError,
-      environment:
-        process.env.AI_BASE && process.env.AI_ROUTE
-          ? "AI_BASE + AI_ROUTE configured"
-          : "AI config missing",
-      endpoint:
-        process.env.AI_BASE && process.env.AI_ROUTE
-          ? process.env.AI_BASE + process.env.AI_ROUTE
-          : "Not configured",
-    },
-    message: status.isAvailable
-      ? "AI service is operational"
-      : "AI service is unavailable - using mock responses",
-  });
-});
+router.get("/status", getServiceStatus);
 
 /**
  * @swagger
@@ -144,33 +180,53 @@ router.get("/status", async (req, res) => {
  *     tags: [AI Chat]
  *     responses:
  *       200:
- *         description: AI connection successful
+ *         description: AI connection test result
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               example:
- *                 success: true
- *                 message: "AI service is connected"
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
  *                 response:
- *                   reply: "Hello from AI"
+ *                   type: object
+ *                   properties:
+ *                     reply:
+ *                       type: string
+ *                     isMock:
+ *                       type: boolean
+ *                     note:
+ *                       type: string
+ *                     timestamp:
+ *                       type: string
+ *                       format: date-time
  *       500:
  *         description: AI unreachable
  *         content:
  *           application/json:
  *             schema:
- *               $ref: "#/components/schemas/ErrorResponse"
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
  */
 router.get("/test-connection", async (req, res) => {
   try {
     const testResponse = await askKivelo({
       username: "system-test",
-      message: "Test connection"
+      message: "Test connection - please respond with 'Hello from AI' if working"
     });
 
     res.json({
       success: true,
-      message: "AI service is connected",
+      message: testResponse.isMock ? 
+        "AI service unavailable - using mock mode" : 
+        "AI service is connected and responding",
       response: testResponse,
     });
   } catch (error) {

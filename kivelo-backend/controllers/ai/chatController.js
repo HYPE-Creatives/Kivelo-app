@@ -18,22 +18,24 @@ export const chat = async (req, res) => {
     // Payload expected by AI model
     const payload = { username, message };
 
-    // Call AI
+    console.log(`📤 Chat request from ${username}: "${message}"`);
+
+    // Call AI and get RAW response - no processing
     const aiResponse = await askKivelo(payload);
 
-    // AI team standard output: { reply: "string" }
-    const reply =
-      aiResponse.reply ||
-      aiResponse.text ||
-      aiResponse.output ||
-      aiResponse.generated_text ||
-      "";
+    // Debug logging
+    console.log("📥 AI Response:", {
+      isMock: aiResponse.isMock,
+      replyLength: aiResponse.reply?.length,
+      hasReply: !!aiResponse.reply,
+      fullKeys: Object.keys(aiResponse)
+    });
 
-    // Save history
+    // Save history with full response for debugging
     chatHistory.push({
       username,
       user: message,
-      ai: reply,
+      ai: aiResponse,
       time: new Date(),
       isMock: aiResponse.isMock || false,
     });
@@ -43,14 +45,17 @@ export const chat = async (req, res) => {
       chatHistory = chatHistory.slice(-25);
     }
 
-    // Return EXACT AI format
-    return res.json({ reply });
+    // Return EXACT AI response without any processing
+    return res.json(aiResponse);
 
   } catch (err) {
-    console.error("Chat controller error:", err);
+    console.error("💥 Chat controller error:", err);
 
     return res.status(503).json({
       reply: "AI service unavailable. Please try again later.",
+      error: err.message,
+      isMock: true,
+      timestamp: new Date().toISOString()
     });
   }
 };
@@ -61,6 +66,7 @@ export const getHistory = (req, res) => {
     history: chatHistory,
     count: chatHistory.length,
     containsMockResponses: chatHistory.some((msg) => msg.isMock),
+    totalMockResponses: chatHistory.filter((msg) => msg.isMock).length,
   });
 };
 
@@ -71,5 +77,27 @@ export const clearHistory = (req, res) => {
   res.json({
     success: true,
     message: `Chat history cleared (${removed} messages removed)`,
+  });
+};
+
+// New endpoint to check AI service status
+export const getServiceStatus = async (req, res) => {
+  const { getAIServiceStatus, checkAIHealth } = await import("../../utils/aiTrigger.js");
+  
+  // Optionally perform a fresh health check
+  if (req.query.refresh === 'true') {
+    await checkAIHealth();
+  }
+
+  const status = getAIServiceStatus();
+  
+  res.json({
+    success: true,
+    aiService: status,
+    message: status.isAvailable ? 
+      "AI service is operational" : 
+      status.hasValidEndpoint ? 
+        "AI service is currently unavailable" : 
+        "AI service is not configured"
   });
 };
