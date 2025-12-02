@@ -1,3 +1,8 @@
+// at top add:
+import { createServer } from "http";
+import { Server as IOServer } from "socket.io";
+import { setIO } from "./utils/socket.js";
+
 import cron from 'node-cron';
 import User from './models/User.js';
 
@@ -10,6 +15,9 @@ import express from 'express';
 import getProDashboard from "./utils/proDashboard.js";
 import getNotFoundPage from './utils/notFoundPage.js';
 import { logRequests } from "./middleware/logRequests.js";
+import analyticsRoutes from "./routes/analytics.js";
+import getAnalyticsDashboard from "./utils/analyticsDashboard.js";
+import { analyticsLogger } from "./middleware/analyticsLogger.js";
 import cors from 'cors';
 import { apiKeyMiddleware } from './middleware/apiKey.js';
 import { rateLimiter } from "./middleware/rateLimiter.js";
@@ -69,6 +77,26 @@ const PORT = config.port;
 connectDB();
 
 const app = express();
+
+const httpServer = createServer(app);
+
+const io = new IOServer(httpServer, {
+  cors: {
+    origin: process.env.FRONTEND_ORIGIN || "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+// store io instance
+setIO(io);
+
+// optional: handle connections
+io.on("connection", (socket) => {
+  console.log("Socket connected:", socket.id);
+  socket.on("disconnect", () => {
+    console.log("Socket disconnected:", socket.id);
+  });
+});
 
 // ========================= SECURITY HEADERS =========================
 app.use(helmet({
@@ -132,6 +160,9 @@ app.use(rateLimiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// ========================= ANALYTICS LOGGING =========================
+app.use(analyticsLogger);
+
 // ========================= LOGGING =========================
 app.use(morgan(config.logging.level));
 
@@ -164,7 +195,14 @@ app.get("/api", (req, res) => {
   res.send(getProDashboard("KIVELO API – API Overview"));
 });
 
-app.get("/api/health", (req, res) => {
+// Analytics Dashboard Routes
+app.use("/api-analytics", analyticsRoutes);
+app.get("/api-analytics", (req, res) => {
+  res.send(getAnalyticsDashboard());
+});
+
+// Health Check Route
+app.get("/api-health", (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
@@ -203,7 +241,8 @@ app.use((req, res, next) => {
       "/swagger-ui-bundle.js",
       "/swagger-ui-standalone-preset.js",
       "/favicon-32x32.png",
-      "/favicon-16x16.png"
+      "/favicon-16x16.png",
+      "/swagger.json"
     ];
 
     const asset = p.replace("/api-docs", "");
@@ -237,17 +276,20 @@ const getAllRoutes = (app) => {
   return routes;
 };
 
+
 // ===============================================================
 // 🔐 API KEY PROTECTION (fixed & correct)
 // ===============================================================
 const PUBLIC_ROUTES = [
   "/",
   "/api",
-  "/api/health",
+  "/api-health",
   "/api/auth/login",
   "/api/auth/register",
   "/api/auth/refresh",
-  "/api-docs"
+  "/api-docs",
+  "/api-analytics",
+  "/api-analytics/"
 ];
 
 app.use((req, res, next) => {
@@ -310,7 +352,7 @@ cron.schedule("0 0 * * *", cleanupUnverifiedUsers, {
 });
 
 // ========================= START SERVER =========================
-const server = app.listen(PORT, () => {
+const server = httpServer.listen(PORT, () => {
   console.log(`
 🚀 Kivelo Server Started
 📍 Port: ${PORT}

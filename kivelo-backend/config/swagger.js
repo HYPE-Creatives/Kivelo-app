@@ -2,23 +2,28 @@
 import swaggerJSDoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
 
+/**
+ * -------------------------------------
+ * 🔧 SWAGGER OPTIONS
+ * -------------------------------------
+ */
 const options = {
   definition: {
     openapi: "3.0.3",
     info: {
       title: "Kivelo API",
       version: "1.0.0",
-      description:
-        "API documentation for the Kivelo project — including endpoints for authentication, user management, AI chat functionality, and a full-scale Security Audit module that allows fetching, creating, and exporting audit records securely.",
+      description: "Endpoints for authentication, family wellness features, analytics, audit logging, and AI-powered insights.",
       contact: {
         name: "Kivelo Developer Team",
         email: "support@kivelo.app",
       },
     },
+
     servers: [
       {
         url: "https://family-wellness.onrender.com",
-        description: "Production Server (Render)",
+        description: "Production Server",
       },
       {
         url: "http://localhost:5000",
@@ -30,231 +35,91 @@ const options = {
       },
     ],
 
+    // 🛡️ GLOBAL SECURITY (JWT Enabled)
+    security: [
+      { bearerAuth: [] }
+    ],
+
     components: {
       securitySchemes: {
         bearerAuth: {
           type: "http",
           scheme: "bearer",
           bearerFormat: "JWT",
-          description:
-            "Enter a valid JWT token to authorize. Example: `Bearer eyJhbGciOiJI...`",
+          description: "Provide a valid JWT token."
         },
+
+        // If you want API key support inside Swagger later:
+        // ApiKeyAuth: {
+        //   type: "apiKey",
+        //   in: "header",
+        //   name: "x-api-key",
+        //   description: "Your API key",
+        // },
       },
+
       schemas: {
-        /* ======================
-           EXISTING AUDIT SCHEMAS
-           ====================== */
+        // You can keep your existing schemas — unchanged
         AuditLog: {
           type: "object",
           properties: {
-            _id: { type: "string", example: "674a21a2f2a1e8b1..." },
-            timestamp: {
-              type: "string",
-              format: "date-time",
-              example: "2025-11-05T12:45:30.000Z",
-            },
-            actor: {
-              type: "object",
-              properties: {
-                id: { type: "string", example: "67123abc90d..." },
-                model: { type: "string", example: "Parent" },
-                ip: { type: "string", example: "192.168.1.10" },
-              },
-            },
-            action: { type: "string", example: "user.login" },
-            outcome: {
-              type: "string",
-              enum: ["success", "failure", "unknown"],
-              example: "success",
-            },
-            level: {
-              type: "string",
-              enum: ["info", "warning", "critical"],
-              example: "info",
-            },
-            resource: {
-              type: "object",
-              properties: {
-                type: { type: "string", example: "profile" },
-                id: { type: "string", example: "user_87abc" },
-              },
-            },
-            metadata: {
-              type: "object",
-              additionalProperties: true,
-              example: { method: "POST", userAgent: "Mozilla/5.0" },
-            },
+            _id: { type: "string" },
+            timestamp: { type: "string", format: "date-time" },
+            actor: { type: "object" },
+            action: { type: "string" },
+            outcome: { type: "string", enum: ["success", "failure", "unknown"] },
+            level: { type: "string", enum: ["info", "warning", "critical"] },
+            resource: { type: "object" },
+            metadata: { type: "object" },
           },
         },
-
-        AuditLogInput: {
-          type: "object",
-          required: ["action"],
-          properties: {
-            actor: {
-              type: "object",
-              example: {
-                id: "67123abc90d...",
-                model: "User",
-                ip: "192.168.1.5",
-              },
-            },
-            action: { type: "string", example: "user.update.profile" },
-            resource: {
-              type: "object",
-              example: { type: "profile", id: "user_87abc" },
-            },
-            outcome: {
-              type: "string",
-              enum: ["success", "failure", "unknown"],
-              example: "success",
-            },
-            level: {
-              type: "string",
-              enum: ["info", "warning", "critical"],
-              example: "info",
-            },
-            metadata: {
-              type: "object",
-              example: {
-                browser: "Chrome",
-                device: "Android",
-              },
-            },
-          },
-        },
-
-        /* ======================
-           NEW AI SCHEMAS
-           ====================== */
 
         ChatRequest: {
           type: "object",
           required: ["username", "message"],
           properties: {
-            username: {
-              type: "string",
-              example: "YourName",
-            },
-            message: {
-              type: "string",
-              example: "Hello, how are you?",
-            },
+            username: { type: "string" },
+            message: { type: "string" },
           },
         },
 
         ChatResponse: {
           type: "object",
           properties: {
-            reply: {
-              type: "string",
-              example: "I'm doing great, thanks for asking!"
-            }
+            reply: { type: "string" }
           }
         },
 
         ErrorResponse: {
           type: "object",
           properties: {
-            error: { type: "string", example: "message is required" }
+            error: { type: "string" }
           }
-        },
-
-        HistoryItem: {
-          type: "object",
-          properties: {
-            username: { type: "string", example: "YourName" },
-            user: { type: "string", example: "What's my assignment?" },
-            ai: { type: "string", example: "Your assignment is Mathematics." },
-            time: {
-              type: "string",
-              format: "date-time",
-              example: "2025-02-24T12:45:00Z"
-            },
-            isMock: { type: "boolean", example: false }
-          }
-        },
-
-        HistoryResponse: {
-          type: "object",
-          properties: {
-            success: { type: "boolean", example: true },
-            count: { type: "number", example: 2 },
-            containsMockResponses: { type: "boolean", example: false },
-            history: {
-              type: "array",
-              items: { $ref: "#/components/schemas/HistoryItem" }
-            }
-          }
-        },
-
-        ClearHistoryResponse: {
-          type: "object",
-          properties: {
-            success: { type: "boolean", example: true },
-            message: {
-              type: "string",
-              example: "Chat history cleared (4 messages removed)"
-            }
-          }
-        },
-
-        InsightRequest: {
-          type: "object",
-          properties: {
-            mood: { type: "string", example: "sad" },
-            activity: { type: "string", example: "self isolation" },
-            behavior: { type: "string", example: "not talking much" },
-          },
-        },
-
-        InsightResponse: {
-          type: "object",
-          properties: {
-            success: { type: "boolean" },
-            insight: {
-              type: "string",
-              example: "The child appears withdrawn and may benefit from emotional support...",
-            },
-          },
-        },
-
-        RecommendationRequest: {
-          type: "object",
-          properties: {
-            childName: { type: "string", example: "John" },
-            age: { type: "number", example: 12 },
-            context: {
-              type: "string",
-              example: "Low motivation during school activities",
-            },
-          },
-        },
-
-        RecommendationResponse: {
-          type: "object",
-          properties: {
-            success: { type: "boolean" },
-            recommendations: {
-              type: "string",
-              example: "1. Encourage morning exercise. 2. Create a learning routine...",
-            },
-          },
         },
       },
     },
-
-    // Apply Bearer Auth globally
-    security: [{ bearerAuth: [] }],
   },
 
-  // Path to your route and model files (globs supported)
+  // Auto-detect all route files
   apis: ["./routes/*.js", "./models/*.js"],
 };
 
+// Generate specification
 const swaggerSpec = swaggerJSDoc(options);
 
+/**
+ * -------------------------------------
+ * 🚀 SWAGGER SETUP FUNCTION
+ * -------------------------------------
+ */
 export const swaggerDocs = (app, port) => {
+  // ✔️ Serve swagger.json programmatically
+  app.get("/api-docs/swagger.json", (req, res) => {
+    res.header("Content-Type", "application/json");
+    res.send(swaggerSpec);
+  });
+
+  // Swagger UI
   app.use(
     "/api-docs",
     swaggerUi.serve,
@@ -262,7 +127,7 @@ export const swaggerDocs = (app, port) => {
       explorer: true,
       customCss: `
         .swagger-ui .topbar { display: none }
-        .swagger-ui .info .title { color: #2563eb; }
+        .swagger-ui .info .title { color: #2563eb; font-weight: bold; }
         .swagger-ui .scheme-container { background: #f8fafc; }
       `,
       customSiteTitle: "Kivelo API Docs",
@@ -271,21 +136,14 @@ export const swaggerDocs = (app, port) => {
         displayRequestDuration: true,
         docExpansion: "list",
         filter: true,
-        showExtensions: true,
-        showCommonExtensions: true,
-      }
+      },
     })
   );
 
-  console.log(
-    `📘 Swagger docs available at: http://localhost:${port}/api-docs`
-  );
-  console.log(
-    `🌐 Production docs available at: https://family-wellness.onrender.com/api-docs`
-  );
-  console.log(
-    `🔗 Ngrok docs available at: https://interangular-hattie-unreforming.ngrok-free.dev/docs`
-  );
+  // Logs
+  console.log(`📘 Swagger UI: http://localhost:${port}/api-docs`);
+  console.log(`📄 Swagger JSON: http://localhost:${port}/api-docs/swagger.json`);
+  console.log(`🌐 Production Docs: https://family-wellness.onrender.com/api-docs`);
 };
 
 export default swaggerSpec;

@@ -151,6 +151,10 @@ const getProDashboard = (title) => {
               <span>API Docs:</span>
               <span><a href="/api-docs" style="color:#6dd5fa; text-decoration:none;">Swagger</a></span>
             </div>
+            <div class="info-row">
+              <span>API Analytics:</span>
+              <span><a href="/api-analytics" style="color:#6dd5fa; text-decoration:none;">Analytics Dashboard</a></span>
+            </div>
         </div>
 
         <a href="/api-docs" class="btn">
