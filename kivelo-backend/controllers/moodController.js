@@ -1,40 +1,557 @@
-import MoodCheckin from "../models/MoodCheckin.js";
-import { sendToAI } from "../utils/aiTrigger.js";
+import Mood from '../models/MoodCheckin.js';
+import User from '../models/User.js';
+import { updateStreak } from '../services/streakService.js';
+import { analyzeMoodForParent } from '../services/moodAnalysisService.js';
 
-// Record a mood check-in
-export const recordMood = async (req, res) => {
-  try {
-    const { childId, moodEmoji, intensity, notes } = req.body;
+// Helper function for trust zone calculation
+const calculateTrustZone = (score) => {
+  if (score >= 8) return 'green';
+  if (score >= 6) return 'yellow';
+  if (score >= 4) return 'orange';
+  return 'red';
+};
 
-    if (!childId || !moodEmoji || !intensity)
-      return res.status(400).json({ message: "All fields are required" });
+// Helper: Calculate mood statistics
+const calculateMoodStats = (moods) => {
+  if (moods.length === 0) {
+    return {
+      averageScore: 0,
+      totalEntries: 0,
+      trustZoneDistribution: {},
+      frequentEmojis: {}
+    };
+  }
+  
+  const totalScore = moods.reduce((sum, mood) => sum + (mood.moodScore || 5), 0);
+  const averageScore = totalScore / moods.length;
+  
+  const zoneDistribution = moods.reduce((dist, mood) => {
+    const zone = mood.trustZone || calculateTrustZone(mood.moodScore || 5);
+    dist[zone] = (dist[zone] || 0) + 1;
+    return dist;
+  }, {});
+  
+  const emojiDistribution = moods.reduce((dist, mood) => {
+    if (mood.emoji) {
+      dist[mood.emoji] = (dist[mood.emoji] || 0) + 1;
+    }
+    return dist;
+  }, {});
+  
+  return {
+    averageScore: parseFloat(averageScore.toFixed(2)),
+    totalEntries: moods.length,
+    trustZoneDistribution: zoneDistribution,
+    frequentEmojis: emojiDistribution,
+    currentTrustZone: calculateTrustZone(averageScore)
+  };
+};
 
-    const checkin = await MoodCheckin.create({
-      childId,
-      moodEmoji,
-      intensity,
-      notes,
+// Helper: Generate mood insights
+const generateMoodInsights = (moods, stats) => {
+  const insights = [];
+  
+  if (stats.averageScore < 5) {
+    insights.push({
+      type: 'warning',
+      message: 'Your average mood is lower than usual. Consider trying some relaxing activities.',
+      suggestion: 'Try the AI helper for activity suggestions'
     });
+  }
+  
+  if (stats.trustZoneDistribution.red > 0) {
+    insights.push({
+      type: 'alert',
+      message: 'You had some difficult days recently. Remember, it\'s okay to ask for help.',
+      suggestion: 'Share your feelings with a trusted adult'
+    });
+  }
+  
+  return insights;
+};
 
-    // Notify AI team or enqueue for analysis later
-    // e.g., send to AI microservice or queue
-    await sendToAI(checkin);
+// ==================== EXPORTED CONTROLLER FUNCTIONS ====================
 
-    res.status(201).json({ success: true, data: checkin });
+/**
+ * Submit a mood check-in (PRD: Simple daily logging - emoji, voice, drawing, or short text)
+ */
+export const submitMoodCheckin = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { 
+      emoji, 
+      textNote, 
+      voiceNote, 
+      drawing, 
+      moodScore, 
+      tags, 
+      context 
+    } = req.body;
+    
+    // Determine type based on input
+    let type = 'combined';
+    if (emoji && !textNote && !voiceNote && !drawing) type = 'emoji';
+    else if (textNote && !emoji && !voiceNote && !drawing) type = 'text';
+    else if (voiceNote && !emoji && !textNote && !drawing) type = 'voice';
+    else if (drawing && !emoji && !textNote && !voiceNote) type = 'drawing';
+    
+    // Create mood check-in
+    const moodCheckin = await Mood.create({
+      child: userId,
+      type,
+      emoji,
+      textNote,
+      voiceNote,
+      drawing,
+      moodScore: moodScore || 5,
+      tags,
+      context,
+      trustZone: calculateTrustZone(moodScore || 5)
+    });
+    
+    // Update user's streak
+    await updateStreak(userId);
+    
+    // Award points for mood check-in
+    await User.findByIdAndUpdate(userId, {
+      $inc: { points: 10 }
+    });
+    
+    // Analyze mood for parent notifications if needed
+    if (moodScore <= 4) {
+      await analyzeMoodForParent(userId, moodCheckin);
+    }
+    
+    res.status(201).json({
+      success: true,
+      data: moodCheckin,
+      message: 'Mood recorded successfully!'
+    });
   } catch (error) {
-    console.error("Error recording mood:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 };
 
-// Get all moods for a child
-export const getMoodsByChild = async (req, res) => {
+/**
+ * Get mood history with filters
+ */
+export const getMoodHistory = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { period = 'week', limit = 50 } = req.query;
+    
+    let startDate = new Date();
+    switch (period) {
+      case 'day': startDate.setDate(startDate.getDate() - 1); break;
+      case 'week': startDate.setDate(startDate.getDate() - 7); break;
+      case 'month': startDate.setMonth(startDate.getMonth() - 1); break;
+      case 'year': startDate.setFullYear(startDate.getFullYear() - 1); break;
+    }
+    
+    const moods = await Mood.find({
+      child: userId,
+      createdAt: { $gte: startDate }
+    })
+    .sort({ createdAt: -1 })
+    .limit(parseInt(limit));
+    
+    const stats = calculateMoodStats(moods);
+    
+    res.json({
+      success: true,
+      data: moods,
+      stats,
+      insights: generateMoodInsights(moods, stats)
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+/**
+ * Get mood insights and AI-generated suggestions
+ */
+export const getMoodInsights = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { days = 30 } = req.query;
+    
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    
+    const moods = await Mood.find({
+      child: userId,
+      createdAt: { $gte: startDate }
+    });
+    
+    if (moods.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          message: 'Not enough data for insights',
+          suggestions: ['Try checking in more regularly!']
+        }
+      });
+    }
+    
+    const stats = calculateMoodStats(moods);
+    const insights = generateMoodInsights(moods, stats);
+    
+    res.json({
+      success: true,
+      data: {
+        stats,
+        insights
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+/**
+ * Get mood statistics
+ */
+export const getMoodStats = async (req, res) => {
+  try {
+    const targetUserId = req.query.childId || req.user._id;
+    const userId = req.user._id;
+    
+    // Check permission if accessing another user's stats
+    if (targetUserId !== userId.toString() && req.user.role !== 'parent') {
+      const parent = await User.findById(userId);
+      const hasAccess = parent.parent?.children?.some(
+        child => child.toString() === targetUserId
+      );
+      
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+    }
+    
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const moods = await Mood.find({
+      child: targetUserId,
+      createdAt: { $gte: thirtyDaysAgo }
+    });
+    
+    const stats = calculateMoodStats(moods);
+    
+    // Get user streak
+    const user = await User.findById(targetUserId).select('streakCount points');
+    
+    res.json({
+      success: true,
+      data: {
+        ...stats,
+        streakCount: user?.streakCount || 0,
+        points: user?.points || 0,
+        childId: targetUserId
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+/**
+ * Get today's mood check-in
+ */
+export const getTodayMood = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const todayMood = await Mood.findOne({
+      child: userId,
+      createdAt: { $gte: today }
+    });
+    
+    res.json({
+      success: true,
+      data: todayMood,
+      hasCheckedInToday: !!todayMood
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+/**
+ * Get mood trends for charts
+ */
+export const getMoodTrends = async (req, res) => {
+  try {
+    const targetUserId = req.query.childId || req.user._id;
+    const range = parseInt(req.query.range) || 7;
+    
+    // Permission check
+    if (targetUserId !== req.user._id.toString() && req.user.role !== 'parent') {
+      const parent = await User.findById(req.user._id);
+      const hasAccess = parent.parent?.children?.some(
+        child => child.toString() === targetUserId
+      );
+      
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
+    }
+    
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - range);
+    
+    const trends = await Mood.aggregate([
+      {
+        $match: {
+          child: targetUserId,
+          createdAt: { $gte: startDate }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
+          },
+          averageScore: { $avg: "$moodScore" },
+          count: { $sum: 1 },
+          emojis: { $push: "$emoji" },
+          trustZones: { $push: "$trustZone" }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+    
+    res.json({
+      success: true,
+      data: trends,
+      range
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+/**
+ * Update mood entry (only text/notes allowed)
+ */
+export const updateMoodEntry = async (req, res) => {
+  try {
+    const { moodId } = req.params;
+    const { textNote, tags } = req.body;
+    const userId = req.user._id;
+    
+    const mood = await Mood.findOne({
+      _id: moodId,
+      child: userId
+    });
+    
+    if (!mood) {
+      return res.status(404).json({
+        success: false,
+        message: 'Mood entry not found'
+      });
+    }
+    
+    // Only allow updates to text notes and tags
+    if (textNote !== undefined) mood.textNote = textNote;
+    if (tags !== undefined) mood.tags = tags;
+    
+    await mood.save();
+    
+    res.json({
+      success: true,
+      data: mood,
+      message: 'Mood entry updated'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+/**
+ * Delete mood entry
+ */
+export const deleteMoodEntry = async (req, res) => {
+  try {
+    const { moodId } = req.params;
+    const userId = req.user._id;
+    
+    const mood = await Mood.findOneAndDelete({
+      _id: moodId,
+      child: userId
+    });
+    
+    if (!mood) {
+      return res.status(404).json({
+        success: false,
+        message: 'Mood entry not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Mood entry deleted'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+/**
+ * Get trust zone summary for a child (Parent access)
+ */
+export const getTrustZoneSummary = async (req, res) => {
   try {
     const { childId } = req.params;
-    const moods = await MoodCheckin.find({ childId }).sort({ createdAt: -1 });
-    res.status(200).json({ success: true, data: moods });
+    const parentId = req.user._id;
+    
+    // TEMPORARY FIX: Check child's parent field instead
+    // Find the child user and verify they belong to this parent
+    const childUser = await User.findOne({
+      _id: childId,
+      role: 'child',
+      'child.parent': parentId  // Check the child's parent reference
+    });
+    
+    if (!childUser && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - child does not belong to this parent'
+      });
+    }
+    
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const moods = await Mood.find({
+      child: childId,
+      createdAt: { $gte: sevenDaysAgo }
+    });
+    
+    const zoneCounts = { green: 0, yellow: 0, orange: 0, red: 0 };
+    let totalScore = 0;
+    
+    moods.forEach(mood => {
+      zoneCounts[mood.trustZone] = (zoneCounts[mood.trustZone] || 0) + 1;
+      totalScore += mood.moodScore;
+    });
+    
+    const averageScore = moods.length > 0 ? totalScore / moods.length : 0;
+    const currentZone = calculateTrustZone(averageScore);
+    
+    res.json({
+      success: true,
+      data: {
+        childId,
+        averageScore: parseFloat(averageScore.toFixed(2)),
+        currentZone,
+        zoneDistribution: zoneCounts,
+        totalEntries: moods.length,
+        lastUpdated: new Date()
+      }
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
   }
 };
+
+/**
+ * Get mood by ID (single entry)
+ */
+export const getMoodById = async (req, res) => {
+  try {
+    const { moodId } = req.params;
+    const userId = req.user._id;
+    
+    const mood = await Mood.findOne({
+      _id: moodId,
+      child: userId
+    });
+    
+    if (!mood) {
+      return res.status(404).json({
+        success: false,
+        message: 'Mood entry not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: mood
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+/**
+ * Get recent moods (for quick view)
+ */
+export const getRecentMoods = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const limit = parseInt(req.query.limit) || 10;
+    
+    const moods = await Mood.find({
+      child: userId
+    })
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .select('emoji moodScore trustZone createdAt textNote');
+    
+    res.json({
+      success: true,
+      data: moods
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+// ==================== LEGACY EXPORTS (Backward Compatibility) ====================
+
+// These are for your existing routes that might be using different function names
+export const createMood = submitMoodCheckin; // Alias for backward compatibility
+export const getAllMoods = getMoodHistory;   // Alias for backward compatibility

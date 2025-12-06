@@ -13,6 +13,14 @@ const router = express.Router();
 
 /**
  * @swagger
+ * tags:
+ *   - name: AI Helper
+ *     description: AI interaction and chat functionalities
+ *   - name: AI Chat
+ *     description: Chat with the AI model and manage chat history
+ */
+/**
+ * @swagger
  * /api/ai/chat:
  *   post:
  *     summary: Send a message to the AI model

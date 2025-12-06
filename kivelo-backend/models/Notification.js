@@ -1,6 +1,25 @@
 import mongoose from 'mongoose';
 
 const notificationSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  type: {
+    type: String,
+    enum: [
+      'mood_alert',
+      'streak_milestone', 
+      'new_journal',
+      'points_earned',
+      'badge_earned',
+      'system',
+      'parent_alert',
+      'ai_suggestion'
+    ],
+    required: true
+  },
   title: {
     type: String,
     required: true
@@ -9,30 +28,37 @@ const notificationSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  type: {
-    type: String,
-    enum: ['info', 'warning', 'success', 'error'],
-    default: 'info'
+  data: {
+    type: Object,
+    default: {}
+  },
+  priority: {
+    type: Number,
+    min: 1,
+    max: 5,
+    default: 3
   },
   isRead: {
     type: Boolean,
     default: false
   },
-  user: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+  isSent: {
+    type: Boolean,
+    default: false
   },
-  relatedTo: {
-    type: mongoose.Schema.Types.ObjectId,
-    refPath: 'relatedModel'
-  },
-  relatedModel: {
+  sentVia: [{
     type: String,
-    enum: ['Activity', 'Child', 'Payment']
+    enum: ['push', 'email', 'sms']
+  }],
+  scheduledFor: Date,
+  createdAt: {
+    type: Date,
+    default: Date.now
   }
-}, {
-  timestamps: true
 });
+
+// Index for faster queries
+notificationSchema.index({ userId: 1, isRead: 1, createdAt: -1 });
+notificationSchema.index({ scheduledFor: 1, isSent: 1 });
 
 export default mongoose.model('Notification', notificationSchema);

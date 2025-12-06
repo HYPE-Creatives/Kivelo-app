@@ -36,6 +36,10 @@ import activityRoutes from './routes/activity.js';
 import moodRoutes from "./routes/mood.js";
 import auditRoutes from "./routes/auditRoutes.js";
 import errorHandler from './middleware/errorHandler.js';
+import gamificationRoutes from './routes/gamification.js';
+import learningRoutes from './routes/learning.js';
+import journalRoutes from './routes/journal.js';
+import notificationRoute from './routes/notificationRoutes.js';
 import "./jobs/auditRetention.js";
 import morgan from "morgan";
 import path from 'path';
@@ -223,8 +227,12 @@ app.use("/api/activity", activityRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/families", familyRoutes);
 app.use("/api/ai", aiRoutes);
-app.use("/api/moods", moodRoutes);
+app.use("/api/mood", moodRoutes);
 app.use("/api/audit", auditRoutes);
+app.use('/api/gamification', gamificationRoutes);
+app.use('/api/learning', learningRoutes);
+app.use('/api/journals', journalRoutes);
+app.use('/api/notifications', notificationRoute);
 
 // ===============================================================
 // 🔒 STRICT SWAGGER PROTECTION (fixed)

@@ -8,8 +8,8 @@ const router = express.Router();
 /**
  * @swagger
  * tags:
- *   name: Families
- *   description: Family management endpoints
+ *   name: Family Management
+ *   description: Family management endpoints - Parent-child linking and family management
  */
 
 /**
@@ -111,7 +111,7 @@ const router = express.Router();
  *   post:
  *     summary: Create a new family
  *     description: Create a new family with optional family photo. The authenticated user becomes the family admin.
- *     tags: [Families]
+ *     tags: [Family Management]
  *     security:
  *       - ApiKeyAuth: []
  *       - bearerAuth: []
@@ -193,7 +193,7 @@ router.post('/', auth, uploadSingle('familyPhoto'), createFamily);
  *   put:
  *     summary: Update family information
  *     description: Update family details and/or photo. Only the family admin can update the family.
- *     tags: [Families]
+ *     tags: [Family Management]
  *     security:
  *       - ApiKeyAuth: []
  *       - bearerAuth: []
@@ -279,7 +279,7 @@ router.put('/:id', auth, uploadSingle('familyPhoto'), updateFamily);
  *   delete:
  *     summary: Delete family photo
  *     description: Remove the family photo. Only the family admin can delete the photo.
- *     tags: [Families]
+ *     tags: [Family Management]
  *     security:
  *       - ApiKeyAuth: []
  *       - bearerAuth: []

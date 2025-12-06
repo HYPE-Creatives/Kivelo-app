@@ -9,6 +9,7 @@ import {
   deleteProfilePicture
 } from '../controllers/userControllers.js';
 import auth from '../middleware/auth.js';
+import { isSelfOrParent } from '../middleware/roleCheck.js';
 import { auditLogger } from '../middleware/auditMiddleware.js';
 import { uploadSingle } from '../middleware/upload.js';
 
@@ -93,7 +94,7 @@ const router = express.Router();
  *       401:
  *         description: Unauthorized
  */
-router.get('/profile', auth, auditLogger("user.view.profile"), getProfile);
+router.get('/profile', auth, isSelfOrParent, auditLogger("user.view.profile"), getProfile);
 
 /**
  * @swagger
@@ -127,7 +128,7 @@ router.get('/profile', auth, auditLogger("user.view.profile"), getProfile);
  *       400:
  *         description: Invalid request
  */
-router.put('/profile', auth, uploadSingle('avatar'), auditLogger((req) => `user.update.profile:${req.user?._id}`), updateProfile);
+router.put('/profile', auth, isSelfOrParent, uploadSingle('avatar'), auditLogger((req) => `user.update.profile:${req.user?._id}`), updateProfile);
 
 /**
  * @swagger
@@ -158,7 +159,7 @@ router.put('/profile', auth, uploadSingle('avatar'), auditLogger((req) => `user.
  *       400:
  *         description: Invalid request
  */
-router.put('/update-password', auth, auditLogger("user.update.password"), updatePassword);
+router.put('/update-password', auth, isSelfOrParent, auditLogger("user.update.password"), updatePassword);
 
 /**
  * @swagger
@@ -175,7 +176,7 @@ router.put('/update-password', auth, auditLogger("user.update.password"), update
  *       401:
  *         description: Unauthorized
  */
-router.put('/deactivate', auth, auditLogger("user.deactivate"), deactivateAccount);
+router.put('/deactivate', auth, isSelfOrParent, auditLogger("user.deactivate"), deactivateAccount);
 
 /**
  * @swagger
@@ -192,7 +193,7 @@ router.put('/deactivate', auth, auditLogger("user.deactivate"), deactivateAccoun
  *       401:
  *         description: Unauthorized
  */
-router.get('/dashboard', auth, auditLogger("user.view.dashboard"), getDashboardStats);
+router.get('/dashboard', auth, isSelfOrParent, auditLogger("user.view.dashboard"), getDashboardStats);
 
 /** 
  * @swagger
@@ -232,7 +233,7 @@ router.get('/dashboard', auth, auditLogger("user.view.dashboard"), getDashboardS
  *       500:
  *         description: Server error
  */
-router.post('/avatar', auth, uploadSingle('avatar'), auditLogger("user.upload.avatar"), uploadProfilePicture);
+router.post('/avatar', auth, isSelfOrParent, uploadSingle('avatar'), auditLogger("user.upload.avatar"), uploadProfilePicture);
 
 /** 
  * @swagger
@@ -267,6 +268,6 @@ router.post('/avatar', auth, uploadSingle('avatar'), auditLogger("user.upload.av
  *       500:
  *         description: Server error
  */
-router.delete('/avatar', auth, auditLogger("user.delete.avatar"), deleteProfilePicture);
+router.delete('/avatar', auth, isSelfOrParent, auditLogger("user.delete.avatar"), deleteProfilePicture);
 
 export default router;

@@ -115,13 +115,61 @@ const userSchema = new mongoose.Schema({
     },
     interests: [String],
     gradeLevel: String,
-    points: {
-      type: Number,
-      default: 0
+  },
+
+  // Gamification fields (for children)
+  streakCount: {
+    type: Number,
+    default: 0
+  },
+  badges: [{
+    badgeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Badge'
+    },
+    earnedAt: { type: Date , default: Date.now },
+    progress: Number
+  }],
+  // Move points from child object to root (keep both for backward compatibility)
+  points: {
+    type: Number,
+    default: 0
+  },
+
+  // Trust Zone settings (for parents)
+  trustZoneSettings: {
+    greenThreshold: { type: Number, default: 8 },
+    yellowThreshold: { type: Number, default: 6 },
+    orangeThreshold: { type: Number, default: 4 },
+    redThreshold: { type: Number, default: 0 },
+    notificationsEnabled: { type: Boolean, default: true }
+  },
+
+  // Learning platform progress (for parents)
+  learningProgress: [{
+    articleId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Article'
+    },
+    completed: { type: Boolean, default: false },
+    completedAt: Date,
+    quizScore: Number
+  }],
+
+  // Communication coaching preferences
+  coachingPreferences: {
+    responseStyle: {
+      type: String,
+      enum: ['gentle', 'direct', 'playful', 'professional'],
+      default: 'gentle'
+    },
+    language: {
+      type: String,
+      default: 'en'
     }
   }
 }, {
-  timestamps: true,
+  timestamps: true
 });
 
 // REMOVED DUPLICATE INDEXES - they are already created by 'unique: true' above

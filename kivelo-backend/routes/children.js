@@ -12,6 +12,9 @@ import {
   updateChildPreferences,
   getChildDashboard
 } from '../controllers/childControllers.js';
+import { getMoodHistory } from '../controllers/moodController.js';
+import { isChild, isSelfOrParent } from '../middleware/roleCheck.js';
+
 
 /**
  * @swagger
@@ -71,7 +74,7 @@ import {
  *       401:
  *         description: Unauthorized
  */
-router.get('/', auth, getChildProfile);
+router.get('/', auth, isChild, getChildProfile);
 
 /**
  * @swagger
@@ -117,7 +120,7 @@ router.put('/', auth, updateChildProfile);
  *       401:
  *         description: Unauthorized
  */
-router.get('/dashboard', auth, getChildDashboard);
+router.get('/dashboard', auth, isChild, getChildDashboard);
 
 /**
  * @swagger
@@ -275,6 +278,10 @@ router.get('/progress', auth, getChildProgress);
  *       401:
  *         description: Unauthorized
  */
-router.put('/preferences', auth, updateChildPreferences);
+router.put('/preferences', auth, isSelfOrParent, updateChildPreferences);
+
+
+// Child or their parent can access child's data
+router.get('/:childId/mood-history', auth, isSelfOrParent, getMoodHistory);
 
 export default router;

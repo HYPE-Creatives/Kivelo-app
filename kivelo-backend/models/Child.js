@@ -5,26 +5,47 @@ const childSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
-    unique: true // This creates an index
+    unique: true
   },
   parent: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Parent',
+    ref: 'User',
     required: true
   },
   dob: { type: Date, required: true },
+  activities: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Activity'
+  }],
+  // Gamification (sync with User model)
+  streakCount: {
+    type: Number,
+    default: 0
+  },
   points: {
     type: Number,
     default: 0
   },
-  level: {
-    type: Number,
-    default: 1
+
+  // Badges earned
+  badges: [{
+    badgeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Badge'
+    },
+    earnedAt: Date,
+    progress: Number
+  }],
+
+  // Mood history summary
+  moodStats: {
+    averageScore: { type: Number, default: 0 },
+    totalEntries: { type: Number, default: 0 },
+    lastEntry: Date,
+    currentStreak: { type: Number, default: 0 }
   },
-  currentStreak: {
-    type: Number,
-    default: 0
-  },
+
+  // One-time code for setup
   oneTimeCode: String,
   codeExpires: Date,
   isCodeUsed: {
@@ -35,19 +56,19 @@ const childSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+
+  // Child preferences
   preferences: {
     favoriteActivities: [String],
-    learningStyle: String
+    learningStyle: String,
+    avatarStyle: String,
+    notificationSound: String
   }
 }, {
   timestamps: true
 });
 
-// Only create compound indexes if needed for query performance
-// For example, if you frequently query by parent and points:
 childSchema.index({ parent: 1, points: -1 });
-
-// Or if you frequently query by oneTimeCode and isCodeUsed:
-childSchema.index({ oneTimeCode: 1, isCodeUsed: 1 });
+childSchema.index({ 'moodStats.currentStreak': -1 });
 
 export default mongoose.model('Child', childSchema);

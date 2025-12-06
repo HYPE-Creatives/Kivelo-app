@@ -21,6 +21,7 @@ import {
   getChildMoods,
   getChildMoodSummary
 } from '../controllers/parentControllers.js';
+import { isParent, hasAccessToChild } from '../middleware/roleCheck.js';
 
 /**
  * @swagger
@@ -41,6 +42,8 @@ import {
 /**
  * @swagger
  * tags:
+ *   - name: Parent Dashboard
+ *     description: Parent dashboard and family management
  *   - name: Parents
  *     description: Manage parent profiles, children, billing, subscriptions, and family dashboard
  */
@@ -61,7 +64,7 @@ import {
  *       401:
  *         description: Unauthorized
  */
-router.get('/', auth, getParentProfile);
+router.get('/', auth, isParent, getParentProfile);
 
 /**
  * @swagger
@@ -86,7 +89,7 @@ router.get('/', auth, getParentProfile);
  *       200:
  *         description: Parent profile updated successfully
  */
-router.put('/', auth, updateParentProfile);
+router.put('/', auth, isParent, updateParentProfile);
 
 /**
  * @swagger
@@ -101,7 +104,7 @@ router.put('/', auth, updateParentProfile);
  *       200:
  *         description: Successfully retrieved children list
  */
-router.get('/children-list', auth, getChildrenList);
+router.get('/children-list', auth, isParent, getChildrenList);
 
 /**
  * @swagger
@@ -132,7 +135,7 @@ router.get('/children-list', auth, getChildrenList);
  *       201:
  *         description: Child added successfully
  */
-router.post('/children-list', auth, addChild);
+router.post('/children-list', auth, isParent, addChild);
 
 /**
  * @swagger
@@ -162,7 +165,7 @@ router.post('/children-list', auth, addChild);
  *       200:
  *         description: Child updated successfully
  */
-router.put('/children-list/:childId', auth, updateChild);
+router.put('/children-list/:childId', auth, isParent, hasAccessToChild, updateChild);
 
 /**
  * @swagger
@@ -229,7 +232,7 @@ router.get('/reports', auth, getActivityReports);
  *       200:
  *         description: Billing info retrieved successfully
  */
-router.get('/billing', auth, getBillingInfo);
+router.get('/billing', auth, isParent, getBillingInfo);
 
 /**
  * @swagger
@@ -388,7 +391,7 @@ router.put('/settings', auth, updateFamilySettings);
  *       200:
  *         description: Child mood data retrieved successfully
  */
-router.get('/moods/:childId', auth, getChildMoods);
+router.get('/moods/:childId', auth, isParent, hasAccessToChild, getChildMoods);
 
 /**
  * @swagger
@@ -409,6 +412,6 @@ router.get('/moods/:childId', auth, getChildMoods);
  *       200:
  *         description: Child mood summary retrieved successfully
  */
-router.get('/summary/:childId', auth, getChildMoodSummary);
+router.get('/summary/:childId', auth, isParent, hasAccessToChild, getChildMoodSummary);
 
 export default router;

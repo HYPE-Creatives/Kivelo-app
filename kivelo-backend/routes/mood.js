@@ -1,129 +1,476 @@
-import express from "express";
-import auth from "../middleware/auth.js";
-import { recordMood, getMoodsByChild } from "../controllers/moodController.js";
+import express from 'express';
+import {
+  submitMoodCheckin,
+  getMoodHistory,
+  getMoodInsights,
+  getMoodStats,
+  deleteMoodEntry,
+  updateMoodEntry,
+  getTodayMood,
+  getMoodTrends,
+  getTrustZoneSummary
+} from '../controllers/moodController.js';
+import auth from '../middleware/auth.js';
+import { isChild, isParent, isSelfOrParent } from '../middleware/roleCheck.js';
+import upload from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
 
-/**
- * @swagger
- * components:
- *   securitySchemes:
- *     ApiKeyAuth:
- *       type: "apiKey"
- *       in: "header"
- *       name: "x-api-key"
- *       description: "API key required for all backend access"
- *     bearerAuth:
- *       type: "http"
- *       scheme: "bearer"
- *       bearerFormat: "JWT"
- *       description: "JWT Authorization header using the Bearer scheme"
- */
+// ==============================================
+// CHILD MOOD CHECK-IN ROUTES
+// ==============================================
 
 /**
  * @swagger
- * tags:
- *   - name: Moods
- *     description: Manage and track children's mood records
- */
-
-/**
- * @swagger
- * /api/moods/record:
+ * /api/mood/checkin:
  *   post:
- *     summary: Record a child's mood
- *     tags: [Moods]
+ *     summary: Submit a mood check-in
+ *     description: Child submits daily mood check-in (emoji, voice, drawing, or short text)
+ *     tags: [Mood Tracking]
  *     security:
- *       - ApiKeyAuth: []
  *       - bearerAuth: []
- *     description: Record a mood entry for a specific child. Accessible by authenticated parents or the child user.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required:
- *               - childId
- *               - mood
- *             properties:
- *               childId:
- *                 type: string
- *                 example: "6721a2b4f0a7de034cd92b12"
- *               mood:
- *                 type: string
- *                 enum: [happy, sad, excited, tired, angry, calm]
- *                 example: "happy"
- *               notes:
- *                 type: string
- *                 example: "Had a great day at school!"
+ *             $ref: '#/components/schemas/MoodCheckinRequest'
  *     responses:
  *       201:
- *         description: Mood recorded successfully
+ *         description: Mood check-in recorded successfully
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               example:
- *                 success: true
- *                 message: "Mood recorded successfully"
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
  *                 data:
- *                   _id: "6721bda9b7ef503b6c67a80e"
- *                   childId: "6721a2b4f0a7de034cd92b12"
- *                   mood: "happy"
- *                   notes: "Had a great day at school!"
- *                   createdAt: "2025-10-21T10:24:15.000Z"
- *       400:
- *         description: Invalid input or missing parameters
- *       401:
- *         description: Unauthorized
+ *                   $ref: '#/components/schemas/MoodCheckinResponse'
+ *                 message:
+ *                   type: string
+ *                   example: "Mood recorded successfully!"
  */
-router.post("/record", auth, recordMood);
+router.post('/checkin', auth, isChild, submitMoodCheckin);
 
 /**
  * @swagger
- * /api/moods/{childId}:
- *   get:
- *     summary: Get all moods recorded for a specific child
- *     tags: [Moods]
+ * /api/mood/checkin/with-media:
+ *   post:
+ *     summary: Submit mood check-in with file uploads
+ *     tags: [Mood Tracking]
  *     security:
- *       - ApiKeyAuth: []
+ *       - bearerAuth: []
+ *     requestBody:
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               voiceFile:
+ *                 type: string
+ *                 format: binary
+ *               drawingFile:
+ *                 type: string
+ *                 format: binary
+ *               moodScore:
+ *                 type: integer
+ *               emoji:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Mood check-in with media recorded
+ */
+router.post('/checkin/with-media', 
+  auth, 
+  isChild, 
+  upload.fields([
+    { name: 'voiceFile', maxCount: 1 },
+    { name: 'drawingFile', maxCount: 1 }
+  ]),
+  submitMoodCheckin
+);
+
+/**
+ * @swagger
+ * /api/mood/history:
+ *   get:
+ *     summary: Get mood history with filters
+ *     tags: [Mood Tracking]
+ *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: childId
- *         required: true
+ *       - name: period
+ *         in: query
  *         schema:
  *           type: string
- *         description: Child ID to fetch moods for
+ *           enum: [day, week, month, year]
+ *           default: week
+ *       - name: limit
+ *         in: query
+ *         schema:
+ *           type: integer
+ *           default: 50
  *     responses:
  *       200:
- *         description: Successfully retrieved child mood history
+ *         description: Mood history retrieved
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   _id:
- *                     type: string
- *                     example: "6721bda9b7ef503b6c67a80e"
- *                   mood:
- *                     type: string
- *                     example: "happy"
- *                   notes:
- *                     type: string
- *                     example: "Played football with friends"
- *                   createdAt:
- *                     type: string
- *                     format: date-time
- *                     example: "2025-10-21T10:24:15.000Z"
- *       404:
- *         description: No mood data found for the child
- *       401:
- *         description: Unauthorized
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/MoodCheckinResponse'
+ *                 stats:
+ *                   $ref: '#/components/schemas/MoodStats'
  */
-router.get("/:childId", auth, getMoodsByChild);
+router.get('/history', auth, isChild, getMoodHistory);
+
+/**
+ * @swagger
+ * /api/mood/today:
+ *   get:
+ *     summary: Get today's mood check-in
+ *     tags: [Mood Tracking]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Today's mood status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   $ref: '#/components/schemas/MoodCheckinResponse'
+ *                 hasCheckedInToday:
+ *                   type: boolean
+ */
+router.get('/today', auth, isChild, getTodayMood);
+
+/**
+ * @swagger
+ * /api/mood/stats:
+ *   get:
+ *     summary: Get mood statistics
+ *     tags: [Mood Tracking]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: childId
+ *         in: query
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Mood statistics retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   $ref: '#/components/schemas/MoodStats'
+ */
+router.get('/stats', auth, isSelfOrParent, getMoodStats);
+
+/**
+ * @swagger
+ * /api/mood/insights:
+ *   get:
+ *     summary: Get AI-generated mood insights
+ *     tags: [Mood Tracking]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: days
+ *         in: query
+ *         schema:
+ *           type: integer
+ *           default: 30
+ *     responses:
+ *       200:
+ *         description: Mood insights retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     stats:
+ *                       $ref: '#/components/schemas/MoodStats'
+ *                     insights:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/MoodInsight'
+ */
+router.get('/insights', auth, isChild, getMoodInsights);
+
+/**
+ * @swagger
+ * /api/mood/trends:
+ *   get:
+ *     summary: Get mood trends for charts
+ *     tags: [Mood Tracking]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: childId
+ *         in: query
+ *         schema:
+ *           type: string
+ *       - name: range
+ *         in: query
+ *         schema:
+ *           type: integer
+ *           default: 7
+ *     responses:
+ *       200:
+ *         description: Mood trends data
+ */
+router.get('/trends', auth, isSelfOrParent, getMoodTrends);
+
+// ==============================================
+// MOOD ENTRY MANAGEMENT ROUTES
+// ==============================================
+
+/**
+ * @swagger
+ * /api/mood/{moodId}:
+ *   put:
+ *     summary: Update a mood entry
+ *     tags: [Mood Tracking]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: moodId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               textNote:
+ *                 type: string
+ *               tags:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       200:
+ *         description: Mood entry updated
+ *   delete:
+ *     summary: Delete a mood entry
+ *     tags: [Mood Tracking]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: moodId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Mood entry deleted
+ */
+router.put('/:moodId', auth, isChild, updateMoodEntry);
+router.delete('/:moodId', auth, isChild, deleteMoodEntry);
+
+// ==============================================
+// PARENT-SPECIFIC ROUTES (Trust Zones)
+// ==============================================
+
+/**
+ * @swagger
+ * /api/mood/trust-zones/{childId}:
+ *   get:
+ *     summary: Get trust zone summary for a child
+ *     tags: [Parent Dashboard, Mood Tracking]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: childId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Trust zone summary retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   $ref: '#/components/schemas/TrustZoneSummary'
+ */
+router.get('/trust-zones/:childId', auth, isParent, getTrustZoneSummary);
+
+/**
+ * @swagger
+ * /api/mood/child/{childId}/history:
+ *   get:
+ *     summary: Get child's mood history (parent view)
+ *     tags: [Parent Dashboard, Mood Tracking]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: childId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - name: period
+ *         in: query
+ *         schema:
+ *           type: string
+ *           default: week
+ *     responses:
+ *       200:
+ *         description: Child's mood history retrieved
+ */
+router.get('/child/:childId/history', auth, isSelfOrParent, getMoodHistory);
+
+// ==============================================
+// GAMIFICATION & AI HELPER ROUTES
+// ==============================================
+
+/**
+ * @swagger
+ * /api/mood/streak:
+ *   get:
+ *     summary: Get current streak info
+ *     tags: [Gamification, Mood Tracking]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Streak information
+ */
+router.get('/streak', auth, isChild, (req, res) => {
+  res.json({ 
+    success: true,
+    data: {
+      streakCount: req.user.streakCount || 0,
+      points: req.user.points || 0
+    }
+  });
+});
+
+/**
+ * @swagger
+ * /api/mood/achievements:
+ *   get:
+ *     summary: Get mood-related achievements
+ *     tags: [Gamification, Mood Tracking]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Achievements retrieved
+ */
+router.get('/achievements', auth, isChild, (req, res) => {
+  res.json({ 
+    success: true,
+    data: {
+      badges: req.user.badges || [],
+      totalBadges: req.user.badges?.length || 0
+    }
+  });
+});
+
+/**
+ * @swagger
+ * /api/mood/suggestions:
+ *   get:
+ *     summary: Get AI suggestions based on current mood
+ *     tags: [AI Helper, Mood Tracking]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: moodScore
+ *         in: query
+ *         schema:
+ *           type: integer
+ *       - name: moodLabel
+ *         in: query
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: AI suggestions retrieved
+ */
+router.get('/suggestions', auth, isChild, (req, res) => {
+  const { moodScore, moodLabel } = req.query;
+  res.json({ 
+    success: true,
+    data: {
+      suggestions: [
+        { type: 'activity', activity: 'Coloring', emoji: '🎨', duration: 10 }
+      ],
+      message: `Based on your mood (${moodScore}/10)`
+    }
+  });
+});
+
+// ==============================================
+// BACKWARD COMPATIBILITY ROUTES
+// ==============================================
+
+/**
+ * @swagger
+ * /api/mood:
+ *   post:
+ *     summary: Legacy endpoint for mood submission
+ *     tags: [Mood Tracking]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/MoodCheckinRequest'
+ *     responses:
+ *       201:
+ *         description: Mood recorded
+ *   get:
+ *     summary: Legacy endpoint for getting moods
+ *     tags: [Mood Tracking]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: period
+ *         in: query
+ *         schema:
+ *           type: string
+ *           default: week
+ *     responses:
+ *       200:
+ *         description: Mood history retrieved
+ */
+router.post('/', auth, isChild, submitMoodCheckin);
+router.get('/', auth, isChild, getMoodHistory);
 
 export default router;
