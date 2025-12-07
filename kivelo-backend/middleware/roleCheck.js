@@ -1,237 +1,170 @@
-import User from '../models/User.js';
+import { resolveChildAccess } from "../utils/resolveChildAccess.js";
 
-/**
- * Middleware to verify if the authenticated user is a PARENT
- */
+/* -----------------------------------------
+   PARENT ONLY
+----------------------------------------- */
 export const isParent = (req, res, next) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication required'
-      });
-    }
-
-    if (req.user.role !== 'parent') {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. Parent privileges required.'
-      });
-    }
-
-    next();
-  } catch (error) {
-    console.error('Error in isParent middleware:', error);
-    res.status(500).json({
+  if (!req.user) {
+    return res.status(401).json({
       success: false,
-      message: 'Server error during role verification'
+      message: "Authentication required"
     });
   }
+
+  if (req.user.role !== "parent") {
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. Parent privileges required."
+    });
+  }
+
+  next();
 };
 
-/**
- * Middleware to verify if the authenticated user is a CHILD
- */
+
+/* -----------------------------------------
+   CHILD ONLY
+----------------------------------------- */
 export const isChild = (req, res, next) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication required'
-      });
-    }
-
-    if (req.user.role !== 'child') {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. Child privileges required.'
-      });
-    }
-
-    next();
-  } catch (error) {
-    console.error('Error in isChild middleware:', error);
-    res.status(500).json({
+  if (!req.user) {
+    return res.status(401).json({
       success: false,
-      message: 'Server error during role verification'
+      message: "Authentication required"
     });
   }
+
+  if (req.user.role !== "child") {
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. Child privileges required."
+    });
+  }
+
+  next();
 };
 
-/**
- * Middleware to verify if parent has access to a specific child
- * This is for routes like: /api/parent/child/:childId/...
- */
+
+/* -----------------------------------------
+   PARENT MUST HAVE ACCESS TO CHILD
+----------------------------------------- */
 export const hasAccessToChild = async (req, res, next) => {
   try {
-    const parentId = req.user._id;
-    const childId = req.params.childId;
-    
+    const parentId = req.user._id.toString();
+    const childId = req.params.childId?.toString();
+
     if (!childId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Child ID is required'
-      });
+      return res.status(400).json({ success: false, message: "Child ID is required" });
     }
 
-    // Verify user is a parent
-    if (req.user.role !== 'parent') {
+    if (req.user.role !== "parent") {
       return res.status(403).json({
         success: false,
-        message: 'Only parents can access child data'
+        message: "Only parents can access child data"
       });
     }
 
-    // Two ways to check access:
-    // 1. Check parent's children array in User model
-    // 2. Check Child model's parent reference
-    
-    // Option 1: Using User model (your current structure)
-    const parent = await User.findById(parentId).select('parent.children');
-    
-    if (!parent) {
-      return res.status(404).json({
-        success: false,
-        message: 'Parent not found'
-      });
-    }
+    const resolved = await resolveChildAccess(parentId, childId);
 
-    // Check if child exists in parent's children array
-    const childExists = parent.parent?.children?.some(
-      child => child.toString() === childId
-    );
-
-    if (!childExists) {
+    if (!resolved) {
       return res.status(403).json({
         success: false,
-        message: 'You do not have permission to access this child'
+        message: "You do not have permission to access this child"
       });
     }
 
+    req.resolvedChild = resolved;
     next();
+
   } catch (error) {
-    console.error('Error in hasAccessToChild middleware:', error);
-    
-    if (error.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid Child ID format'
-      });
-    }
-    
-    res.status(500).json({
+    console.error("Error in hasAccessToChild:", error);
+    return res.status(500).json({
       success: false,
-      message: 'Server error while verifying child access'
+      message: "Server error while verifying child access"
     });
   }
 };
 
-/**
- * Middleware to check if user is Admin (if you have admin role)
- */
+
+/* -----------------------------------------
+   ADMIN ONLY
+----------------------------------------- */
 export const isAdmin = (req, res, next) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication required'
-      });
-    }
-
-    // Assuming you might add admin role in future
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. Admin privileges required.'
-      });
-    }
-
-    next();
-  } catch (error) {
-    console.error('Error in isAdmin middleware:', error);
-    res.status(500).json({
+  if (!req.user) {
+    return res.status(401).json({
       success: false,
-      message: 'Server error during admin verification'
+      message: "Authentication required"
     });
   }
+
+  if (req.user.role !== "admin") {
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. Admin privileges required."
+    });
+  }
+
+  next();
 };
 
-/**
- * Middleware to verify if user is either Parent OR Admin
- * Useful for routes that both parents and admins can access
- */
+
+/* -----------------------------------------
+   PARENT OR ADMIN
+----------------------------------------- */
 export const isParentOrAdmin = (req, res, next) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication required'
-      });
-    }
-
-    if (req.user.role !== 'parent' && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. Parent or Admin privileges required.'
-      });
-    }
-
-    next();
-  } catch (error) {
-    console.error('Error in isParentOrAdmin middleware:', error);
-    res.status(500).json({
+  if (!req.user) {
+    return res.status(401).json({
       success: false,
-      message: 'Server error during role verification'
+      message: "Authentication required"
     });
   }
+
+  if (req.user.role !== "parent" && req.user.role !== "admin") {
+    return res.status(403).json({
+      success: false,
+      message: "Access denied. Parent or Admin privileges required."
+    });
+  }
+
+  next();
 };
 
-/**
- * Middleware to check if user owns the resource (for child accessing their own data)
- * Example: /api/child/profile should only be accessible by the child themselves
- */
+
+/* -----------------------------------------
+   SELF OR PARENT ACCESS
+----------------------------------------- */
 export const isSelfOrParent = async (req, res, next) => {
   try {
-    const requestingUserId = req.user._id;
-    const targetUserId = req.params.userId || req.params.childId;
-    
-    if (!targetUserId) {
-      return next(); // No specific user ID in route, proceed
-    }
+    const requesterId = req.user._id.toString();
+    const targetId = (req.params.userId || req.params.childId)?.toString();
 
-    // If user is accessing their own data
-    if (requestingUserId.toString() === targetUserId) {
-      return next();
-    }
+    if (!targetId) return next();
 
-    // If user is parent, check if they have access to this child
-    if (req.user.role === 'parent') {
-      const parent = await User.findById(requestingUserId).select('parent.children');
-      
-      const hasAccess = parent.parent?.children?.some(
-        child => child.toString() === targetUserId
-      );
-      
-      if (hasAccess) {
+    // If accessing own data
+    if (requesterId === targetId) return next();
+
+    // Parent accessing child's data → use proper validator
+    if (req.user.role === "parent") {
+      const resolved = await resolveChildAccess(requesterId, targetId);
+
+      if (resolved) {
+        req.resolvedChild = resolved;
         return next();
       }
     }
 
-    // If user is admin, allow access
-    if (req.user.role === 'admin') {
-      return next();
-    }
+    // Admin allowed
+    if (req.user.role === "admin") return next();
 
     return res.status(403).json({
       success: false,
-      message: 'You do not have permission to access this resource'
+      message: "You do not have permission to access this resource"
     });
-    
+
   } catch (error) {
-    console.error('Error in isSelfOrParent middleware:', error);
-    res.status(500).json({
+    console.error("Error in isSelfOrParent:", error);
+    return res.status(500).json({
       success: false,
-      message: 'Server error during permission check'
+      message: "Server error during permission check"
     });
   }
 };

@@ -1,98 +1,109 @@
 // controllers/journalController.js
+
 import Journal from '../models/JournalEntry.js';
 import User from '../models/User.js';
 import Child from '../models/Child.js';
-import Parent from '../models/Parent.js';
 import { journalSchema } from '../middleware/validators.js';
 import { updateUserStreak } from '../controllers/gamificationController.js';
 import Notification from '../models/Notification.js';
+import { resolveChildAccess } from '../utils/resolveChildAccess.js';
+import mongoose from 'mongoose';
 
-// ✅ Function 1: createJournal (your existing function)
+const toObjectId = id => (mongoose.Types.ObjectId.isValid(id) ? mongoose.Types.ObjectId(id) : null);
+
+/**
+ * createJournal
+ * - child (User._id) is the canonical stored field
+ * - childId (Child._id) also stored for convenience
+ */
 export async function createJournal(req, res, next) {
   try {
     const { error, value } = journalSchema.validate(req.body);
-    if (error) return res.status(400).json({ error: error.message });
+    if (error) return res.status(400).json({ success: false, message: error.message });
 
-    // Find child profile based on user role
-    let child;
-    
+    let targetChildUserId;
+    let childDoc;
+
+    // CHILD creating for themself
     if (req.user.role === 'child') {
-      // For child users, find their own child profile
-      child = await Child.findOne({ user: req.user._id });
-      if (!child) {
-        return res.status(404).json({ error: 'Child profile not found' });
+      childDoc = await Child.findOne({ user: req.user._id });
+      if (!childDoc) return res.status(404).json({ success: false, message: 'Child profile not found' });
+
+      targetChildUserId = req.user._id; // child user id
+    }
+    // PARENT creating for child
+    else if (req.user.role === 'parent') {
+      if (!value.childId) {
+        return res.status(400).json({ success: false, message: 'childId is required for parents' });
       }
-      // Override childId in value to ensure they can only create for themselves
-      value.childId = child._id;
-    } else if (req.user.role === 'parent') {
-      // For parent users, find child by childId from request
-      child = await Child.findById(value.childId);
-      if (!child) {
-        return res.status(404).json({ error: 'Child not found' });
+
+      // Resolve access (accepts Child._id or User._id)
+      const resolved = await resolveChildAccess(req.user._id, value.childId);
+      if (!resolved) {
+        return res.status(403).json({ success: false, message: 'Access denied - child not found or not yours' });
       }
+
+      targetChildUserId = resolved.userId;
+      // fetch childDoc for additional metadata (if needed)
+      childDoc = await Child.findOne({ user: targetChildUserId });
     } else {
-      return res.status(403).json({ error: 'Access denied - invalid role' });
+      return res.status(403).json({ success: false, message: 'Access denied - invalid role' });
     }
 
-    // Check if parent has access to this child (for parent users)
-    if (req.user.role === 'parent') {
-      if (String(child.parent) !== String(req.user._id)) {
-        return res.status(403).json({
-          error: 'Access denied - not your child'
-        });
-      }
-    }
-
+    // Build journal object (primary child field is user id)
     const journalData = {
-      child: child.user, // This is the user ID, not child ID
-      childId: child._id, // Store child document ID as well
-      childName: child.name || child.user.name,
+      child: targetChildUserId,                  // canonical user id
+      childId: childDoc?._id || null,           // child document id if available
+      childName: value.childName || undefined,  // allow override if provided
       type: value.type,
+      title: value.title || 'Untitled',
       content: value.content,
       assets: value.assets || [],
       visibility: value.visibility || 'parent-only',
-      title: value.title || 'Untitled',
       mood: value.mood || 'neutral',
       moodIntensity: value.moodIntensity || 5,
       tags: value.tags || [],
-      isPrivate: value.visibility === 'private',
+      isPrivate: (value.visibility || 'parent-only') === 'private',
       aiAnalysis: value.aiAnalysis || {}
     };
 
     const journal = await Journal.create(journalData);
 
-    // Award points if child is creating
+    // If a child created the journal, award points & update streak
     if (req.user.role === 'child') {
-      await updateUserStreak(req.user._id);
+      try {
+        await updateUserStreak(req.user._id);
+      } catch (e) {
+        console.warn('Failed to update user streak:', e.message);
+      }
+
       const pointsToAward = 15;
-      await User.findByIdAndUpdate(req.user._id, {
-        $inc: { points: pointsToAward }
-      });
-      
-      // Add pointsEarned to the journal response
+      await User.findByIdAndUpdate(req.user._id, { $inc: { points: pointsToAward } });
+
+      // add meta for response
       journal.pointsEarned = pointsToAward;
       journal.streakUpdated = true;
     }
 
-    // Notify parent if not private
-    if (journalData.visibility !== 'private' && child.parent) {
+    // Notify parent unless private / no parent set
+    if (!journal.isPrivate && childDoc?.parent) {
       try {
-        const childUser = await User.findById(child.user).select('name');
+        const childUser = await User.findById(targetChildUserId).select('name');
         const childName = childUser?.name || 'Your child';
-        
+
         await Notification.create({
-          userId: child.parent,
+          userId: childDoc.parent, // parent user id
           type: 'new_journal',
           title: 'New Journal Entry',
-          message: `${childName} created a new journal entry: "${journalData.title}"`,
+          message: `${childName} created a new journal entry: "${journal.title}"`,
           data: {
             journalId: journal._id,
-            childId: child.user._id,
-            childName: childName
+            childId: childDoc.user,
+            childName
           }
         });
-      } catch (notifError) {
-        console.log('Failed to create notification:', notifError.message);
+      } catch (notifErr) {
+        console.warn('Failed to create notification:', notifErr.message);
       }
     }
 
@@ -102,244 +113,174 @@ export async function createJournal(req, res, next) {
       pointsEarned: req.user.role === 'child' ? 15 : 0,
       message: 'Journal entry created successfully'
     });
+
   } catch (err) {
     console.error('Error in createJournal:', err);
-    res.status(500).json({
-      success: false,
-      message: err.message
-    });
+    return res.status(500).json({ success: false, message: err.message });
   }
 }
 
-// ✅ Function 2: getChildJournals
+/**
+ * getChildJournals (parent views a child's journals)
+ * - childId in params may be Child._id OR User._id; resolve via resolveChildAccess
+ * - queries journals by journal.child (User._id)
+ */
 export const getChildJournals = async (req, res) => {
   try {
-    const { childId } = req.params;
+    const rawChildId = req.params.childId;
     const parentId = req.user._id;
 
-    const child = await Child.findOne({
-      _id: childId,
-      parent: parentId
-    });
-
-    if (!child) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied - child not found or does not belong to you'
-      });
+    // Resolve access
+    const resolved = await resolveChildAccess(parentId, rawChildId);
+    if (!resolved) {
+      return res.status(403).json({ success: false, message: 'Access denied - child not found or does not belong to you' });
     }
 
-    const { page = 1, limit = 10, type, visibility, dateFrom, dateTo } = req.query;
+    const targetChildUserId = resolved.userId;
+    const childDoc = await Child.findOne({ user: targetChildUserId });
+    const childUser = await User.findById(targetChildUserId).select('name');
+
+    const page = parseInt(req.query.page || 1);
+    const limit = parseInt(req.query.limit || 10);
     const skip = (page - 1) * limit;
 
-    const query = { child: child.user };
+    const { type, visibility, dateFrom, dateTo } = req.query;
+    const query = { child: targetChildUserId };
 
     if (type && type !== 'all') query.type = type;
-
-    if (visibility && visibility !== 'all') {
-      query.visibility = visibility;
-    }
-
+    if (visibility && visibility !== 'all') query.visibility = visibility;
     if (dateFrom || dateTo) {
       query.createdAt = {};
       if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
       if (dateTo) query.createdAt.$lte = new Date(dateTo);
     }
 
-    const journals = await Journal.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const total = await Journal.countDocuments(query);
-
-    const childUser = await User.findById(child.user).select('name');
+    const [journals, total] = await Promise.all([
+      Journal.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Journal.countDocuments(query)
+    ]);
 
     res.json({
       success: true,
       data: {
         journals,
         childInfo: {
-          id: child._id,
-          userId: child.user,
-          name: childUser?.name
+          id: childDoc?._id || null,
+          userId: targetChildUserId,
+          name: childUser?.name || null
         }
       },
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page,
+        limit,
         total,
         pages: Math.ceil(total / limit)
       }
     });
-  } catch (error) {
-    console.error('Error in getChildJournals:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+
+  } catch (err) {
+    console.error('Error in getChildJournals:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// ✅ Function 3: getMyJournals
+/**
+ * getMyJournals (child only)
+ * - child queries by journal.child (User._id)
+ */
 export const getMyJournals = async (req, res) => {
   try {
     if (req.user.role !== 'child') {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. Child only.'
-      });
+      return res.status(403).json({ success: false, message: 'Access denied. Child only.' });
     }
 
     const childProfile = await Child.findOne({ user: req.user._id });
-    if (!childProfile) {
-      return res.status(404).json({
-        success: false,
-        message: 'Child profile not found'
-      });
-    }
+    if (!childProfile) return res.status(404).json({ success: false, message: 'Child profile not found' });
 
-    const { page = 1, limit = 10, type = 'all', visibility = 'all' } = req.query;
+    const page = parseInt(req.query.page || 1);
+    const limit = parseInt(req.query.limit || 10);
     const skip = (page - 1) * limit;
 
+    const { type = 'all', visibility = 'all' } = req.query;
     const query = { child: req.user._id };
 
     if (type !== 'all') query.type = type;
+    if (visibility !== 'all') query.visibility = visibility;
 
-    if (visibility !== 'all') {
-      query.visibility = visibility;
-    }
-
-    const journals = await Journal.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const total = await Journal.countDocuments(query);
-
-    const typeStats = await Journal.aggregate([
-      { $match: { child: req.user._id } },
-      {
-        $group: {
-          _id: '$type',
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-
-    const visibilityStats = await Journal.aggregate([
-      { $match: { child: req.user._id } },
-      {
-        $group: {
-          _id: '$visibility',
-          count: { $sum: 1 }
-        }
-      }
+    const [journals, total, typeStats, visibilityStats] = await Promise.all([
+      Journal.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Journal.countDocuments(query),
+      Journal.aggregate([{ $match: { child: req.user._id } }, { $group: { _id: '$type', count: { $sum: 1 } } }]),
+      Journal.aggregate([{ $match: { child: req.user._id } }, { $group: { _id: '$visibility', count: { $sum: 1 } } }])
     ]);
 
     res.json({
       success: true,
       data: journals,
-      stats: {
-        byType: typeStats,
-        byVisibility: visibilityStats
-      },
+      stats: { byType: typeStats, byVisibility: visibilityStats },
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page,
+        limit,
         total,
         pages: Math.ceil(total / limit)
       }
     });
-  } catch (error) {
-    console.error('Error in getMyJournals:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+
+  } catch (err) {
+    console.error('Error in getMyJournals:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// ✅ Function 4: getJournal
+/**
+ * getJournal (single)
+ * - child can only access their own journal
+ * - parent must own the child and journal must not be private
+ */
 export const getJournal = async (req, res) => {
   try {
     const { journalId } = req.params;
 
     const journal = await Journal.findById(journalId);
+    if (!journal) return res.status(404).json({ success: false, message: 'Journal entry not found' });
 
-    if (!journal) {
-      return res.status(404).json({
-        success: false,
-        message: 'Journal entry not found'
-      });
-    }
-
-    // Check permissions
     if (req.user.role === 'child') {
       if (journal.child.toString() !== req.user._id.toString()) {
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied - this is not your journal'
-        });
+        return res.status(403).json({ success: false, message: 'Access denied - this is not your journal' });
       }
     } else if (req.user.role === 'parent') {
-      const childProfile = await Child.findOne({
-        user: journal.child,
-        parent: req.user._id
-      });
-
-      if (!childProfile) {
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied - this child is not under your care'
-        });
-      }
+      // Resolve the parent-child relation
+      const resolved = await resolveChildAccess(req.user._id, journal.child);
+      if (!resolved) return res.status(403).json({ success: false, message: 'Access denied - this child is not under your care' });
 
       if (journal.visibility === 'private') {
-        return res.status(403).json({
-          success: false,
-          message: 'This journal is marked as private'
-        });
+        return res.status(403).json({ success: false, message: 'This journal is marked as private' });
       }
+    } else if (req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    res.json({
-      success: true,
-      data: journal
-    });
-  } catch (error) {
-    console.error('Error in getJournal:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    return res.json({ success: true, data: journal });
+
+  } catch (err) {
+    console.error('Error in getJournal:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// ✅ Function 5: updateJournal
+/**
+ * updateJournal (child updates their own journal)
+ */
 export const updateJournal = async (req, res) => {
   try {
     const { journalId } = req.params;
 
-    const journal = await Journal.findOne({
-      _id: journalId,
-      child: req.user._id
-    });
-
-    if (!journal) {
-      return res.status(404).json({
-        success: false,
-        message: 'Journal entry not found or access denied'
-      });
-    }
+    // Only the child who owns the journal can update via this endpoint
+    const journal = await Journal.findOne({ _id: journalId, child: req.user._id });
+    if (!journal) return res.status(404).json({ success: false, message: 'Journal entry not found or access denied' });
 
     const { error, value } = journalSchema.validate(req.body);
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        message: error.message
-      });
-    }
+    if (error) return res.status(400).json({ success: false, message: error.message });
 
     Object.keys(value).forEach(key => {
       if (value[key] !== undefined) {
@@ -353,137 +294,78 @@ export const updateJournal = async (req, res) => {
 
     await journal.save();
 
-    res.json({
-      success: true,
-      data: journal,
-      message: 'Journal entry updated successfully'
-    });
-  } catch (error) {
-    console.error('Error in updateJournal:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    return res.json({ success: true, data: journal, message: 'Journal entry updated successfully' });
+
+  } catch (err) {
+    console.error('Error in updateJournal:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// ✅ Function 6: deleteJournal
+/**
+ * deleteJournal (child deletes their own journal)
+ */
 export const deleteJournal = async (req, res) => {
   try {
     const { journalId } = req.params;
 
-    const journal = await Journal.findOneAndDelete({
-      _id: journalId,
-      child: req.user._id
-    });
+    const journal = await Journal.findOneAndDelete({ _id: journalId, child: req.user._id });
+    if (!journal) return res.status(404).json({ success: false, message: 'Journal entry not found or access denied' });
 
-    if (!journal) {
-      return res.status(404).json({
-        success: false,
-        message: 'Journal entry not found or access denied'
-      });
-    }
+    return res.json({ success: true, message: 'Journal entry deleted successfully' });
 
-    res.json({
-      success: true,
-      message: 'Journal entry deleted successfully'
-    });
-  } catch (error) {
-    console.error('Error in deleteJournal:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+  } catch (err) {
+    console.error('Error in deleteJournal:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// ✅ Function 7: getJournalStats
+/**
+ * getJournalStats (parent)
+ * - resolves child then computes stats (non-private journals)
+ */
 export const getJournalStats = async (req, res) => {
   try {
-    const { childId } = req.params;
+    const rawChildId = req.params.childId;
     const parentId = req.user._id;
 
-    const child = await Child.findOne({
-      _id: childId,
-      parent: parentId
-    });
+    const resolved = await resolveChildAccess(parentId, rawChildId);
+    if (!resolved) return res.status(403).json({ success: false, message: 'Access denied' });
 
-    if (!child) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied'
-      });
-    }
-
-    const childUser = await User.findById(child.user).select('name');
+    const targetChildUserId = resolved.userId;
+    const childDoc = await Child.findOne({ user: targetChildUserId });
+    const childUser = await User.findById(targetChildUserId).select('name');
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const frequencyStats = await Journal.aggregate([
-      {
-        $match: {
-          child: child.user,
-          createdAt: { $gte: thirtyDaysAgo },
-          visibility: { $ne: 'private' }
-        }
-      },
-      {
-        $group: {
-          _id: {
-            year: { $year: '$createdAt' },
-            month: { $month: '$createdAt' },
-            day: { $dayOfMonth: '$createdAt' }
-          },
-          count: { $sum: 1 }
-        }
-      },
+      { $match: { child: targetChildUserId, createdAt: { $gte: thirtyDaysAgo }, visibility: { $ne: 'private' } } },
+      { $group: { _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' }, day: { $dayOfMonth: '$createdAt' } }, count: { $sum: 1 } } },
       { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 } }
     ]);
 
     const typeDistribution = await Journal.aggregate([
-      {
-        $match: {
-          child: child.user,
-          visibility: { $ne: 'private' }
-        }
-      },
-      {
-        $group: {
-          _id: '$type',
-          count: { $sum: 1 }
-        }
-      },
+      { $match: { child: targetChildUserId, visibility: { $ne: 'private' } } },
+      { $group: { _id: '$type', count: { $sum: 1 } } },
       { $sort: { count: -1 } }
     ]);
 
     const visibilityDistribution = await Journal.aggregate([
-      { $match: { child: child.user } },
-      {
-        $group: {
-          _id: '$visibility',
-          count: { $sum: 1 }
-        }
-      },
+      { $match: { child: targetChildUserId } },
+      { $group: { _id: '$visibility', count: { $sum: 1 } } },
       { $sort: { count: -1 } }
     ]);
 
-    const recentJournals = await Journal.find({
-      child: child.user,
-      visibility: { $ne: 'private' }
-    })
+    const recentJournals = await Journal.find({ child: targetChildUserId, visibility: { $ne: 'private' } })
       .sort({ createdAt: -1 })
       .limit(5)
       .select('title type visibility createdAt');
 
-    res.json({
+    return res.json({
       success: true,
       data: {
-        childInfo: {
-          id: child._id,
-          userId: child.user,
-          name: childUser?.name
-        },
+        childInfo: { id: childDoc?._id || null, userId: targetChildUserId, name: childUser?.name || null },
         frequencyStats,
         typeDistribution,
         visibilityDistribution,
@@ -495,54 +377,38 @@ export const getJournalStats = async (req, res) => {
         }
       }
     });
-  } catch (error) {
-    console.error('Error in getJournalStats:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+
+  } catch (err) {
+    console.error('Error in getJournalStats:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// ✅ Function 8: searchJournals
+/**
+ * searchJournals (parent or child)
+ * - parent must resolve ownership of childId when provided
+ */
 export const searchJournals = async (req, res) => {
   try {
     const { q, childId, type, visibility, limit = 20 } = req.query;
-    const parentId = req.user._id;
 
-    if (!q) {
-      return res.status(400).json({
-        success: false,
-        message: 'Search query is required'
-      });
-    }
+    if (!q) return res.status(400).json({ success: false, message: 'Search query is required' });
 
-    let query = {};
-
-    if (childId && req.user.role === 'parent') {
-      const child = await Child.findOne({ _id: childId, parent: parentId });
-      if (!child) {
-        return res.status(403).json({
-          success: false,
-          message: 'Access denied'
-        });
-      }
-      query.child = child.user;
+    const query = {};
+    if (childId) {
+      if (req.user.role !== 'parent') return res.status(403).json({ success: false, message: 'Access denied' });
+      const resolved = await resolveChildAccess(req.user._id, childId);
+      if (!resolved) return res.status(403).json({ success: false, message: 'Access denied' });
+      query.child = resolved.userId;
       query.visibility = { $ne: 'private' };
     } else if (req.user.role === 'child') {
       query.child = req.user._id;
     } else {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied'
-      });
+      return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
     if (type && type !== 'all') query.type = type;
-
-    if (visibility && visibility !== 'all') {
-      query.visibility = visibility;
-    }
+    if (visibility && visibility !== 'all') query.visibility = visibility;
 
     query.$or = [
       { title: { $regex: q, $options: 'i' } },
@@ -550,34 +416,22 @@ export const searchJournals = async (req, res) => {
       { tags: { $regex: q, $options: 'i' } }
     ];
 
-    const journals = await Journal.find(query)
-      .sort({ createdAt: -1 })
-      .limit(parseInt(limit));
+    const journals = await Journal.find(query).sort({ createdAt: -1 }).limit(parseInt(limit));
 
-    res.json({
-      success: true,
-      data: journals,
-      count: journals.length,
-      query: q
-    });
-  } catch (error) {
-    console.error('Error in searchJournals:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    return res.json({ success: true, data: journals, count: journals.length, query: q });
+
+  } catch (err) {
+    console.error('Error in searchJournals:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// ✅ Function 9: getJournalPrompts (MISSING FUNCTION - ADDED)
+/**
+ * getJournalPrompts (child)
+ */
 export const getJournalPrompts = async (req, res) => {
   try {
-    if (req.user.role !== 'child') {
-      return res.status(403).json({
-        success: false,
-        message: 'Only children can get journal prompts'
-      });
-    }
+    if (req.user.role !== 'child') return res.status(403).json({ success: false, message: 'Only children can get journal prompts' });
 
     const prompts = [
       "What made you smile today?",
@@ -597,139 +451,89 @@ export const getJournalPrompts = async (req, res) => {
       "What's something you want to learn how to do?"
     ];
 
-    // Get 3 random prompts
     const shuffled = [...prompts].sort(() => 0.5 - Math.random());
     const randomPrompts = shuffled.slice(0, 3);
 
-    res.json({
-      success: true,
-      data: {
-        prompts: randomPrompts,
-        totalAvailable: prompts.length
-      }
-    });
-  } catch (error) {
-    console.error('Error in getJournalPrompts:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
+    return res.json({ success: true, data: { prompts: randomPrompts, totalAvailable: prompts.length } });
+
+  } catch (err) {
+    console.error('Error in getJournalPrompts:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// ✅ Function 10: exportJournals (MISSING FUNCTION - ADDED)
+/**
+ * exportJournals (parent)
+ * - exports non-private journals for a child (childId param may be Child._id or User._id)
+ */
 export const exportJournals = async (req, res) => {
   try {
     const { childId, format = 'json', startDate, endDate } = req.query;
 
-    if (!childId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Child ID is required'
-      });
-    }
+    if (!childId) return res.status(400).json({ success: false, message: 'Child ID is required' });
 
-    // Verify parent access
-    const child = await Child.findOne({
-      _id: childId,
-      parent: req.user._id
-    });
+    const resolved = await resolveChildAccess(req.user._id, childId);
+    if (!resolved) return res.status(403).json({ success: false, message: 'Access denied - child not found or not yours' });
 
-    if (!child) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied - child not found or not yours'
-      });
-    }
+    const targetChildUserId = resolved.userId;
+    const childDoc = await Child.findOne({ user: targetChildUserId });
+    const childUser = await User.findById(targetChildUserId).select('name email');
 
-    // Build query
-    const query = {
-      child: child.user,
-      visibility: { $ne: 'private' } // Only export non-private journals
-    };
-
-    // Add date range if provided
+    const query = { child: targetChildUserId, visibility: { $ne: 'private' } };
     if (startDate || endDate) {
       query.createdAt = {};
       if (startDate) query.createdAt.$gte = new Date(startDate);
       if (endDate) query.createdAt.$lte = new Date(endDate);
     }
 
-    const journals = await Journal.find(query)
-      .sort({ createdAt: -1 });
-
-    const childUser = await User.findById(child.user).select('name email');
+    const journals = await Journal.find(query).sort({ createdAt: -1 });
 
     if (format === 'csv') {
-      // Prepare CSV data
-      const csvData = journals.map(journal => ({
-        Date: journal.createdAt.toISOString().split('T')[0],
-        Title: journal.title || 'Untitled',
-        Type: journal.type,
-        Content: journal.content.substring(0, 200).replace(/"/g, '""') + (journal.content.length > 200 ? '...' : ''),
-        Mood: journal.mood || 'neutral',
-        'Mood Intensity': journal.moodIntensity || 5,
-        Visibility: journal.visibility,
-        Tags: journal.tags.join(', '),
-        'Word Count': journal.wordCount || 0
+      const csvData = journals.map(j => ({
+        Date: j.createdAt.toISOString().split('T')[0],
+        Title: j.title || 'Untitled',
+        Type: j.type,
+        Content: (j.content || '').substring(0, 200).replace(/"/g, '""') + ((j.content || '').length > 200 ? '...' : ''),
+        Mood: j.mood || 'neutral',
+        'Mood Intensity': j.moodIntensity || 5,
+        Visibility: j.visibility,
+        Tags: (j.tags || []).join(', '),
+        'Word Count': j.wordCount || 0
       }));
 
-      // Convert to CSV
       const headers = Object.keys(csvData[0] || {}).join(',');
-      const rows = csvData.map(row =>
-        Object.values(row).map(value =>
-          `"${String(value).replace(/"/g, '""')}"`
-        ).join(',')
-      );
+      const rows = csvData.map(row => Object.values(row).map(v => `"${String(v).replace(/"/g, '""')}"`).join(','));
       const csvContent = [headers, ...rows].join('\n');
 
-      // Set headers for file download
       res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition',
-        `attachment; filename=journals_${childUser?.name || 'child'}_${new Date().toISOString().split('T')[0]}.csv`);
-
-      res.send(csvContent);
-    } else {
-      // JSON format (default)
-      res.json({
-        success: true,
-        data: {
-          child: {
-            id: child._id,
-            userId: child.user,
-            name: childUser?.name,
-            email: childUser?.email
-          },
-          journals: journals.map(j => ({
-            id: j._id,
-            title: j.title,
-            type: j.type,
-            content: j.content,
-            mood: j.mood,
-            moodIntensity: j.moodIntensity,
-            visibility: j.visibility,
-            tags: j.tags,
-            createdAt: j.createdAt,
-            wordCount: j.wordCount,
-            assets: j.assets
-          })),
-          exportInfo: {
-            format: 'json',
-            exportDate: new Date(),
-            totalJournals: journals.length,
-            dateRange: startDate || endDate ? {
-              start: startDate,
-              end: endDate
-            } : 'all time'
-          }
-        }
-      });
+      res.setHeader('Content-Disposition', `attachment; filename=journals_${childUser?.name || 'child'}_${new Date().toISOString().split('T')[0]}.csv`);
+      return res.send(csvContent);
     }
-  } catch (error) {
-    console.error('Error in exportJournals:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message
+
+    // Default JSON
+    return res.json({
+      success: true,
+      data: {
+        child: { id: childDoc?._id || null, userId: targetChildUserId, name: childUser?.name, email: childUser?.email },
+        journals: journals.map(j => ({
+          id: j._id,
+          title: j.title,
+          type: j.type,
+          content: j.content,
+          mood: j.mood,
+          moodIntensity: j.moodIntensity,
+          visibility: j.visibility,
+          tags: j.tags,
+          createdAt: j.createdAt,
+          wordCount: j.wordCount,
+          assets: j.assets
+        })),
+        exportInfo: { format: 'json', exportDate: new Date(), totalJournals: journals.length, dateRange: startDate || endDate ? { start: startDate, end: endDate } : 'all time' }
+      }
     });
+
+  } catch (err) {
+    console.error('Error in exportJournals:', err);
+    return res.status(500).json({ success: false, message: err.message });
   }
 };

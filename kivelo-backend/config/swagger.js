@@ -468,6 +468,104 @@ All protected routes require JWT token in Authorization header:
               default: []
             }
           }
+        },
+        GamificationStats: {
+          type: "object",
+          properties: {
+            childInfo: {
+              type: "object",
+              properties: {
+                id: { type: "string", example: "65a1b2c3d4e5f67890123456" },
+                name: { type: "string", example: "John Doe" },
+                age: { type: "integer", example: 10 }
+              }
+            },
+            points: {
+              type: "object",
+              properties: {
+                total: { type: "integer", example: 1250 },
+                current: { type: "integer", example: 250 },
+                weeklyEarned: { type: "integer", example: 150 },
+                monthlyEarned: { type: "integer", example: 450 }
+              }
+            },
+            streak: {
+              type: "object",
+              properties: {
+                current: { type: "integer", example: 7 },
+                longest: { type: "integer", example: 21 },
+                lastActivity: { type: "string", format: "date-time" }
+              }
+            },
+            badges: {
+              type: "object",
+              properties: {
+                total: { type: "integer", example: 8 },
+                earned: { type: "integer", example: 5 },
+                recent: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name: { type: "string", example: "Early Bird" },
+                      icon: { type: "string", example: "🐦" }
+                    }
+                  }
+                }
+              }
+            },
+            level: {
+              type: "object",
+              properties: {
+                current: { type: "integer", example: 3 },
+                title: { type: "string", example: "Explorer" },
+                progress: { type: "number", example: 0.65 },
+                nextLevelPoints: { type: "integer", example: 300 }
+              }
+            },
+            leaderboard: {
+              type: "object",
+              properties: {
+                rank: { type: "integer", example: 5 },
+                totalPlayers: { type: "integer", example: 50 },
+                topPlayers: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name: { type: "string", example: "Alice" },
+                      points: { type: "integer", example: 1800 }
+                    }
+                  }
+                }
+              }
+            },
+            activityStats: {
+              type: "object",
+              properties: {
+                journalsThisWeek: { type: "integer", example: 4 },
+                moodChecksThisWeek: { type: "integer", example: 7 },
+                activitiesCompleted: { type: "integer", example: 3 }
+              }
+            },
+            rewards: {
+              type: "object",
+              properties: {
+                available: { type: "integer", example: 2 },
+                redeemed: { type: "integer", example: 5 },
+                upcoming: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name: { type: "string", example: "Extra Playtime" },
+                      pointsRequired: { type: "integer", example: 100 }
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }

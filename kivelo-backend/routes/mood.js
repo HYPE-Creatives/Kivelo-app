@@ -293,6 +293,25 @@ router.get('/trends', auth, isSelfOrParent, getMoodTrends);
  *         description: Mood entry deleted
  */
 router.put('/:moodId', auth, isChild, updateMoodEntry);
+
+/**
+ * @swagger
+ * /api/v1/mood/{moodId}:
+ *  delete: 
+ *    summary: Delete a mood entry
+ *    tags: [Mood Tracking]
+ *    security:
+ *      - bearerAuth: []
+ *    parameters:
+ *      - name: moodId
+ *        in: path
+ *        required: true
+ *        schema:
+ *          type: string
+ *    responses:
+ *      200:
+ *        description: Mood entry deleted
+ */
 router.delete('/:moodId', auth, isChild, deleteMoodEntry);
 
 // ==============================================

@@ -15,6 +15,7 @@ const notificationSchema = new mongoose.Schema({
       'points_earned',
       'badge_earned',
       'system',
+      'reminder',
       'parent_alert',
       'ai_suggestion'
     ],
