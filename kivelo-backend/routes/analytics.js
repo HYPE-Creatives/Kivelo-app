@@ -18,7 +18,7 @@ const router = express.Router();
  *       properties:
  *         path:
  *           type: string
- *           example: "/api/auth/login"
+ *           example: "/api/v1/auth/login"
  *         method:
  *           type: string
  *           example: "POST"
@@ -102,7 +102,7 @@ const router = express.Router();
 
 /**
  * @swagger
- * /api-analytics/routes:
+ * /api-analytics/v1/routes:
  *   get:
  *     summary: Get route usage analytics
  *     description: Retrieve statistics about API route usage including request counts and response times
@@ -161,7 +161,7 @@ router.get("/routes", getRoutes);
 
 /**
  * @swagger
- * /api-analytics/stats:
+ * /api-analytics/v1/stats:
  *   get:
  *     summary: Get system statistics
  *     description: Retrieve overall system statistics including user counts, activity metrics, and AI usage
@@ -211,7 +211,7 @@ router.get("/stats", getStats);
 
 /**
  * @swagger
- * /api-analytics/summary:
+ * /api-analytics/v1/summary:
  *   get:
  *     summary: Get analytics summary
  *     description: Retrieve a comprehensive summary of system analytics for a given period
@@ -276,7 +276,7 @@ router.get("/summary", getSummary);
 
 /**
  * @swagger
- * /api-analytics/time-series:
+ * /api-analytics/v1/time-series:
  *   get:
  *     summary: Get time series analytics data
  *     description: Retrieve time-series data for requests, users, and errors over a specified time range

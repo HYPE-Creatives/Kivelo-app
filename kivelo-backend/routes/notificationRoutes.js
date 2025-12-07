@@ -35,7 +35,7 @@ router.use(auth);
 
 /**
  * @swagger
- * /notifications:
+ * /api/v1/notifications:
  *   get:
  *     summary: Get user's notifications
  *     description: Retrieve paginated list of notifications with filtering options
@@ -131,7 +131,7 @@ router.get('/', getNotifications);
 
 /**
  * @swagger
- * /notifications/stats:
+ * /api/v1/notifications/stats:
  *   get:
  *     summary: Get notification statistics
  *     description: Get detailed statistics about user's notifications
@@ -171,7 +171,7 @@ router.get('/stats', getNotificationStats);
 
 /**
  * @swagger
- * /notifications/{notificationId}:
+ * /api/v1/notifications/{notificationId}:
  *   get:
  *     summary: Get single notification
  *     description: Get specific notification by ID (marks as read when retrieved)
@@ -207,7 +207,7 @@ router.get('/:notificationId', getNotification);
 
 /**
  * @swagger
- * /notifications/{notificationId}/read:
+ * /api/v1/notifications/{notificationId}/read:
  *   put:
  *     summary: Mark notification as read
  *     description: Mark a specific notification as read
@@ -246,7 +246,7 @@ router.put('/:notificationId/read', markAsRead);
 
 /**
  * @swagger
- * /notifications/read-all:
+ * /api/v1/notifications/read-all:
  *   put:
  *     summary: Mark all notifications as read
  *     description: Mark all unread notifications as read for the current user
@@ -281,7 +281,7 @@ router.put('/read-all', markAllAsRead);
 
 /**
  * @swagger
- * /notifications/{notificationId}:
+ * /api/v1/notifications/{notificationId}:
  *   delete:
  *     summary: Delete notification
  *     description: Delete a specific notification
@@ -318,7 +318,7 @@ router.delete('/:notificationId', deleteNotification);
 
 /**
  * @swagger
- * /notifications/clear-read:
+ * /api/v1/notifications/clear-read:
  *   delete:
  *     summary: Clear all read notifications
  *     description: Delete all read notifications for the current user
@@ -357,7 +357,7 @@ router.delete('/clear-read', clearAllRead);
 
 /**
  * @swagger
- * /notifications/parent/child/{childId}:
+ * /api/v1/notifications/parent/child/{childId}:
  *   get:
  *     summary: Get child's notifications (Parent view)
  *     description: Parent retrieves notifications related to a specific child
@@ -420,7 +420,7 @@ router.get('/parent/child/:childId', isParent, getChildNotifications);
 
 /**
  * @swagger
- * /notifications/parent/mood-alert:
+ * /api/v1/notifications/parent/mood-alert:
  *   post:
  *     summary: Send mood alert notification
  *     description: Parent sends a mood alert notification about their child
@@ -479,7 +479,7 @@ router.post('/parent/mood-alert', isParent, sendMoodAlert);
 
 /**
  * @swagger
- * /notifications/parent/ai-suggestion:
+ * /api/v1/notifications/parent/ai-suggestion:
  *   post:
  *     summary: Send AI suggestion notification
  *     description: Parent sends an AI-powered parenting suggestion notification
@@ -530,7 +530,7 @@ router.post('/parent/ai-suggestion', isParent, sendAISuggestion);
 
 /**
  * @swagger
- * /notifications/parent/bulk:
+ * /api/v1/notifications/parent/bulk:
  *   post:
  *     summary: Send bulk notifications to children
  *     description: Parent sends notifications to multiple children at once
@@ -605,7 +605,7 @@ router.post('/parent/bulk', isParent, sendBulkNotifications);
 
 /**
  * @swagger
- * /notifications:
+ * /api/v1/notifications:
  *   post:
  *     summary: Create a new notification
  *     description: Create a notification for yourself or your children (with proper permissions)
@@ -653,7 +653,7 @@ router.post('/', createNotification);
 
 /**
  * @swagger
- * /notifications/schedule:
+ * /api/v1/notifications/schedule:
  *   post:
  *     summary: Schedule a notification for future delivery
  *     description: Create a notification that will be delivered at a specified future time

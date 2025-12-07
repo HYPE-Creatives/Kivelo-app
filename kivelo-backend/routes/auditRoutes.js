@@ -119,7 +119,7 @@ const router = express.Router();
 
 /**
  * @swagger
- * /api/audit:
+ * /api/v1/audit:
  *   get:
  *     summary: Retrieve paginated audit logs
  *     description: Returns system audit logs with filtering and pagination. Accessible by all admins with audit permission.
@@ -240,7 +240,7 @@ router.get("/", requireAdminAuth, requirePermission('audit'), getAuditLogs);
 
 /**
  * @swagger
- * /api/audit/export:
+ * /api/v1/audit/export:
  *   get:
  *     summary: Export audit logs to CSV or JSON
  *     description: Export filtered audit logs for download. Accessible by all admins with audit permission.
@@ -309,7 +309,7 @@ router.get("/export", requireAdminAuth, requirePermission('audit'), exportAuditL
 
 /**
  * @swagger
- * /api/audit/{id}:
+ * /api/v1/audit/{id}:
  *   get:
  *     summary: Retrieve a single audit log by ID
  *     description: Fetch the complete details of a specific audit log entry. Accessible by all admins with audit permission.
@@ -354,7 +354,7 @@ router.get("/:id", requireAdminAuth, requirePermission('audit'), getAuditLogById
 
 /**
  * @swagger
- * /api/audit:
+ * /api/v1/audit:
  *   post:
  *     summary: Create a new audit log entry
  *     description: Manually create a new audit log entry. Typically used for internal system events. Automatically captures the admin making the request.

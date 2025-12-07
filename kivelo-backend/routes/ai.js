@@ -21,7 +21,7 @@ const router = express.Router();
  */
 /**
  * @swagger
- * /api/ai/chat:
+ * /api/v1/ai/chat:
  *   post:
  *     summary: Send a message to the AI model
  *     tags: [AI Chat]
@@ -71,7 +71,7 @@ router.post("/chat", auth, chat, requireBodyFields("message"));
 
 /**
  * @swagger
- * /api/ai/chat/history:
+ * /api/v1/ai/chat/history:
  *   get:
  *     summary: Retrieve chat history
  *     tags: [AI Chat]
@@ -114,7 +114,7 @@ router.get("/chat/history", auth, getHistory);
 
 /**
  * @swagger
- * /api/ai/chat/clear-history:
+ * /api/v1/ai/chat/clear-history:
  *   delete:
  *     summary: Clear all chat history
  *     tags: [AI Chat]
@@ -137,7 +137,7 @@ router.delete("/chat/clear-history", auth, clearHistory);
 
 /**
  * @swagger
- * /api/ai/status:
+ * /api/v1/ai/status:
  *   get:
  *     summary: Check AI service availability and health
  *     tags: [AI Chat]
@@ -183,7 +183,7 @@ router.get("/status", getServiceStatus);
 
 /**
  * @swagger
- * /api/ai/test-connection:
+ * /api/v1/ai/test-connection:
  *   get:
  *     summary: Test the connection to the AI service
  *     tags: [AI Chat]

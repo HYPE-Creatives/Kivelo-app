@@ -66,7 +66,7 @@ const getAnalyticsDashboard = () => {
 
   async function fetchRoutes() {
     try {
-      const res = await fetch("/api-analytics/routes");
+      const res = await fetch("/api-analytics/v1/routes");
       const json = await res.json();
       const routes = json.routes || [];
       // populate dropdown
@@ -91,7 +91,7 @@ const getAnalyticsDashboard = () => {
   async function loadStats() {
     try {
       const q = buildQuery();
-      const res = await fetch("/api-analytics/stats" + (q ? ("?"+q) : ""));
+      const res = await fetch("/api-analytics/v1/stats" + (q ? ("?"+q) : ""));
       const json = await res.json();
 
       totalEl.textContent = json.totalRequests || 0;

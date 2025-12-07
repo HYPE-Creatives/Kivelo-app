@@ -14,20 +14,35 @@ export const requireBodyFields = (...fields) => {
   };
 };
 
+// Update journalSchema to handle both parent and child scenarios
 export const journalSchema = Joi.object({
-  childId: Joi.string().hex().length(24).required(),
-  type: Joi.string().valid('text', 'audio', 'video', 'drawing', 'mixed').default('text'),
-  content: Joi.string().min(1).max(5000).required(),
-  assets: Joi.array().items(Joi.string().uri()).default([]),
-  visibility: Joi.string().valid('private', 'parent-only', 'public').default('private'),
-  title: Joi.string().max(100).default('Untitled'),
-  mood: Joi.string().valid('happy', 'sad', 'angry', 'anxious', 'excited', 'calm', 'tired', 'neutral').default('neutral'),
-  moodIntensity: Joi.number().min(1).max(10).default(5),
-  tags: Joi.array().items(Joi.string().max(20)).default([]),
-  aiAnalysis: Joi.object({
-    summary: Joi.string(),
-    keywords: Joi.array().items(Joi.string()),
-    sentiment: Joi.string().valid('positive', 'neutral', 'negative'),
-    suggestions: Joi.array().items(Joi.string())
-  }).optional()
+  childId: Joi.string()
+    .optional() // Make optional for children
+    .description('Child document ID (required for parent, optional for child)'),
+  type: Joi.string()
+    .valid('text', 'audio', 'video', 'drawing', 'mixed')
+    .required(),
+  content: Joi.string()
+    .required()
+    .max(10000),
+  assets: Joi.array()
+    .items(Joi.string())
+    .default([]),
+  title: Joi.string()
+    .max(200)
+    .default('Untitled'),
+  mood: Joi.string()
+    .valid('happy', 'sad', 'angry', 'excited', 'calm', 'anxious', 'neutral')
+    .default('neutral'),
+  moodIntensity: Joi.number()
+    .min(1)
+    .max(10)
+    .default(5),
+  visibility: Joi.string()
+    .valid('private', 'parent-only', 'public')
+    .default('parent-only'),
+  tags: Joi.array()
+    .items(Joi.string())
+    .default([]),
+  aiAnalysis: Joi.object().default({})
 });

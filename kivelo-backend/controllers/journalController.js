@@ -13,54 +13,50 @@ export async function createJournal(req, res, next) {
     const { error, value } = journalSchema.validate(req.body);
     if (error) return res.status(400).json({ error: error.message });
 
-    const child = await Child.findById(value.childId);
-    if (!child) return res.status(404).json({ error: 'Child not found' });
+    // Find child profile based on user role
+    let child;
+    
+    if (req.user.role === 'child') {
+      // For child users, find their own child profile
+      child = await Child.findOne({ user: req.user._id });
+      if (!child) {
+        return res.status(404).json({ error: 'Child profile not found' });
+      }
+      // Override childId in value to ensure they can only create for themselves
+      value.childId = child._id;
+    } else if (req.user.role === 'parent') {
+      // For parent users, find child by childId from request
+      child = await Child.findById(value.childId);
+      if (!child) {
+        return res.status(404).json({ error: 'Child not found' });
+      }
+    } else {
+      return res.status(403).json({ error: 'Access denied - invalid role' });
+    }
 
-    // When a child creates a journal, notify parent
-    if (!isPrivate && child.parent) {
-      await Notification.create({
-        userId: child.parent,
-        type: 'new_journal',
-        title: 'New Journal Entry',
-        message: `${child.user.name} created a new journal entry: "${title}"`,
-        data: {
-          journalId: journal._id,
-          childId: child.user._id,
-          childName: child.user.name
-        }
-      });
-    };
-
-    // Authorization check
+    // Check if parent has access to this child (for parent users)
     if (req.user.role === 'parent') {
       if (String(child.parent) !== String(req.user._id)) {
         return res.status(403).json({
           error: 'Access denied - not your child'
         });
       }
-    } else if (req.user.role === 'child') {
-      const childProfile = await Child.findOne({ user: req.user._id });
-      if (!childProfile || String(childProfile._id) !== String(value.childId)) {
-        return res.status(403).json({
-          error: 'You can only create journals for yourself'
-        });
-      }
-    } else {
-      return res.status(403).json({ error: 'Access denied' });
     }
 
     const journalData = {
-      child: child.user,
+      child: child.user, // This is the user ID, not child ID
+      childId: child._id, // Store child document ID as well
+      childName: child.name || child.user.name,
       type: value.type,
       content: value.content,
-      assets: value.assets,
-      visibility: value.visibility,
+      assets: value.assets || [],
+      visibility: value.visibility || 'parent-only',
       title: value.title || 'Untitled',
       mood: value.mood || 'neutral',
       moodIntensity: value.moodIntensity || 5,
       tags: value.tags || [],
-      isPrivate: value.visibility === 'private' || false,
-      aiAnalysis: value.aiAnalysis
+      isPrivate: value.visibility === 'private',
+      aiAnalysis: value.aiAnalysis || {}
     };
 
     const journal = await Journal.create(journalData);
@@ -72,19 +68,27 @@ export async function createJournal(req, res, next) {
       await User.findByIdAndUpdate(req.user._id, {
         $inc: { points: pointsToAward }
       });
+      
+      // Add pointsEarned to the journal response
+      journal.pointsEarned = pointsToAward;
+      journal.streakUpdated = true;
     }
 
     // Notify parent if not private
     if (journalData.visibility !== 'private' && child.parent) {
       try {
+        const childUser = await User.findById(child.user).select('name');
+        const childName = childUser?.name || 'Your child';
+        
         await Notification.create({
           userId: child.parent,
-          type: 'journal_created',
+          type: 'new_journal',
           title: 'New Journal Entry',
-          message: `${child.user.name || 'Your child'} created a new journal entry`,
+          message: `${childName} created a new journal entry: "${journalData.title}"`,
           data: {
             journalId: journal._id,
-            childId: child.user._id
+            childId: child.user._id,
+            childName: childName
           }
         });
       } catch (notifError) {
@@ -95,6 +99,7 @@ export async function createJournal(req, res, next) {
     return res.status(201).json({
       success: true,
       data: journal,
+      pointsEarned: req.user.role === 'child' ? 15 : 0,
       message: 'Journal entry created successfully'
     });
   } catch (err) {

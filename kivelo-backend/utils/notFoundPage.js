@@ -59,7 +59,7 @@ export default function getNotFoundPage(path) {
           <p>The requested API endpoint does not exist:</p>
           <div class="path">${path}</div>
           <p>Please check your request or return to the API dashboard.</p>
-          <a href="/api">Go to API Overview</a>
+          <a href="/api/v1">Go to API Overview</a>
         </div>
       </body>
     </html>

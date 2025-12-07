@@ -173,7 +173,7 @@ const router = express.Router();
 
 /**
  * @swagger
- * /api/admin/setup-super-admin:
+ * /api/v1/admin/setup-super-admin:
  *   post:
  *     summary: Initialize system by creating the first Super Admin
  *     tags: [Admin Auth]
@@ -241,7 +241,7 @@ router.post('/setup-super-admin', setupSuperAdmin);
 
 /**
  * @swagger
- * /api/admin/login:
+ * /api/v1/admin/login:
  *   post:
  *     summary: Login an admin
  *     tags: [Admin Auth]
@@ -314,7 +314,7 @@ router.post('/login', adminLogin);
 
 /**
  * @swagger
- * /api/admin/refresh:
+ * /api/v1/admin/refresh:
  *   post:
  *     summary: Refresh admin access token using cookie
  *     tags: [Admin Auth]
@@ -365,7 +365,7 @@ router.post('/refresh', refreshAdminToken);
 
 /**
  * @swagger
- * /api/admin/logout:
+ * /api/v1/admin/logout:
  *   post:
  *     summary: Logout admin user
  *     tags: [Admin Auth]
@@ -404,7 +404,7 @@ router.post('/logout', requireAdminAuth, adminLogout);
 
 /**
  * @swagger
- * /api/admin/admins:
+ * /api/v1/admin/admins:
  *   post:
  *     summary: Create a new admin (Super Admin only)
  *     tags: [Admin Management]
@@ -466,7 +466,7 @@ router.post('/admins', requireAdminAuth, requireSuperAdmin, createAdmin);
 
 /**
  * @swagger
- * /api/admin/admins:
+ * /api/v1/admin/admins:
  *   get:
  *     summary: Get all admins with pagination (Super Admin only)
  *     tags: [Admin Management]
@@ -539,7 +539,7 @@ router.get('/admins', requireAdminAuth, requireSuperAdmin, getAdmins);
 
 /**
  * @swagger
- * /api/admin/admins/{id}:
+ * /api/v1/admin/admins/{id}:
  *   put:
  *     summary: Update admin details
  *     tags: [Admin Management]
@@ -602,7 +602,7 @@ router.put('/admins/:id', requireAdminAuth, requireSuperAdmin, updateAdmin);
 
 /**
  * @swagger
- * /api/admin/admins/{id}/permissions:
+ * /api/v1/admin/admins/{id}/permissions:
  *   patch:
  *     summary: Set admin permissions (Super Admin only)
  *     tags: [Admin Permissions]
@@ -662,7 +662,7 @@ router.patch('/admins/:id/permissions', requireAdminAuth, requireSuperAdmin, set
 
 /**
  * @swagger
- * /api/admin/admins/{id}/permissions:
+ * /api/v1/admin/admins/{id}/permissions:
  *   get:
  *     summary: Get admin permissions
  *     tags: [Admin Permissions]
@@ -715,7 +715,7 @@ router.get('/admins/:id/permissions', requireAdminAuth, getAdminPermissions);
 
 /**
  * @swagger
- * /api/admin/admins/{id}:
+ * /api/v1/admin/admins/{id}:
  *   delete:
  *     summary: Delete an admin (Super Admin only)
  *     tags: [Admin Management]
@@ -760,7 +760,7 @@ router.delete('/admins/:id', requireAdminAuth, requireSuperAdmin, deleteAdmin);
 
 /**
  * @swagger
- * /api/admin/users:
+ * /api/v1/admin/users:
  *   get:
  *     summary: Get all users with filtering and pagination
  *     tags: [User Management]
@@ -837,7 +837,7 @@ router.get('/users', requireAdminAuth, requirePermission('users'), getUsers);
 
 /**
  * @swagger
- * /api/admin/users/{id}:
+ * /api/v1/admin/users/{id}:
  *   get:
  *     summary: Get user details including parent/child specific data
  *     tags: [User Management]
@@ -878,7 +878,7 @@ router.get('/users/:id', requireAdminAuth, requirePermission('users'), getUserDe
 
 /**
  * @swagger
- * /api/admin/users/{id}/status:
+ * /api/v1/admin/users/{id}/status:
  *   put:
  *     summary: Update user account status
  *     tags: [User Management]
@@ -936,7 +936,7 @@ router.put('/users/:id/status', requireAdminAuth, requirePermission('users'), up
 
 /**
  * @swagger
- * /api/admin/dashboard:
+ * /api/v1/admin/dashboard:
  *   get:
  *     summary: Get admin dashboard overview with statistics
  *     tags: [Analytics]
@@ -994,7 +994,7 @@ router.get('/dashboard', requireAdminAuth, requirePermission('analytics'), getAd
 
 /**
  * @swagger
- * /api/admin/analytics:
+ * /api/v1/admin/analytics:
  *   get:
  *     summary: Get system analytics data including growth metrics
  *     tags: [Analytics]
@@ -1037,7 +1037,7 @@ router.get('/analytics', requireAdminAuth, requirePermission('analytics'), getSy
 
 /**
  * @swagger
- * /api/admin/settings:
+ * /api/v1/admin/settings:
  *   get:
  *     summary: Retrieve current system settings (Super Admin only)
  *     tags: [System Management]
@@ -1084,7 +1084,7 @@ router.get('/settings', requireAdminAuth, requireSuperAdmin, getSystemSettings);
 
 /**
  * @swagger
- * /api/admin/settings:
+ * /api/v1/admin/settings:
  *   put:
  *     summary: Update system settings (Super Admin only)
  *     tags: [System Management]
@@ -1130,7 +1130,7 @@ router.put('/settings', requireAdminAuth, requireSuperAdmin, updateSystemSetting
 
 /**
  * @swagger
- * /api/admin/profile:
+ * /api/v1/admin/profile:
  *   put:
  *     summary: Update admin profile information
  *     tags: [System Management]
@@ -1177,7 +1177,7 @@ router.put('/profile', requireAdminAuth, updateAdminProfile);
 
 /**
  * @swagger
- * /api/admin/change-password:
+ * /api/v1/admin/change-password:
  *   put:
  *     summary: Change admin password
  *     tags: [System Management]
@@ -1225,7 +1225,7 @@ router.put('/change-password', requireAdminAuth, changeAdminPassword);
 
 /**
  * @swagger
- * /api/admin/debug:
+ * /api/v1/admin/debug:
  *   get:
  *     summary: Debug endpoint to check admin role and permissions
  *     tags: [Admin Auth]

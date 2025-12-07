@@ -193,6 +193,26 @@ All protected routes require JWT token in Authorization header:
               }
             }
           }
+        },
+        BadRequestError: {
+          description: "Bad Request - The request was invalid or cannot be served",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/ErrorResponse"
+              }
+            }
+          }
+        },
+        ServerError: {
+          description: "Internal server error",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/ErrorResponse"
+              }
+            }
+          }
         }
       },
 
@@ -467,14 +487,14 @@ const swaggerSpec = swaggerJSDoc(options);
  */
 export const swaggerDocs = (app, port) => {
   // ✔️ Serve swagger.json programmatically
-  app.get("/api-docs/swagger.json", (req, res) => {
+  app.get("/api-docs/v1/swagger.json", (req, res) => {
     res.header("Content-Type", "application/json");
     res.send(swaggerSpec);
   });
 
   // Swagger UI
   app.use(
-    "/api-docs",
+    "/api-docs/v1",
     swaggerUi.serve,
     swaggerUi.setup(swaggerSpec, {
       explorer: true,
@@ -493,8 +513,8 @@ export const swaggerDocs = (app, port) => {
     })
   );
 
-  console.log(`📘 Swagger UI: http://localhost:${port}/api-docs`);
-  console.log(`📄 Swagger JSON: http://localhost:${port}/api-docs/swagger.json`);
+  console.log(`📘 Swagger UI: http://localhost:${port}/api-docs/v1`);
+  console.log(`📄 Swagger JSON: http://localhost:${port}/api-docs/v1/swagger.json`);
 };
 
 export default swaggerSpec;

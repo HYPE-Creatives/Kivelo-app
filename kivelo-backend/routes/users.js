@@ -81,7 +81,7 @@ const router = express.Router();
 
 /**
  * @swagger
- * /api/users/profile:
+ * /api/v1/users/profile:
  *   get:
  *     summary: Get user profile
  *     tags: [Users]
@@ -98,7 +98,7 @@ router.get('/profile', auth, isSelfOrParent, auditLogger("user.view.profile"), g
 
 /**
  * @swagger
- * /api/users/profile:
+ * /api/v1/users/profile:
  *   put:
  *     summary: Update user profile with optional avatar
  *     tags: [Users]
@@ -132,7 +132,7 @@ router.put('/profile', auth, isSelfOrParent, uploadSingle('avatar'), auditLogger
 
 /**
  * @swagger
- * /api/users/update-password:
+ * /api/v1/users/update-password:
  *   put:
  *     summary: Update user password
  *     tags: [Users]
@@ -163,7 +163,7 @@ router.put('/update-password', auth, isSelfOrParent, auditLogger("user.update.pa
 
 /**
  * @swagger
- * /api/users/deactivate:
+ * /api/v1/users/deactivate:
  *   put:
  *     summary: Deactivate user account
  *     tags: [Users]
@@ -180,7 +180,7 @@ router.put('/deactivate', auth, isSelfOrParent, auditLogger("user.deactivate"), 
 
 /**
  * @swagger
- * /api/users/dashboard:
+ * /api/v1/users/dashboard:
  *   get:
  *     summary: Get user dashboard statistics
  *     tags: [Users]
@@ -197,7 +197,7 @@ router.get('/dashboard', auth, isSelfOrParent, auditLogger("user.view.dashboard"
 
 /** 
  * @swagger
- * /api/users/avatar:
+ * /api/v1/users/avatar:
  *   post:
  *     summary: Upload user avatar to Cloudinary
  *     tags: [Users]
@@ -237,7 +237,7 @@ router.post('/avatar', auth, isSelfOrParent, uploadSingle('avatar'), auditLogger
 
 /** 
  * @swagger
- * /api/users/avatar:
+ * /api/v1/users/avatar:
  *   delete:
  *     summary: Delete user avatar from Cloudinary and database
  *     description: Permanently removes avatar image from Cloudinary storage and user profile

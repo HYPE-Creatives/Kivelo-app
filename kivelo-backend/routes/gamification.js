@@ -12,7 +12,7 @@ const router = express.Router();
 
 /**
  * @swagger
- * /api/gamification/stats:
+ * /api/v1/gamification/stats:
  *   get:
  *     summary: Get gamification statistics
  *     description: Get user's points, streak, badges, and level information
@@ -42,7 +42,7 @@ router.get('/stats', auth, isChild, getGamificationStats);
 
 /**
  * @swagger
- * /api/gamification/badges:
+ * /api/v1/gamification/badges:
  *   get:
  *     summary: Get available badges
  *     description: Get list of all available badges that can be earned
@@ -83,7 +83,7 @@ router.get('/badges', auth, getAvailableBadges);
 
 /**
  * @swagger
- * /api/gamification/award-points:
+ * /api/v1/gamification/award-points:
  *   post:
  *     summary: Award points to child
  *     description: Parent awards points to their child for completing activities
@@ -134,7 +134,7 @@ router.post('/award-points', auth, isParent, awardPoints);
 
 /**
  * @swagger
- * /api/gamification/rewards/redeem:
+ * /api/v1/gamification/rewards/redeem:
  *   post:
  *     summary: Redeem reward with points
  *     description: Child redeems a reward using accumulated points

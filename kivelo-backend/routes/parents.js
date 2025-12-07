@@ -50,7 +50,7 @@ import { isParent, hasAccessToChild } from '../middleware/roleCheck.js';
 
 /**
  * @swagger
- * /api/parents:
+ * /api/v1/parents:
  *   get:
  *     summary: Get parent profile
  *     tags: [Parents]
@@ -68,7 +68,7 @@ router.get('/', auth, isParent, getParentProfile);
 
 /**
  * @swagger
- * /api/parents:
+ * /api/v1/parents:
  *   put:
  *     summary: Update parent profile
  *     tags: [Parents]
@@ -93,7 +93,7 @@ router.put('/', auth, isParent, updateParentProfile);
 
 /**
  * @swagger
- * /api/parents/children-list:
+ * /api/v1/parents/children-list:
  *   get:
  *     summary: Get list of children
  *     tags: [Parents]
@@ -108,7 +108,7 @@ router.get('/children-list', auth, isParent, getChildrenList);
 
 /**
  * @swagger
- * /api/parents/children-list:
+ * /api/v1/parents/children-list:
  *   post:
  *     summary: Add a new child
  *     tags: [Parents]
@@ -139,7 +139,7 @@ router.post('/children-list', auth, isParent, addChild);
 
 /**
  * @swagger
- * /api/parents/children-list/{childId}:
+ * /api/v1/parents/children-list/{childId}:
  *   put:
  *     summary: Update child information
  *     tags: [Parents]
@@ -169,7 +169,7 @@ router.put('/children-list/:childId', auth, isParent, hasAccessToChild, updateCh
 
 /**
  * @swagger
- * /api/parents/children-list/{childId}:
+ * /api/v1/parents/children-list/{childId}:
  *   delete:
  *     summary: Remove child from family
  *     tags: [Parents]
@@ -190,7 +190,7 @@ router.delete('/children-list/:childId', auth, removeChild);
 
 /**
  * @swagger
- * /api/parents/dashboard:
+ * /api/v1/parents/dashboard:
  *   get:
  *     summary: Get family dashboard
  *     tags: [Parents]
@@ -206,7 +206,7 @@ router.get('/dashboard', auth, getFamilyDashboard);
 
 /**
  * @swagger
- * /api/parents/reports:
+ * /api/v1/parents/reports:
  *   get:
  *     summary: Get activity reports for all children
  *     tags: [Parents]
@@ -221,7 +221,7 @@ router.get('/reports', auth, getActivityReports);
 
 /**
  * @swagger
- * /api/parents/billing:
+ * /api/v1/parents/billing:
  *   get:
  *     summary: Get billing information
  *     tags: [Parents]
@@ -236,7 +236,7 @@ router.get('/billing', auth, isParent, getBillingInfo);
 
 /**
  * @swagger
- * /api/parents/billing:
+ * /api/v1/parents/billing:
  *   put:
  *     summary: Update billing information
  *     tags: [Parents]
@@ -260,7 +260,7 @@ router.put('/billing', auth, updateBillingInfo);
 
 /**
  * @swagger
- * /api/parents/subscription:
+ * /api/v1/parents/subscription:
  *   get:
  *     summary: Get subscription details
  *     tags: [Parents]
@@ -275,7 +275,7 @@ router.get('/subscription', auth, getSubscription);
 
 /**
  * @swagger
- * /api/parents/subscription:
+ * /api/v1/parents/subscription:
  *   put:
  *     summary: Update subscription plan
  *     tags: [Parents]
@@ -298,7 +298,7 @@ router.put('/subscription', auth, updateSubscription);
 
 /**
  * @swagger
- * /api/parents/notifications:
+ * /api/v1/parents/notifications:
  *   get:
  *     summary: Get parent notifications
  *     tags: [Parents]
@@ -313,7 +313,7 @@ router.get('/notifications', auth, getNotifications);
 
 /**
  * @swagger
- * /api/parents/notifications/{notificationId}/read:
+ * /api/v1/parents/notifications/{notificationId}/read:
  *   put:
  *     summary: Mark a notification as read
  *     tags: [Parents]
@@ -335,7 +335,7 @@ router.put('/notifications/:notificationId/read', auth, markNotificationAsRead);
 
 /**
  * @swagger
- * /api/parents/settings:
+ * /api/v1/parents/settings:
  *   get:
  *     summary: Get family settings
  *     tags: [Parents]
@@ -350,7 +350,7 @@ router.get('/settings', auth, getFamilySettings);
 
 /**
  * @swagger
- * /api/parents/settings:
+ * /api/v1/parents/settings:
  *   put:
  *     summary: Update family settings
  *     tags: [Parents]
@@ -373,7 +373,7 @@ router.put('/settings', auth, updateFamilySettings);
 
 /**
  * @swagger
- * /api/parents/moods/{childId}:
+ * /api/v1/parents/moods/{childId}:
  *   get:
  *     summary: Get mood data for a specific child
  *     tags: [Parents]
@@ -395,7 +395,7 @@ router.get('/moods/:childId', auth, isParent, hasAccessToChild, getChildMoods);
 
 /**
  * @swagger
- * /api/parents/summary/{childId}:
+ * /api/v1/parents/summary/{childId}:
  *   get:
  *     summary: Get mood summary for a specific child
  *     tags: [Parents]

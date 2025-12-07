@@ -35,6 +35,7 @@ import aiRoutes from "./routes/ai.js";
 import activityRoutes from './routes/activity.js';
 import moodRoutes from "./routes/mood.js";
 import auditRoutes from "./routes/auditRoutes.js";
+import settingsRoutes from './routes/settingsRoutes.js';
 import errorHandler from './middleware/errorHandler.js';
 import gamificationRoutes from './routes/gamification.js';
 import learningRoutes from './routes/learning.js';
@@ -199,9 +200,13 @@ app.get("/api", (req, res) => {
   res.send(getProDashboard("KIVELO API – API Overview"));
 });
 
+app.get("/api/v1", (req, res) => {
+  res.send(getProDashboard("KIVELO API – API v1 Overview"));
+});
+
 // Analytics Dashboard Routes
-app.use("/api-analytics", analyticsRoutes);
-app.get("/api-analytics", (req, res) => {
+app.use("/api-analytics/v1", analyticsRoutes);
+app.get("/api-analytics/v1", (req, res) => {
   res.send(getAnalyticsDashboard());
 });
 
@@ -219,20 +224,21 @@ app.get("/api-health", (req, res) => {
 app.use(logRequests);
 
 // ========================= API ROUTES =========================
-app.use("/api/auth", authRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/parents", parentRoutes);
-app.use("/api/children", childRoutes);
-app.use("/api/activity", activityRoutes);
-app.use("/api/users", userRoutes);
-app.use("/api/families", familyRoutes);
-app.use("/api/ai", aiRoutes);
-app.use("/api/mood", moodRoutes);
-app.use("/api/audit", auditRoutes);
-app.use('/api/gamification', gamificationRoutes);
-app.use('/api/learning', learningRoutes);
-app.use('/api/journals', journalRoutes);
-app.use('/api/notifications', notificationRoute);
+app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/admin", adminRoutes);
+app.use("/api/v1/parents", parentRoutes);
+app.use("/api/v1/children", childRoutes);
+app.use("/api/v1/activities", activityRoutes);
+app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/families", familyRoutes);
+app.use("/api/v1/vai", aiRoutes);
+app.use("/api/v1/mood", moodRoutes);
+app.use("/api/v1/audit", auditRoutes);
+app.use('/api/v1/gamification', gamificationRoutes);
+app.use('/api/v1/learning', learningRoutes);
+app.use('/api/v1/journals', journalRoutes);
+app.use('/api/v1/notifications', notificationRoute);
+app.use('/api/v1/settings', settingsRoutes);
 
 // ===============================================================
 // 🔒 STRICT SWAGGER PROTECTION (fixed)
@@ -240,9 +246,9 @@ app.use('/api/notifications', notificationRoute);
 app.use((req, res, next) => {
   const p = req.path || "";
 
-  if (p === "/api-docs" || p === "/api-docs/") return next();
+  if (p === "/api-docs/v1" || p === "/api-docs/v1/") return next();
 
-  if (p.startsWith("/api-docs/")) {
+  if (p.startsWith("/api-docs/v1/")) {
     const allowed = [
       "/swagger-ui.css",
       "/swagger-ui-init.js",
@@ -253,7 +259,7 @@ app.use((req, res, next) => {
       "/swagger.json"
     ];
 
-    const asset = p.replace("/api-docs", "");
+    const asset = p.replace("/api-docs/v1", "");
 
     if (allowed.includes(asset)) return next();
 
@@ -291,13 +297,16 @@ const getAllRoutes = (app) => {
 const PUBLIC_ROUTES = [
   "/",
   "/api",
+  "/api/v1",
   "/api-health",
-  "/api/auth/login",
-  "/api/auth/register",
-  "/api/auth/refresh",
+  "/api/v1/auth/login",
+  "/api/v1/auth/register",
+  "/api/v1/auth/refresh",
   "/api-docs",
+  "/api-docs/v1",
   "/api-analytics",
-  "/api-analytics/"
+  "/api-analytics/",
+  "/api-analytics/v1"
 ];
 
 app.use((req, res, next) => {

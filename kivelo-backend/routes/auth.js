@@ -62,7 +62,7 @@ const __dirname = path.dirname(__filename);
 
 /**
  * @swagger
- * /api/auth/register-parent:
+ * /api/v1/auth/register-parent:
  *   post:
  *     summary: Register a new parent account
  *     tags: [Authentication]
@@ -204,7 +204,7 @@ router.post("/register-parent", parentRegister);
 
 /**
  * @swagger
- * /api/auth/login:
+ * /api/v1/auth/login:
  *   post:
  *     summary: Login user (Parent or Child)
  *     tags: [Authentication]
@@ -313,7 +313,7 @@ router.post("/login", auditLogger((req) => `user.login:email=${req.body.email}`)
 
 /**
  * @swagger
- * /api/auth/forgot-password:
+ * /api/v1/auth/forgot-password:
  *   post:
  *     summary: Request password reset code
  *     tags: [Authentication]
@@ -366,7 +366,7 @@ router.post('/forgot-password', forgotPassword);
 
 /**
  * @swagger
- * /api/auth/verify-reset-token:
+ * /api/v1/auth/verify-reset-token:
  *   post:
  *     summary: Verify password reset token
  *     tags: [Authentication]
@@ -404,7 +404,7 @@ router.post('/verify-reset-token', verifyResetToken);
 
 /**
  * @swagger
- * /api/auth/reset-password:
+ * /api/v1/auth/reset-password:
  *   post:
  *     summary: Reset user password with verified token
  *     tags: [Authentication]
@@ -452,7 +452,7 @@ router.post('/reset-password', resetPassword);
 
 /**
  * @swagger
- * /api/auth/verify-email:
+ * /api/v1/auth/verify-email:
  *   post:
  *     summary: Verify email with 6-digit code
  *     tags: [Email Verification]
@@ -510,7 +510,7 @@ router.post("/verify-email", verifyEmail);
 
 /**
  * @swagger
- * /api/auth/verify-email/{token}:
+ * /api/v1/auth/verify-email/{token}:
  *   get:
  *     summary: Verify email with JWT token (via link)
  *     tags: [Email Verification]
@@ -554,7 +554,7 @@ router.get("/verify-email/:token", verifyEmailWithToken);
 
 /**
  * @swagger
- * /api/auth/generate-verification-link:
+ * /api/v1/auth/generate-verification-link:
  *   post:
  *     summary: Generate new verification link
  *     tags: [Email Verification]
@@ -586,7 +586,7 @@ router.post("/generate-verification-link", generateVerificationLink);
 
 /**
  * @swagger
- * /api/auth/resend-verification:
+ * /api/v1/auth/resend-verification:
  *   post:
  *     summary: Resend verification code
  *     tags: [Email Verification]
@@ -620,7 +620,7 @@ router.post("/resend-verification", resendVerificationCode);
 
 /**
  * @swagger
- * /api/auth/generate-code:
+ * /api/v1/auth/generate-code:
  *   post:
  *     summary: Generate one-time registration code for child account
  *     tags: [Child Accounts]
@@ -694,7 +694,7 @@ router.post("/generate-code", auth, generateOneTimeCode);
 
 /**
  * @swagger
- * /api/auth/child-login:
+ * /api/v1/auth/child-login:
  *   post:
  *     summary: Child login with one-time code
  *     tags: [Child Accounts]
@@ -750,7 +750,7 @@ router.post("/child-login", childLoginWithCode);
 
 /**
  * @swagger
- * /api/auth/register-child:
+ * /api/v1/auth/register-child:
  *   post:
  *     summary: Register child with one-time code
  *     tags: [Child Accounts]
@@ -808,7 +808,7 @@ router.post("/register-child", registerChildWithCode);
 
 /**
  * @swagger
- * /api/auth/set-child-password:
+ * /api/v1/auth/set-child-password:
  *   post:
  *     summary: Set child password after initial login
  *     tags: [Child Accounts]
@@ -857,7 +857,7 @@ router.post("/set-child-password", auth, childSetPassword);
 
 /**
  * @swagger
- * /api/auth/reset-child-password:
+ * /api/v1/auth/reset-child-password:
  *   post:
  *     summary: Reset child password (Parent only)
  *     tags: [Child Accounts]
@@ -899,7 +899,7 @@ router.post("/reset-child-password", auth, childResetPassword);
 
 /**
  * @swagger
- * /api/auth/refresh-token:
+ * /api/v1/auth/refresh-token:
  *   get:
  *     summary: Refresh access token (HTTP-only cookie based)
  *     tags: [Authentication]
@@ -935,7 +935,7 @@ router.get("/refresh-token", refreshAccessToken);
 
 /**
  * @swagger
- * /api/auth/verify-token:
+ * /api/v1/auth/verify-token:
  *   get:
  *     summary: Verify access JWT token validity
  *     tags: [Authentication]
@@ -966,7 +966,7 @@ router.get("/verify-token", auth, verifyToken);
 
 /**
  * @swagger
- * /api/auth/logout:
+ * /api/v1/auth/logout:
  *   post:
  *     summary: Logout user
  *     tags: [Authentication]
@@ -1003,7 +1003,7 @@ router.post("/logout", auth, logout);
 
 /**
  * @swagger
- * /api/auth/test-body-parsing:
+ * /api/v1/auth/test-body-parsing:
  *   post:
  *     summary: Test request body parsing
  *     tags: [Authentication]

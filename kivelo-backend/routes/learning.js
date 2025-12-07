@@ -179,7 +179,7 @@ const router = express.Router();
 
 /**
  * @swagger
- * /api/learning/articles:
+ * /api/v1/learning/articles:
  *   get:
  *     summary: Get all learning articles
  *     description: Retrieve a list of learning articles available for parents. Includes filtering by category and progress status.
@@ -242,7 +242,7 @@ router.get('/articles', auth, isParent, getLearningArticles);
 
 /**
  * @swagger
- * /api/learning/articles/{articleId}/complete:
+ * /api/v1/learning/articles/{articleId}/complete:
  *   post:
  *     summary: Mark article as complete
  *     description: Mark a learning article as completed by the parent/user. Records completion time and updates progress.
@@ -325,7 +325,7 @@ router.post('/articles/:articleId/complete', auth, isParent, markArticleComplete
 
 /**
  * @swagger
- * /api/learning/articles/{articleId}:
+ * /api/v1/learning/articles/{articleId}:
  *   get:
  *     summary: Get article with quiz
  *     description: Retrieve a specific learning article along with its associated quiz questions and answers.

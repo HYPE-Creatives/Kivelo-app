@@ -22,7 +22,7 @@ const router = express.Router();
 
 /**
  * @swagger
- * /api/mood/checkin:
+ * /api/v1/mood/checkin:
  *   post:
  *     summary: Submit a mood check-in
  *     description: Child submits daily mood check-in (emoji, voice, drawing, or short text)
@@ -56,7 +56,7 @@ router.post('/checkin', auth, isChild, submitMoodCheckin);
 
 /**
  * @swagger
- * /api/mood/checkin/with-media:
+ * /api/v1/mood/checkin/with-media:
  *   post:
  *     summary: Submit mood check-in with file uploads
  *     tags: [Mood Tracking]
@@ -94,7 +94,7 @@ router.post('/checkin/with-media',
 
 /**
  * @swagger
- * /api/mood/history:
+ * /api/v1/mood/history:
  *   get:
  *     summary: Get mood history with filters
  *     tags: [Mood Tracking]
@@ -133,7 +133,7 @@ router.get('/history', auth, isChild, getMoodHistory);
 
 /**
  * @swagger
- * /api/mood/today:
+ * /api/v1/mood/today:
  *   get:
  *     summary: Get today's mood check-in
  *     tags: [Mood Tracking]
@@ -158,7 +158,7 @@ router.get('/today', auth, isChild, getTodayMood);
 
 /**
  * @swagger
- * /api/mood/stats:
+ * /api/v1/mood/stats:
  *   get:
  *     summary: Get mood statistics
  *     tags: [Mood Tracking]
@@ -186,7 +186,7 @@ router.get('/stats', auth, isSelfOrParent, getMoodStats);
 
 /**
  * @swagger
- * /api/mood/insights:
+ * /api/v1/mood/insights:
  *   get:
  *     summary: Get AI-generated mood insights
  *     tags: [Mood Tracking]
@@ -222,7 +222,7 @@ router.get('/insights', auth, isChild, getMoodInsights);
 
 /**
  * @swagger
- * /api/mood/trends:
+ * /api/v1/mood/trends:
  *   get:
  *     summary: Get mood trends for charts
  *     tags: [Mood Tracking]
@@ -250,7 +250,7 @@ router.get('/trends', auth, isSelfOrParent, getMoodTrends);
 
 /**
  * @swagger
- * /api/mood/{moodId}:
+ * /api/v1/mood/{moodId}:
  *   put:
  *     summary: Update a mood entry
  *     tags: [Mood Tracking]
@@ -301,7 +301,7 @@ router.delete('/:moodId', auth, isChild, deleteMoodEntry);
 
 /**
  * @swagger
- * /api/mood/trust-zones/{childId}:
+ * /api/v1/mood/trust-zones/{childId}:
  *   get:
  *     summary: Get trust zone summary for a child
  *     tags: [Parent Dashboard, Mood Tracking]
@@ -330,7 +330,7 @@ router.get('/trust-zones/:childId', auth, isParent, getTrustZoneSummary);
 
 /**
  * @swagger
- * /api/mood/child/{childId}/history:
+ * /api/v1/mood/child/{childId}/history:
  *   get:
  *     summary: Get child's mood history (parent view)
  *     tags: [Parent Dashboard, Mood Tracking]
@@ -359,7 +359,7 @@ router.get('/child/:childId/history', auth, isSelfOrParent, getMoodHistory);
 
 /**
  * @swagger
- * /api/mood/streak:
+ * /api/v1/mood/streak:
  *   get:
  *     summary: Get current streak info
  *     tags: [Gamification, Mood Tracking]
@@ -381,7 +381,7 @@ router.get('/streak', auth, isChild, (req, res) => {
 
 /**
  * @swagger
- * /api/mood/achievements:
+ * /api/v1/mood/achievements:
  *   get:
  *     summary: Get mood-related achievements
  *     tags: [Gamification, Mood Tracking]
@@ -403,7 +403,7 @@ router.get('/achievements', auth, isChild, (req, res) => {
 
 /**
  * @swagger
- * /api/mood/suggestions:
+ * /api/v1/mood/suggestions:
  *   get:
  *     summary: Get AI suggestions based on current mood
  *     tags: [AI Helper, Mood Tracking]
@@ -441,7 +441,7 @@ router.get('/suggestions', auth, isChild, (req, res) => {
 
 /**
  * @swagger
- * /api/mood:
+ * /api/v1/mood:
  *   post:
  *     summary: Legacy endpoint for mood submission
  *     tags: [Mood Tracking]
@@ -471,6 +471,26 @@ router.get('/suggestions', auth, isChild, (req, res) => {
  *         description: Mood history retrieved
  */
 router.post('/', auth, isChild, submitMoodCheckin);
+
+
+/**
+ * @swagger
+ * /api/v1/mood:
+ *   get:
+ *     summary: Legacy endpoint for getting moods
+ *     tags: [Mood Tracking]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: period
+ *         in: query
+ *         schema:
+ *           type: string
+ *           default: week
+ *     responses:
+ *       200:
+ *         description: Mood history retrieved
+ */
 router.get('/', auth, isChild, getMoodHistory);
 
 export default router;

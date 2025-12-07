@@ -41,7 +41,7 @@ import { isChild, isSelfOrParent } from '../middleware/roleCheck.js';
 
 /**
  * @swagger
- * /api/children:
+ * /api/v1/children:
  *   get:
  *     summary: Get child profile
  *     tags: [Children]
@@ -78,7 +78,7 @@ router.get('/', auth, isChild, getChildProfile);
 
 /**
  * @swagger
- * /api/children:
+ * /api/v1/children:
  *   put:
  *     summary: Update child profile
  *     tags: [Children]
@@ -106,7 +106,7 @@ router.put('/', auth, updateChildProfile);
 
 /**
  * @swagger
- * /api/children/dashboard:
+ * /api/v1/children/dashboard:
  *   get:
  *     summary: Get child dashboard data
  *     tags: [Children]
@@ -124,7 +124,7 @@ router.get('/dashboard', auth, isChild, getChildDashboard);
 
 /**
  * @swagger
- * /api/children/activities:
+ * /api/v1/children/activities:
  *   get:
  *     summary: Get child activities
  *     tags: [Children]
@@ -142,7 +142,7 @@ router.get('/activities', auth, getChildActivities);
 
 /**
  * @swagger
- * /api/children/activities:
+ * /api/v1/children/activities:
  *   post:
  *     summary: Add a new activity for a child
  *     tags: [Children]
@@ -176,7 +176,7 @@ router.post('/activities', auth, addChildActivity);
 
 /**
  * @swagger
- * /api/children/activities/{activityId}:
+ * /api/v1/children/activities/{activityId}:
  *   put:
  *     summary: Update a child's activity
  *     tags: [Children]
@@ -211,7 +211,7 @@ router.put('/activities/:activityId', auth, updateChildActivity);
 
 /**
  * @swagger
- * /api/children/activities/{activityId}:
+ * /api/v1/children/activities/{activityId}:
  *   delete:
  *     summary: Delete a child's activity
  *     tags: [Children]
@@ -237,7 +237,7 @@ router.delete('/activities/:activityId', auth, deleteChildActivity);
 
 /**
  * @swagger
- * /api/children/progress:
+ * /api/v1/children/progress:
  *   get:
  *     summary: Get child progress reports
  *     tags: [Children]
@@ -255,7 +255,7 @@ router.get('/progress', auth, getChildProgress);
 
 /**
  * @swagger
- * /api/children/preferences:
+ * /api/v1/children/preferences:
  *   put:
  *     summary: Update child preferences
  *     tags: [Children]
@@ -280,7 +280,28 @@ router.get('/progress', auth, getChildProgress);
  */
 router.put('/preferences', auth, isSelfOrParent, updateChildPreferences);
 
-
+/**
+ * @swagger
+ * /api/v1/children/{childId}/mood-history:
+ *   get:
+ *     summary: Get child's mood history
+ *     tags: [Children]
+ *     security:
+ *       - ApiKeyAuth: []
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: childId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Child ID
+ *     responses:
+ *       200:
+ *         description: Mood history retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ */
 // Child or their parent can access child's data
 router.get('/:childId/mood-history', auth, isSelfOrParent, getMoodHistory);
 

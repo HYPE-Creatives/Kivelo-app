@@ -34,7 +34,7 @@ const router = express.Router();
 
 /**
  * @swagger
- * /api/activities:
+ * /api/v1/activities:
  *   get:
  *     summary: Get all user activities
  *     tags: [Activities]
@@ -70,7 +70,7 @@ router.get('/', auth, getUserActivities);
 
 /**
  * @swagger
- * /api/activities:
+ * /api/v1/activities:
  *   post:
  *     summary: Create a new activity
  *     tags: [Activities]
@@ -105,7 +105,7 @@ router.post('/', auth, createActivity);
 
 /**
  * @swagger
- * /api/activities/{id}:
+ * /api/v1/activities/{id}:
  *   put:
  *     summary: Update an existing activity
  *     tags: [Activities]
@@ -144,7 +144,7 @@ router.put('/:id', auth, updateActivity);
 
 /**
  * @swagger
- * /api/activities/{id}:
+ * /api/v1/activities/{id}:
  *   delete:
  *     summary: Delete an activity
  *     tags: [Activities]

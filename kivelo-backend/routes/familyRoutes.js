@@ -107,7 +107,7 @@ const router = express.Router();
 
 /**
  * @swagger
- * /api/families:
+ * /api/v1/families:
  *   post:
  *     summary: Create a new family
  *     description: Create a new family with optional family photo. The authenticated user becomes the family admin.
@@ -189,7 +189,7 @@ router.post('/', auth, uploadSingle('familyPhoto'), createFamily);
 
 /**
  * @swagger
- * /api/families/{id}:
+ * /api/v1/families/{id}:
  *   put:
  *     summary: Update family information
  *     description: Update family details and/or photo. Only the family admin can update the family.
@@ -275,7 +275,7 @@ router.put('/:id', auth, uploadSingle('familyPhoto'), updateFamily);
 
 /**
  * @swagger
- * /api/families/{id}/photo:
+ * /api/v1/families/{id}/photo:
  *   delete:
  *     summary: Delete family photo
  *     description: Remove the family photo. Only the family admin can delete the photo.

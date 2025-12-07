@@ -19,7 +19,92 @@ const router = express.Router();
 
 /**
  * @swagger
- * /journals:
+ * components:
+ *   schemas:
+ *     JournalCreate:
+ *       type: object
+ *       required: ["childId", "type", "content", "title"]
+ *       properties:
+ *         childId:
+ *           type: string
+ *           example: "65a1b2c3d4e5f67890123456"
+ *         type:
+ *           type: string
+ *           enum: [text, audio, video, drawing, mixed]
+ *         content:
+ *           type: string
+ *           example: "Today was amazing!"
+ *         title:
+ *           type: string
+ *           example: "My School Day"
+ *         mood:
+ *           type: string
+ *           example: "happy"
+ *         moodIntensity:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 10
+ *           example: 8
+ *         visibility:
+ *           type: string
+ *           enum: [private, parent-only, public]
+ *           default: parent-only
+ *         tags:
+ *           type: array
+ *           items:
+ *             type: string
+ *           example: ["school", "friends"]
+ * 
+ *     Journal:
+ *       type: object
+ *       properties:
+ *         _id:
+ *           type: string
+ *           example: "65a1b2c3d4e5f67890123456"
+ *         childId:
+ *           type: string
+ *         type:
+ *           type: string
+ *         content:
+ *           type: string
+ *         title:
+ *           type: string
+ *         mood:
+ *           type: string
+ *         moodIntensity:
+ *           type: integer
+ *         visibility:
+ *           type: string
+ *         tags:
+ *           type: array
+ *           items:
+ *             type: string
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *         updatedAt:
+ *           type: string
+ *           format: date-time
+ * 
+ *   responses:
+ *     BadRequestError:
+ *       description: Bad Request
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ErrorResponse'
+ * 
+ *     ServerError:
+ *       description: Internal Server Error
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ErrorResponse'
+ */
+
+/**
+ * @swagger
+ * /api/v1/journals:
  *   post:
  *     summary: Create a new journal entry
  *     description: Child creates a new journal entry. Awards points and updates streak.
@@ -71,7 +156,7 @@ router.post('/', auth, isChild, createJournal);
 
 /**
  * @swagger
- * /journals/my-journals:
+ * /api/v1/journals/my-journals:
  *   get:
  *     summary: Get child's own journals
  *     description: Retrieve paginated list of child's journals with filtering options
@@ -139,7 +224,7 @@ router.get('/my-journals', auth, isChild, getMyJournals);
 
 /**
  * @swagger
- * /journals/prompts:
+ * /api/v1/journals/prompts:
  *   get:
  *     summary: Get journal prompts for child
  *     description: Returns random journal prompts to help child get started
@@ -175,7 +260,7 @@ router.get('/prompts', auth, isChild, getJournalPrompts);
 
 /**
  * @swagger
- * /journals/search:
+ * /api/v1/journals/search:
  *   get:
  *     summary: Search child's journals
  *     description: Search through journal titles, content, and tags
@@ -240,7 +325,7 @@ router.get('/search', auth, isChild, searchJournals);
 
 /**
  * @swagger
- * /journals/child/{childId}:
+ * /api/v1/journals/child/{childId}:
  *   get:
  *     summary: Get child's journals (Parent view)
  *     description: Parent retrieves their child's journals with filtering options
@@ -330,7 +415,7 @@ router.get('/child/:childId', auth, isParent, getChildJournals);
 
 /**
  * @swagger
- * /journals/stats/{childId}:
+ * /api/v1/journals/stats/{childId}:
  *   get:
  *     summary: Get journal statistics for child
  *     description: Parent view of child's journal statistics and analytics
@@ -391,7 +476,7 @@ router.get('/stats/:childId', auth, isParent, getJournalStats);
 
 /**
  * @swagger
- * /journals/export:
+ * /api/v1/journals/export:
  *   get:
  *     summary: Export child's journals
  *     description: Export child's journals in CSV or JSON format (Parent only)
@@ -450,7 +535,7 @@ router.get('/export', auth, isParent, exportJournals);
 
 /**
  * @swagger
- * /journals/{journalId}:
+ * /api/v1/journals/{journalId}:
  *   get:
  *     summary: Get single journal entry
  *     description: Get specific journal entry with permission checks
@@ -486,7 +571,7 @@ router.get('/:journalId', auth, getJournal);
 
 /**
  * @swagger
- * /journals/{journalId}:
+ * /api/v1/journals/{journalId}:
  *   put:
  *     summary: Update journal entry
  *     description: Child updates their own journal entry
@@ -531,7 +616,7 @@ router.put('/:journalId', auth, isChild, updateJournal);
 
 /**
  * @swagger
- * /journals/{journalId}:
+ * /api/v1/journals/{journalId}:
  *   delete:
  *     summary: Delete journal entry
  *     description: Child deletes their own journal entry
