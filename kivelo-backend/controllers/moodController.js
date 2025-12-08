@@ -72,6 +72,20 @@ const generateMoodInsights = (moods, stats) => {
   return insights;
 };
 
+/* ============================================================
+    SAFE BODY CHECKER
+============================================================ */
+const ensureBody = (req, res) => {
+  if (!req.body || typeof req.body !== "object") {
+    res.status(400).json({
+      success: false,
+      message: "Request body cannot be empty. Ensure Content-Type: application/json"
+    });
+    return false;
+  }
+  return true;
+};
+
 // ==================== EXPORTED CONTROLLER FUNCTIONS ====================
 
 /**
@@ -79,6 +93,8 @@ const generateMoodInsights = (moods, stats) => {
  */
 export const submitMoodCheckin = async (req, res) => {
   try {
+    if (!ensureBody(req, res)) return;
+
     const userId = req.user._id;
     const {
       emoji,
@@ -89,6 +105,14 @@ export const submitMoodCheckin = async (req, res) => {
       tags,
       context
     } = req.body;
+
+    // At least one mood input required
+    if (!emoji && !textNote && !voiceNote && !drawing) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one of emoji/textNote/voiceNote/drawing is required."
+      });
+    }
 
     // Determine type based on input
     let type = 'combined';

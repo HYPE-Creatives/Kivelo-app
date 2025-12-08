@@ -231,7 +231,7 @@ app.use("/api/v1/children", childRoutes);
 app.use("/api/v1/activities", activityRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/families", familyRoutes);
-app.use("/api/v1/vai", aiRoutes);
+app.use("/api/v1/ai", aiRoutes);
 app.use("/api/v1/mood", moodRoutes);
 app.use("/api/v1/audit", auditRoutes);
 app.use('/api/v1/gamification', gamificationRoutes);
