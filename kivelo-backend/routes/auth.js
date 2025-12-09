@@ -614,7 +614,7 @@ router.post("/generate-verification-link", generateVerificationLink);
  *       404:
  *         description: User not found
  */
-router.post("/resend-verification", resendVerificationCode);
+router.post("/resend-verification-code", resendVerificationCode);
 
 // ========================= CHILD ACCOUNT ROUTES =========================
 

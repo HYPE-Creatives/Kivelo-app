@@ -327,10 +327,10 @@ export const resendVerificationCode = async (req, res) => {
     if (user.isVerified) return res.status(400).json({ success: false, message: 'Account is already verified' });
 
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const verificationCodeExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const verificationCodeExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
     const verificationToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
-    const verificationLink = `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/verify-email/${verificationToken}`;
+    const verificationLink = `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/v1/auth/verify-email/${verificationToken}`;
 
     user.verificationCode = verificationCode;
     user.verificationCodeExpires = verificationCodeExpires;
