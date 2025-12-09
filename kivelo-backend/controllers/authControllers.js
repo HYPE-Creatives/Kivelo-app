@@ -332,35 +332,34 @@ export const resendVerificationCode = async (req, res) => {
     const verificationToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
     const verificationLink = `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/v1/auth/verify-email/${verificationToken}`;
 
-    user.verificationCode = verificationCode;
+    user.verificationCode = newVerificationCode;
     user.verificationCodeExpires = verificationCodeExpires;
     await user.save();
 
-    await sendEmail(
-      user.email,
+    await sendEmail(user.email,
       'Verify Your Kivelo Account - Security Code',
       `
-      <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
-        <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); overflow: hidden;">
-          <div style="background-color: #4CAF50; color: white; text-align: center; padding: 20px;">
-            <h1 style="margin: 0;">Kivelo</h1>
-            <p style="margin: 0; font-size: 14px;">Empowering Families with Technology</p>
-          </div>  
-          
-          // code will be placed here...
-          <strong>${verificationCode}</strong>
-          
-          <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;" />
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
+          <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); overflow: hidden;">
+            <div style="background-color: #4CAF50; color: white; text-align: center; padding: 20px;">
+              <h1 style="margin: 0;">Kivelo</h1>
+              <p style="margin: 0; font-size: 14px;">Empowering Families with Technology</p>
+            </div>  
+            
+            // code will be placed here...
+            <strong>${newVerificationCode}</strong>
+            
+            <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;" />
 
-          <p style="font-size: 13px; color: #777; text-align: center;">
-            Need help? Contact our support team at 
-            <a href="mailto:support@kivelo.com" style="color: #4CAF50; text-decoration: none;">support@kivelo.com</a>
-          </p>
+            <p style="font-size: 13px; color: #777; text-align: center;">
+              Need help? Contact our support team at 
+              <a href="mailto:support@kivelo.com" style="color: #4CAF50; text-decoration: none;">support@kivelo.com</a>
+            </p>
+          </div>
+          <div style="background-color: #f1f1f1; text-align: center; padding: 15px; font-size: 12px; color: #888;">
+            © ${new Date().getFullYear()} Kivelo. All rights reserved.
+          </div>
         </div>
-        <div style="background-color: #f1f1f1; text-align: center; padding: 15px; font-size: 12px; color: #888;">
-          © ${new Date().getFullYear()} Kivelo. All rights reserved.
-        </div>
-      </div>
       `
     );
 
