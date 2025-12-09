@@ -3,7 +3,7 @@ import User from '../models/User.js';
 import Parent from '../models/Parent.js';
 import Child from '../models/Child.js';
 import Family from '../models/Family.js';
-import sendEmailViaSendGrid from '../utils/sendEmail.js';
+import { sendEmail } from '../utils/sendEmail.js';
 import jwt from 'jsonwebtoken';
 import generateToken from '../utils/generateToken.js';
 import crypto from 'crypto';
@@ -139,7 +139,7 @@ export const generateVerificationLink = async (req, res) => {
     const verificationToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
     const verificationLink = `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/verify-email/${verificationToken}`;
 
-    await sendEmailViaSendGrid(
+    await sendEmail(
       user.email,
       'Verify Your Kivelo Account - Click the Link',
       `
@@ -234,8 +234,8 @@ export const parentRegister = async (req, res) => {
     try {
       const baseUrl = process.env.NODE_ENV === 'production' ? 'https://family-wellness.onrender.com' : 'http://localhost:5000';
       const verificationPageLink = `${baseUrl}/verify?code=${verificationCode}&email=${user.email}`;
-      await sendEmailViaSendGrid(user.email, 
-        'Verify Your Kivelo Account - Security Code', 
+      await sendEmail(user.email,
+        'Verify Your Kivelo Account - Security Code',
         `
            <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
           <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); overflow: hidden;">
@@ -369,7 +369,7 @@ export const resendVerificationCode = async (req, res) => {
     user.verificationCodeExpires = verificationCodeExpires;
     await user.save();
 
-    await sendEmailViaSendGrid(user.email, 'Verify Your Kivelo Account - Security Code', `...`);
+    await sendEmail(user.email, 'Verify Your Kivelo Account - Security Code', `...`);
 
     res.status(200).json({ success: true, message: 'New verification code sent to your email' });
   } catch (error) {
@@ -388,13 +388,35 @@ export const login = async (req, res) => {
     if (!user) return res.status(401).json({ success: false, message: 'Invalid email or password' });
 
     if (!user.isVerified) {
+      const newVerificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const codeExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+      user.verificationCode = newVerificationCode;
+      user.verificationCodeExpires = codeExpiry;
+      await user.save();
+
+      // Send email - same template style you already use
+      await sendEmail(
+        user.email,
+        'Verify Your Kivelo Account - Security Code',
+        `
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
+      <h2>Your Verification Code</h2>
+      <p>Use this code to verify your Kivelo account:</p>
+      <h1>${newVerificationCode}</h1>
+      <p>This code expires in 24 hours.</p>
+    </div>
+    `
+      );
+
       return res.status(403).json({
         success: false,
-        message: 'Please verify your email before logging in. Check your email for the verification code.',
+        message: 'Your account is not verified. A new verification code has been sent to your email.',
         needsVerification: true,
         email: user.email,
       });
     }
+
     if (!user.isActive) return res.status(403).json({ success: false, message: 'Account is deactivated. Please contact support.' });
 
     const isPasswordValid = await bcrypt.compare(password.trim(), user.password);
@@ -434,10 +456,14 @@ export const login = async (req, res) => {
 export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
-    if (!validateEmail(email)) return res.status(400).json({ success: false, message: 'Please provide a valid email address' });
+    if (!email)
+      return res.status(400).json({ success: false, message: 'Email is required' });
+    if (!validateEmail(email))
+      return res.status(400).json({ success: false, message: 'Please provide a valid email address' });
 
     const user = await User.findOne({ email: email.toLowerCase().trim() });
+    
+    // Uniform response: do not reveal if user exists
     if (!user) {
       return res.status(200).json({
         success: true,
@@ -445,23 +471,52 @@ export const forgotPassword = async (req, res) => {
       });
     }
 
-    if (!user.isVerified) return res.status(400).json({ success: false, message: 'Please verify your email before resetting password' });
+    if (!user.isVerified) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please verify your email before resetting your password.',
+        needsVerification: true,
+        email: user.email,
+      });
+    }
 
-    const resetToken = Math.floor(100000 + Math.random() * 900000).toString();
-    const resetTokenExpires = new Date(Date.now() + 1 * 60 * 60 * 1000);
+    // Generate OTP for password reset
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const resetExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-    user.resetPasswordToken = resetToken;
-    user.resetPasswordExpires = resetTokenExpires;
+    user.resetPasswordToken = resetCode;
+    user.resetPasswordExpires = resetExpiry;
     await user.save();
 
-    await sendEmailViaSendGrid(user.email, 'Reset Your Kivelo Password', `...`);
+    // Send password reset code using SAME email style as verification
+    await sendEmail(
+      user.email,
+      'Reset Your Kivelo Password - Security Code',
+      `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
+        <h2>Password Reset Code</h2>
+        <p>Use this code to reset your Kivelo account password:</p>
+        <h1>${resetCode}</h1>
+        <p>This code expires in 1 hour.</p>
+      </div>
+      `
+    );
 
-    res.status(200).json({ success: true, message: 'If an account with that email exists, a password reset code has been sent.' });
+    return res.status(200).json({
+      success: true,
+      message: 'If an account with that email exists, a password reset code has been sent.',
+    });
+
   } catch (error) {
     console.error('Forgot password error:', error);
-    res.status(500).json({ success: false, message: 'Failed to process password reset request', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to process password reset request',
+      error: error.message,
+    });
   }
 };
+
 
 // ========================= VERIFY RESET TOKEN =========================
 export const verifyResetToken = async (req, res) => {
@@ -502,7 +557,7 @@ export const resetPassword = async (req, res) => {
     user.resetPasswordExpires = undefined;
     await user.save();
 
-    await sendEmailViaSendGrid(user.email, 'Your Kivelo Password Has Been Reset', `...`);
+    await sendEmail(user.email, 'Your Kivelo Password Has Been Reset', `...`);
 
     res.status(200).json({ success: true, message: 'Password has been reset successfully. You can now log in with your new password.' });
   } catch (error) {
@@ -550,8 +605,7 @@ export const refreshAccessToken = async (req, res) => {
   }
 };
 
-// ========================= GENERATE / REGENERATE ONE-TIME CODE =========================
-// For parents to generate codes for their children
+// ================ GENERATE / REGENERATE ONE-TIME CODE - parents to generate codes for their children to create a Child Account ================
 export const generateOneTimeCode = async (req, res) => {
   try {
     const { childEmail, childName, childDOB, childGender } = req.body;

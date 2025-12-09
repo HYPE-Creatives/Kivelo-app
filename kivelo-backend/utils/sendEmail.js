@@ -1,39 +1,36 @@
-// utils/sendEmail.js - Using Brevo API (ES6)
-import { TransactionalEmailsApi, SendSmtpEmail } from '@getbrevo/brevo';
+// utils/sendEmail.js
+import Brevo from "@getbrevo/brevo";
 
-// Configure the API key
-const emailAPI = new TransactionalEmailsApi();
-emailAPI.authentications.apiKey.apiKey = process.env.BREVO_API_KEY;
+const apiInstance = new Brevo.TransactionalEmailsApi();
 
-const sendEmail = async (to, subject, html) => {
+// 🔑 CORRECT way to set API key for 2024+ SDKs
+apiInstance.setApiKey(
+  Brevo.TransactionalEmailsApiApiKeys.apiKey,
+  process.env.BREVO_API_KEY
+);
+
+export const sendEmail = async (to, subject, html) => {
   try {
-    const message = new SendSmtpEmail();
-    message.subject = subject;
-    message.htmlContent = html;
-    message.sender = {
+    const email = new Brevo.SendSmtpEmail();
+
+    email.sender = {
       name: "Kivelo",
-      email: "dawoduolalekanfatai@gmail.com", // Must be a verified sender in your Brevo account
+      email: process.env.BREVO_SENDER_EMAIL,  // Must be VERIFIED sender!
     };
-    message.to = [{ email: to }];
 
-    const response = await emailAPI.sendTransacEmail(message);
-    console.log(`✅ Email sent successfully to ${to}`);
-    return { success: true, response };
+    email.to = [{ email: to }];
+    email.subject = subject;
+    email.htmlContent = html;
 
-  } catch (error) {
-    console.error('❌ Brevo API error:', error.message);
-    
-    // More detailed error logging
-    if (error.response) {
-      console.error('Brevo API response:', error.response.body);
-    }
-    
-    return { 
-      success: false, 
-      error: error.message,
-      details: error.response?.body 
+    const result = await apiInstance.sendTransacEmail(email);
+
+    console.log("📧 Email sent!", result.messageId || result);
+    return { success: true };
+  } catch (err) {
+    console.error("❌ Brevo Send Error:", err.response?.body || err.message);
+    return {
+      success: false,
+      error: err.response?.body || err.message,
     };
   }
 };
-
-export default sendEmail;
