@@ -250,41 +250,8 @@ export const parentRegister = async (req, res) => {
                 please use the following verification code:
               </p>
 
-              <div style="text-align: center; margin: 30px 0;">
-                <div style="background-color: #4CAF50; color: #fff; padding: 12px 24px; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 24px; letter-spacing: 2px;">
-                  ${verificationCode}
-                </div>
-              </div>
-
               <p style="font-size: 14px; color: #555; line-height: 1.6;">
-                Click the button below to go directly to the verification page where you can enter this code:
-              </p>
-
-              // <div style="text-align: center; margin: 30px 0;">
-              //   <a href="${verificationPageLink}" 
-              //     style="background-color: #4CAF50; color: #fff; text-decoration: none; 
-              //           padding: 12px 24px; border-radius: 6px; font-weight: bold; 
-              //           display: inline-block; font-size: 16px;">
-              //     Go to Verification Page
-              //   </a>
-              // </div>
-
-              <p style="font-size: 14px; color: #555; line-height: 1.6;">
-                Once on the verification page, enter your email and the code above. 
-                This code will expire in 24 hours.
-              </p>
-
-              <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4CAF50;">
-                <p style="margin: 0; color: #666; font-size: 14px;">
-                  <strong>Quick Steps:</strong><br>
-                  1. Click the button above<br>
-                  2. Enter the code: <strong>${verificationCode}</strong><br>
-                  3. Click "Verify Email" to complete
-                </p>
-              </div>
-
-              <p style="font-size: 12px; color: #777; background: #f8f9fa; padding: 10px; border-radius: 5px;">
-                <strong>Security Note:</strong> For your protection, we use one-time codes instead of clickable links with tokens to prevent exposure in browser URLs.
+                Once on the verification page on the Kivelo App, confirm your email and type or paste the verification code above. <br> Please note that this code will expire in 24 hours.
               </p>
 
               <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;" />
@@ -369,7 +336,33 @@ export const resendVerificationCode = async (req, res) => {
     user.verificationCodeExpires = verificationCodeExpires;
     await user.save();
 
-    await sendEmail(user.email, 'Verify Your Kivelo Account - Security Code', `...`);
+    await sendEmail(
+      user.email,
+      'Verify Your Kivelo Account - Security Code',
+      `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
+        <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); overflow: hidden;">
+          <div style="background-color: #4CAF50; color: white; text-align: center; padding: 20px;">
+            <h1 style="margin: 0;">Kivelo</h1>
+            <p style="margin: 0; font-size: 14px;">Empowering Families with Technology</p>
+          </div>  
+          
+          // code will be placed here...
+          <strong>${verificationCode}</strong>
+          
+          <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;" />
+
+          <p style="font-size: 13px; color: #777; text-align: center;">
+            Need help? Contact our support team at 
+            <a href="mailto:support@kivelo.com" style="color: #4CAF50; text-decoration: none;">support@kivelo.com</a>
+          </p>
+        </div>
+        <div style="background-color: #f1f1f1; text-align: center; padding: 15px; font-size: 12px; color: #888;">
+          © ${new Date().getFullYear()} Kivelo. All rights reserved.
+        </div>
+      </div>
+      `
+    );
 
     res.status(200).json({ success: true, message: 'New verification code sent to your email' });
   } catch (error) {
@@ -400,12 +393,28 @@ export const login = async (req, res) => {
         user.email,
         'Verify Your Kivelo Account - Security Code',
         `
-    <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
-      <h2>Your Verification Code</h2>
-      <p>Use this code to verify your Kivelo account:</p>
-      <h1>${newVerificationCode}</h1>
-      <p>This code expires in 24 hours.</p>
-    </div>
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
+          <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); overflow: hidden;">
+            <div style="background-color: #4CAF50; color: white; text-align: center; padding: 20px;">
+              <h1 style="margin: 0;">Kivelo</h1>
+              <p style="margin: 0; font-size: 14px;">Empowering Families with Technology</p>
+            </div>
+          <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
+            <h2>Your Verification Code</h2>
+            <p>Use this code to verify your Kivelo account:</p>
+            <h1>${newVerificationCode}</h1>
+            <p>This code expires in 24 hours.</p>
+          </div>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;" />
+
+          <p style="font-size: 13px; color: #777; text-align: center;">
+            Need help? Contact our support team at 
+            <a href="mailto:support@kivelo.com" style="color: #4CAF50; text-decoration: none;">support@kivelo.com</a>
+          </p>
+        </div>
+        <div style="background-color: #f1f1f1; text-align: center; padding: 15px; font-size: 12px; color: #888;">
+          © ${new Date().getFullYear()} Kivelo. All rights reserved.
+        </div>
     `
       );
 
@@ -462,7 +471,7 @@ export const forgotPassword = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please provide a valid email address' });
 
     const user = await User.findOne({ email: email.toLowerCase().trim() });
-    
+
     // Uniform response: do not reveal if user exists
     if (!user) {
       return res.status(200).json({
@@ -494,10 +503,26 @@ export const forgotPassword = async (req, res) => {
       'Reset Your Kivelo Password - Security Code',
       `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
-        <h2>Password Reset Code</h2>
-        <p>Use this code to reset your Kivelo account password:</p>
-        <h1>${resetCode}</h1>
-        <p>This code expires in 1 hour.</p>
+          <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); overflow: hidden;">
+            <div style="background-color: #4CAF50; color: white; text-align: center; padding: 20px;">
+              <h1 style="margin: 0;">Kivelo</h1>
+              <p style="margin: 0; font-size: 14px;">Empowering Families with Technology</p>
+            </div>
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
+          <h2>Password Reset Code</h2>
+          <p>Use this code to reset your Kivelo account password:</p>
+          <h1>${resetCode}</h1>
+          <p>This code expires in 1 hour.</p>
+        </div>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;" />
+
+        <p style="font-size: 13px; color: #777; text-align: center;">
+          Need help? Contact our support team at 
+          <a href="mailto:support@kivelo.com" style="color: #4CAF50; text-decoration: none;">support@kivelo.com</a>
+        </p>
+      </div>
+      <div style="background-color: #f1f1f1; text-align: center; padding: 15px; font-size: 12px; color: #888;">
+        © ${new Date().getFullYear()} Kivelo. All rights reserved.
       </div>
       `
     );
