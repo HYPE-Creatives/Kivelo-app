@@ -20,7 +20,7 @@ const cookieOptions = {
   httpOnly: true,
   secure: isProd, // require HTTPS in production
   sameSite: isProd ? 'none' : 'lax', // none for cross-site in prod (with secure true), lax for dev
-  path: '/api/auth/refresh',
+  path: '/api/v1/auth/refresh',
   maxAge: REFRESH_MAX_AGE,
   domain: COOKIE_DOMAIN,
 };
@@ -66,7 +66,7 @@ const clearRefreshTokenCookie = (res) => {
     httpOnly: true,
     secure: isProd,
     sameSite: isProd ? 'none' : 'lax',
-    path: '/api/auth/refresh',
+    path: '/api/v1/auth/refresh',
     domain: COOKIE_DOMAIN,
   });
 };
@@ -137,7 +137,7 @@ export const generateVerificationLink = async (req, res) => {
     if (user.isVerified) return res.status(400).json({ success: false, message: 'Account is already verified' });
 
     const verificationToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
-    const verificationLink = `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/verify-email/${verificationToken}`;
+    const verificationLink = `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/v1/auth/verify-email/${verificationToken}`;
 
     await sendEmail(
       user.email,
@@ -145,7 +145,7 @@ export const generateVerificationLink = async (req, res) => {
       `
       <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
         ... (email body omitted for brevity; same as before)
-        <a href="${verificationLink}" style="...">Verify My Account</a>
+        <a href="${verificationLink}" style="background:#4CAF50;padding:12px 20px;color:white;border-radius:8px;text-decoration:none;">Verify My Account</a>
       </div>
       `
     );
@@ -237,35 +237,35 @@ export const parentRegister = async (req, res) => {
       await sendEmail(user.email,
         'Verify Your Kivelo Account - Security Code',
         `
-           <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
-          <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); overflow: hidden;">
-            <div style="background-color: #4CAF50; color: white; text-align: center; padding: 20px;">
-              <h1 style="margin: 0;">Kivelo</h1>
-              <p style="margin: 0; font-size: 14px;">Empowering Families with Technology</p>
-            </div>
-            <div style="padding: 30px;">
-              <h2 style="color: #333;">Hello ${user.name},</h2>
-              <p style="font-size: 15px; color: #555; line-height: 1.6;">
-                Thank you for joining <strong>Kivelo</strong>! To complete your registration, 
-                please use the following verification code:
-              </p>
+          <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
+            <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); overflow: hidden;">
+              <div style="background-color: #4CAF50; color: white; text-align: center; padding: 20px;">
+                <h1 style="margin: 0;">Kivelo</h1>
+                <p style="margin: 0; font-size: 14px;">Empowering Families with Technology</p>
+              </div>
+              <div style="padding: 30px;">
+                <h2 style="color: #333;">Hello ${user.name},</h2>
+                <p style="font-size: 15px; color: #555; line-height: 1.6;">
+                  Thank you for joining <strong>Kivelo</strong>! To complete your registration, 
+                  please use the following verification code:
+                </p>
 
-              <p style="font-size: 14px; color: #555; line-height: 1.6;">
-                Once on the verification page on the Kivelo App, confirm your email and type or paste the verification code above. <br> Please note that this code will expire in 24 hours.
-              </p>
+                <p style="font-size: 14px; color: #555; line-height: 1.6;">
+                  Once on the verification page on the Kivelo App, confirm your email and type or paste the verification code above. <br> Please note that this code will expire in 24 hours.
+                </p>
 
-              <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;" />
+                <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;" />
 
-              <p style="font-size: 13px; color: #777; text-align: center;">
-                Need help? Contact our support team at 
-                <a href="mailto:support@kivelo.com" style="color: #4CAF50; text-decoration: none;">support@kivelo.com</a>
-              </p>
-            </div>
-            <div style="background-color: #f1f1f1; text-align: center; padding: 15px; font-size: 12px; color: #888;">
-              © ${new Date().getFullYear()} Kivelo. All rights reserved.
+                <p style="font-size: 13px; color: #777; text-align: center;">
+                  Need help? Contact our support team at 
+                  <a href="mailto:support@kivelo.com" style="color: #4CAF50; text-decoration: none;">support@kivelo.com</a>
+                </p>
+              </div>
+              <div style="background-color: #f1f1f1; text-align: center; padding: 15px; font-size: 12px; color: #888;">
+                © ${new Date().getFullYear()} Kivelo. All rights reserved.
+              </div>
             </div>
           </div>
-        </div>
         `
       );
     } catch (emailErr) {
@@ -332,7 +332,7 @@ export const resendVerificationCode = async (req, res) => {
     const verificationToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
     const verificationLink = `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/v1/auth/verify-email/${verificationToken}`;
 
-    user.verificationCode = newVerificationCode;
+    user.verificationCode = verificationCode;
     user.verificationCodeExpires = verificationCodeExpires;
     await user.save();
 
@@ -346,8 +346,7 @@ export const resendVerificationCode = async (req, res) => {
               <p style="margin: 0; font-size: 14px;">Empowering Families with Technology</p>
             </div>  
             
-            // code will be placed here...
-            <strong>${newVerificationCode}</strong>
+            <strong>${verificationCode}</strong>
             
             <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;" />
 
