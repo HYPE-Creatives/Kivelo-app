@@ -44,6 +44,7 @@ const createUserResponse = (user, additionalData = {}) => {
     phone: user.phone,
     dob: user.dob,
     isVerified: user.isVerified,
+    avatar: user.avatar, // Include avatar in response
   };
 
   return { ...baseUser, ...additionalData };
@@ -247,7 +248,7 @@ export const parentRegister = async (req, res) => {
                 <h2 style="color: #333;">Hello ${user.name},</h2>
                 <p style="font-size: 15px; color: #555; line-height: 1.6;">
                   Thank you for joining <strong>Kivelo</strong>! To complete your registration, 
-                  please use the following verification code:
+                  please use the following verification code: ${verificationCode}.
                 </p>
 
                 <p style="font-size: 14px; color: #555; line-height: 1.6;">
@@ -376,6 +377,7 @@ export const login = async (req, res) => {
     if (!email || !password) return res.status(400).json({ success: false, message: 'Email and password are required' });
 
     const user = await User.findOne({ email: email.toLowerCase().trim() }).select('+password');
+    console.log('🔍 Login - User avatar from DB:', user?.avatar); // Debug log
     if (!user) return res.status(401).json({ success: false, message: 'Invalid email or password' });
 
     if (!user.isVerified) {

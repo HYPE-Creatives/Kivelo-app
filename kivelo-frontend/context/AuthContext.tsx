@@ -3,8 +3,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 
 const API_URLS = [
-  "http://localhost:5000/api",
-  "https://family-wellness.onrender.com/api",
+  "http://192.168.66.1:5000/api/v1",  // Local dev server (use your IP for mobile testing)
+  "https://family-wellness.onrender.com/api/v1",
 ];
 
 // Types (keep your existing types)
@@ -28,6 +28,10 @@ interface User {
   children?: string[];
   hasSetPassword?: boolean;
   childDetails?: ChildDetails;
+  avatar?: {
+    url?: string;
+    publicId?: string;
+  };
   parent?: {
     familyCode: string;
     subscription: string;
@@ -56,7 +60,23 @@ interface AuthContextType {
     dob: string,
     termsAccepted: boolean
   ) => Promise<{ success: boolean; message?: string }>;
+  generateOneTimeCode: (
+    parentId: string,
+    childName: string,
+    childEmail: string,
+    childDOB: string,
+    childGender: string
+  ) => Promise<{ success: boolean; message?: string; code?: string }>;
+  setChildPassword: (
+    childId: string,
+    password: string
+  ) => Promise<{ success: boolean; message?: string }>;
+  resetChildPassword: (
+    parentId: string,
+    childEmail: string
+  ) => Promise<{ success: boolean; message?: string; code?: string }>;
   clearAuthState: () => Promise<void>;
+  refreshProfile: () => Promise<{ success: boolean; message?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -93,9 +113,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             errorMessage = response.statusText || errorMessage;
           }
           
+          // For client errors (4xx), don't try other URLs - it's a valid response
+          // Only retry on server errors (5xx) or network issues
+          if (response.status >= 400 && response.status < 500) {
+            // This is a valid auth/validation error, throw it immediately
+            throw new Error(errorMessage);
+          }
+          
+          // Server error (5xx) - try next URL
           lastError = { success: false, message: errorMessage };
-          console.warn(`❌ Failed with ${baseUrl}:`, errorMessage);
-          continue; // Try next URL
+          console.warn(`⚠️ Server error with ${baseUrl}:`, errorMessage);
+          continue;
         }
 
         const data = await response.json();
@@ -103,6 +131,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { response, data };
         
       } catch (error: any) {
+        // If it's our thrown error (client error), re-throw it immediately
+        if (!error.message?.includes('Network') && !error.message?.includes('fetch')) {
+          throw error;
+        }
+        
         lastError = {
           success: false,
           message: `Network error: ${error.message}`
@@ -152,12 +185,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // 🔹 Refresh profile from backend and update stored user
+  const refreshProfile = async () => {
+    try {
+      const accessToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+      if (!accessToken) return { success: false, message: 'No access token' };
+
+      const { data } = await apiCallWithFallback('/users/profile', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (!data || !data.success) {
+        return { success: false, message: data?.message || 'Failed to refresh profile' };
+      }
+
+      const userData = data.data?.user || data.user;
+      if (!userData) return { success: false, message: 'Invalid user data' };
+
+      const finalUser: User = {
+        id: userData._id || userData.id,
+        role: userData.role,
+        email: userData.email,
+        name: userData.name,
+        phone: userData.phone,
+        dob: userData.dob,
+        children: userData.children,
+        parent: userData.parent,
+        childDetails: userData.childDetails,
+        hasSetPassword: userData.hasSetPassword,
+        avatar: userData.avatar,
+      };
+
+      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(finalUser));
+      setUser(finalUser);
+      setIsAuthenticated(true);
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('refreshProfile error', error);
+      return { success: false, message: error.message || 'Failed to refresh profile' };
+    }
+  };
+
   // ✅ SIMPLIFIED LOGIN
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
 
-      const { response, data } = await apiCallWithFallback("/auth/login", {
+      const { data } = await apiCallWithFallback("/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
@@ -167,9 +243,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (data.success) {
         const userData = data.data?.user || data.user;
+        console.log("🖼️ Login - User avatar from server:", userData?.avatar);
+        
         if (!userData) {
           throw new Error("Invalid user data from server");
         }
+
+        // hasSetPassword comes from roleData (at data level), not inside user object
+        const hasSetPassword = data.data?.hasSetPassword ?? userData.hasSetPassword ?? true;
 
         const finalUser: User = {
           id: userData._id || userData.id,
@@ -181,7 +262,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           children: userData.children,
           parent: userData.parent,
           childDetails: userData.childDetails,
-          hasSetPassword: userData.hasSetPassword,
+          hasSetPassword: hasSetPassword,
+          avatar: userData.avatar,
         };
 
         const tokens: AuthTokens = {
@@ -202,7 +284,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, message: data.message || "Login failed" };
       }
     } catch (error: any) {
-      console.error("Login error:", error);
+      // Don't log expected auth errors as ERROR - just return the message
       return { success: false, message: error.message || "Network error" };
     } finally {
       setIsLoading(false);
@@ -214,7 +296,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
 
-      const { response, data } = await apiCallWithFallback("/auth/child-login-code", {
+      const { data } = await apiCallWithFallback("/auth/child-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim().toLowerCase(), code }),
@@ -222,14 +304,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (data.success) {
         const userData = data.data?.user || data.user;
+        // One-time code login always means hasSetPassword is false
         const childUser: User = {
           id: userData._id || userData.id,
           role: 'child',
           email: userData.email,
           name: userData.name,
-          hasSetPassword: userData.hasSetPassword,
+          hasSetPassword: userData.hasSetPassword ?? false, // Default to false for one-time code
           childDetails: userData.childDetails,
           dob: userData.dob,
+          avatar: userData.avatar,
         };
 
         const tokens: AuthTokens = {
@@ -246,7 +330,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, message: data.message || "Invalid code" };
       }
     } catch (error: any) {
-      console.error("One-time code login error:", error);
+      // Don't log expected auth errors as ERROR - just return the message
       return { success: false, message: error.message || "Network error" };
     } finally {
       setIsLoading(false);
@@ -313,7 +397,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       console.log("📤 Sending payload:", payload);
 
-      const { response, data } = await apiCallWithFallback("/auth/register-parent", {
+      const { data } = await apiCallWithFallback("/auth/register-parent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -337,6 +421,156 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // ✅ GENERATE ONE-TIME CODE (Parent only)
+  const generateOneTimeCode = async (
+    parentId: string,
+    childName: string,
+    childEmail: string,
+    childDOB: string,
+    childGender: string
+  ) => {
+    try {
+      console.log("🔍 Generating one-time code for child...");
+
+      const accessToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+      if (!accessToken) {
+        return { success: false, message: "Not authenticated. Please log in again." };
+      }
+
+      const payload = {
+        childName: childName.trim(),
+        childEmail: childEmail.trim().toLowerCase(),
+        childDOB,
+        childGender: childGender.trim()
+      };
+
+      console.log("📤 Sending generate code payload:", payload);
+
+      const { data } = await apiCallWithFallback("/auth/generate-code", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`
+        },
+        body: JSON.stringify(payload),
+      });
+
+      console.log("📨 Generate code response:", data);
+
+      if (data.success) {
+        return {
+          success: true,
+          message: data.message || "One-time code generated successfully!",
+          code: data.code || data.oneTimeCode
+        };
+      } else {
+        return { success: false, message: data.message || "Failed to generate code" };
+      }
+    } catch (error: any) {
+      console.error("Generate code error:", error);
+      return { success: false, message: error.message || "Failed to generate code. Please try again." };
+    }
+  };
+
+  // ✅ SET CHILD PASSWORD (After one-time code login)
+  const setChildPassword = async (childId: string, password: string) => {
+    try {
+      console.log("🔍 Setting child password...");
+
+      const accessToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+      if (!accessToken) {
+        return { success: false, message: "Not authenticated. Please log in again." };
+      }
+
+      if (!password || password.length < 6) {
+        return { success: false, message: "Password must be at least 6 characters long." };
+      }
+
+      const payload = {
+        password: password
+      };
+
+      console.log("📤 Setting password for child:", childId);
+
+      const { data } = await apiCallWithFallback("/auth/set-child-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`
+        },
+        body: JSON.stringify(payload),
+      });
+
+      console.log("📨 Set password response:", data);
+
+      if (data.success) {
+        // Update user state to reflect password has been set
+        if (user) {
+          const updatedUser = { ...user, hasSetPassword: true };
+          await storeAuthData(updatedUser, { accessToken: data.accessToken || accessToken, refreshToken: "" });
+          setUser(updatedUser);
+        }
+        return {
+          success: true,
+          message: data.message || "Password set successfully!"
+        };
+      } else {
+        return { success: false, message: data.message || "Failed to set password" };
+      }
+    } catch (error: any) {
+      console.error("Set password error:", error);
+      return { success: false, message: error.message || "Failed to set password. Please try again." };
+    }
+  };
+
+  // ✅ RESET CHILD PASSWORD (Parent only) - Regenerates one-time code
+  const resetChildPassword = async (parentId: string, childEmail: string) => {
+    try {
+      console.log("🔍 Resetting child password by regenerating code...");
+
+      const accessToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+      if (!accessToken) {
+        return { success: false, message: "Not authenticated. Please log in again." };
+      }
+
+      // Use generate-code endpoint to regenerate code for existing child
+      // Backend will detect existing child and regenerate code
+      const payload = {
+        childEmail: childEmail.trim().toLowerCase(),
+        childName: "Child", // Backend uses existing name if child exists
+        childDOB: "2010-01-01", // Backend uses existing DOB if child exists
+        childGender: "" // Backend uses existing gender if child exists
+      };
+
+      console.log("📤 Regenerating code for child:", childEmail);
+
+      const { data } = await apiCallWithFallback("/auth/generate-code", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`
+        },
+        body: JSON.stringify(payload),
+      });
+
+      console.log("📨 Regenerate code response:", data);
+
+      if (data.success) {
+        const newCode = data.code || data.oneTimeCode;
+        return {
+          success: true,
+          message: `Password reset! New code: ${newCode}. Share this code with your child.`,
+          code: newCode
+        };
+      } else {
+        return { success: false, message: data.message || "Failed to reset password" };
+      }
+    } catch (error: any) {
+      console.error("Reset password error:", error);
+      return { success: false, message: error.message || "Failed to reset password. Please try again." };
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -348,7 +582,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginWithOneTimeCode,
         logout,
         registerParent,
-        clearAuthState,
+        generateOneTimeCode,
+        setChildPassword,
+        resetChildPassword,
+          clearAuthState,
+          refreshProfile,
       }}
     >
       {children}

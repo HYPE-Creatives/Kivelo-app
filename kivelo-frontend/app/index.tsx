@@ -1,9 +1,10 @@
-import { View, Text, Image, TouchableOpacity, ScrollView } from "react-native";
-import { useRouter } from "expo-router";
+import { View, Text, Image, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
+import { useRouter, Redirect } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { useCallback } from "react";
+import { useAuth } from "../context/AuthContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -14,6 +15,7 @@ export default function LandingPage() {
   });
 
   const router = useRouter();
+  const { user, isLoading, isAuthenticated } = useAuth();
 
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded || fontError) {
@@ -21,7 +23,28 @@ export default function LandingPage() {
     }
   }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) return null;
+  // Show loading while checking auth status
+  if (isLoading || (!fontsLoaded && !fontError)) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#4CAF50" }}>
+        <ActivityIndicator size="large" color="#fff" />
+      </View>
+    );
+  }
+
+  // If user is logged in, redirect to their dashboard
+  if (isAuthenticated && user) {
+    if (user.role === "parent") {
+      return <Redirect href="/(dashboard)/parent" />;
+    }
+    if (user.role === "child") {
+      // Check if child needs to set password first
+      if (!user.hasSetPassword) {
+        return <Redirect href="/(auth)/set-password" />;
+      }
+      return <Redirect href="/(dashboard)/child" />;
+    }
+  }
 
   return (
     <LinearGradient

@@ -1,5 +1,6 @@
 // app/(dashboard)/parent/settings.tsx
 import { useState } from "react";
+import AvatarPicker from "../../../components/AvatarPicker";
 import { 
   View, 
   Text, 
@@ -125,8 +126,24 @@ export default function Settings() {
       const result = await resetChildPassword(user.id, resetChildEmail);
       
       if (result.success) {
-        Alert.alert("Success", result.message || "Password reset initiated successfully. Your child will receive a new one-time code.");
+        Alert.alert(
+          "Success", 
+          result.message || "Password reset initiated successfully. Your child will receive a new one-time code.",
+          result.code ? [
+            { 
+              text: "Copy Code", 
+              onPress: () => {
+                Clipboard.setStringAsync(result.code!);
+                Alert.alert("Copied!", "Code copied to clipboard.");
+              } 
+            },
+            { text: "OK", style: "cancel" }
+          ] : undefined
+        );
         setResetChildEmail("");
+        if (result.code) {
+          setGeneratedCode(result.code);
+        }
       } else {
         Alert.alert("Error", result.message || "Failed to reset password. Please check the email address.");
       }
@@ -156,16 +173,14 @@ export default function Settings() {
     );
   };
 
-  const handleUpdateEmail = () => {
-    Alert.alert("Coming Soon", "Email update feature will be available soon.");
-  };
+  // handleUpdateEmail removed; 'Edit Profile' uses dedicated screen
 
   const handleChangePassword = () => {
     Alert.alert("Coming Soon", "Password change feature will be available soon.");
   };
 
   const handleManageFamily = () => {
-    Alert.alert("Coming Soon", "Family management feature will be available soon.");
+    router.push("/(dashboard)/parent/family");
   };
 
   return (
@@ -184,6 +199,9 @@ export default function Settings() {
           <Text style={styles.subtitle}>
             Manage your account & register children.
           </Text>
+          <View style={{ marginTop: 12, alignItems: 'center' }}>
+            <AvatarPicker size={96} />
+          </View>
         </View>
 
         {/* Family Code Display */}
@@ -281,8 +299,8 @@ export default function Settings() {
         <View style={styles.formContainer}>
           <Text style={styles.sectionTitle}>Account Management</Text>
           
-          <TouchableOpacity style={styles.accountButton} onPress={handleUpdateEmail}>
-            <Text style={styles.accountButtonText}>📧 Update Email Address</Text>
+          <TouchableOpacity style={styles.accountButton} onPress={() => router.push('/(dashboard)/parent/settings/profile-edit')}>
+            <Text style={styles.accountButtonText}>📧 Edit Profile</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.accountButton} onPress={handleChangePassword}>
@@ -344,7 +362,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 220,
   },
   header: {
     alignItems: 'center',

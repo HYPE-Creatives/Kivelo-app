@@ -9,7 +9,6 @@ import {
   ScrollView,
   Text,
   Image,
-  ActivityIndicator,
 } from "react-native";
 import { TextInput as PaperTextInput, Button } from "react-native-paper";
 import { useRouter } from "expo-router";
@@ -90,12 +89,7 @@ export default function LoginScreen() {
     );
   };
 
-  const toggleMode = () => {
-    const newMode: LoginMode = mode === "password" ? "oneTimeCode" : "password";
-    setMode(newMode);
-    setPassword("");
-    setCode("");
-  };
+  
 
   return (
     <KeyboardAvoidingView
@@ -203,7 +197,7 @@ export default function LoginScreen() {
 
           {/* Register Link */}
           <View style={styles.registerContainer}>
-            <Text style={styles.registerText}>Don't have an account?</Text>
+            <Text style={styles.registerText}>Don{"'"}t have an account?</Text>
             <TouchableOpacity onPress={handleRegisterRedirect}>
               <Text style={styles.registerLink}> Register</Text>
             </TouchableOpacity>

@@ -49,7 +49,7 @@ export default function AuthLayout() {
       // If child is on set-password route and hasn't set password, stay there
       return;
     }
-  }, [isLoading, user, isSetPasswordRoute]); // Minimal dependencies
+  }, [isLoading, user, isSetPasswordRoute, router]); // Minimal dependencies
 
   // Show loading spinner during initial auth check
   if (isLoading) {

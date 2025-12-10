@@ -72,7 +72,7 @@ export async function getChildrenList(req, res) {
     const parent = await Parent.findOne({ user: req.user.id })
       .populate({
         path: "children",
-        populate: { path: "user", select: "name email dob gender" }
+        populate: { path: "user", select: "name email dob gender avatar" }
       });
 
     if (!parent) return res.status(404).json({ message: "Parent profile not found" });
@@ -97,7 +97,7 @@ export async function getChildById(req, res) {
 
     // access.userId is child's user id (string). The Child doc id may differ.
     const childDoc = await Child.findOne({ $or: [{ _id: childId }, { user: access.userId }] })
-      .populate("user", "name email dob gender");
+      .populate("user", "name email dob gender avatar");
 
     if (!childDoc) return res.status(404).json({ message: "Child not found" });
 

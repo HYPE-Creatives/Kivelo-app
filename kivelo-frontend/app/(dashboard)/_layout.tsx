@@ -1,10 +1,22 @@
 // app/(dashboard)/_layout.tsx
 import { Stack, Redirect } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
-import { Text, View, ActivityIndicator } from 'react-native';
+import { Text, View, ActivityIndicator, BackHandler } from 'react-native';
+import { useEffect } from 'react';
 
 export default function DashboardLayout() {
   const { user, isLoading } = useAuth();
+
+  // Prevent hardware back button from going to auth screens
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener("hardwareBackPress", () => {
+      // Return true to prevent default back behavior when on dashboard
+      // This prevents going back to login/auth screens
+      return true;
+    });
+
+    return () => backHandler.remove();
+  }, []);
 
   if (isLoading) {
     return (

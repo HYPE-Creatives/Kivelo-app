@@ -190,3 +190,69 @@ export const redeemReward = async (req, res) => {
     });
   }
 };
+
+// Award points to self (for game completion, etc.)
+export const awardSelfPoints = async (req, res) => {
+  try {
+    const { points, reason, source } = req.body;
+    const userId = req.user._id;
+    
+    // Validate points (max 100 points per game action to prevent abuse)
+    if (!points || points <= 0 || points > 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Points must be between 1 and 100'
+      });
+    }
+    
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reason is required'
+      });
+    }
+    
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    // Update points
+    user.points = (user.points || 0) + points;
+    await user.save();
+    
+    // Check for badge achievements
+    await checkForBadgesSimple(userId, user.points);
+    
+    // Create notification for points earned (using correct field names from Notification model)
+    await Notification.create({
+      userId: userId,
+      type: 'points_earned',
+      title: '🎮 Points Earned!',
+      message: `You earned ${points} points: ${reason}`,
+      priority: 3,
+      data: { points, reason, source: source || 'game' }
+    });
+    
+    res.json({
+      success: true,
+      data: {
+        points: user.points,
+        pointsAwarded: points,
+        message: `${points} points earned! ${reason}`,
+        level: Math.floor(user.points / 100) + 1,
+        nextLevelPoints: (Math.floor(user.points / 100) + 1) * 100
+      }
+    });
+  } catch (error) {
+    console.error('Error awarding self points:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};

@@ -1,5 +1,5 @@
 import express from 'express';
-import { createFamily, updateFamily, deleteFamilyPhoto } from '../controllers/familyController.js';
+import { getMyFamily, createFamily, updateFamily, deleteFamilyPhoto } from '../controllers/familyController.js';
 import auth from '../middleware/auth.js';
 import { uploadSingle } from '../middleware/upload.js';
 
@@ -11,6 +11,26 @@ const router = express.Router();
  *   name: Family Management
  *   description: Family management endpoints - Parent-child linking and family management
  */
+
+/**
+ * @swagger
+ * /api/v1/families/me:
+ *   get:
+ *     summary: Get current user's family
+ *     description: Retrieves the family that the authenticated user belongs to
+ *     tags: [Family Management]
+ *     security:
+ *       - ApiKeyAuth: []
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Family retrieved successfully
+ *       404:
+ *         description: No family found for user
+ *       500:
+ *         description: Server error
+ */
+router.get('/me', auth, getMyFamily);
 
 /**
  * @swagger

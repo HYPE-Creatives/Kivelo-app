@@ -3,7 +3,8 @@ import {
   getGamificationStats,
   awardPoints,
   getAvailableBadges,
-  redeemReward
+  redeemReward,
+  awardSelfPoints
 } from '../controllers/gamificationController.js';
 import auth from '../middleware/auth.js';
 import { isChild, isParent } from '../middleware/roleCheck.js';
@@ -183,5 +184,68 @@ router.post('/award-points', auth, isParent, awardPoints);
  *         description: Internal server error
  */
 router.post('/rewards/redeem', auth, isChild, redeemReward);
+
+/**
+ * @swagger
+ * /api/v1/gamification/self-points:
+ *   post:
+ *     summary: Award points to self
+ *     description: Child awards points to themselves for completing games, activities, etc.
+ *     tags: [Gamification]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [points, reason]
+ *             properties:
+ *               points:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 100
+ *                 description: Number of points to award (max 100 per action)
+ *               reason:
+ *                 type: string
+ *                 description: Reason for earning points (e.g., "Memory Match completed!")
+ *               source:
+ *                 type: string
+ *                 description: Source of points (e.g., "game", "activity")
+ *     responses:
+ *       200:
+ *         description: Points awarded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     points:
+ *                       type: integer
+ *                       description: New total points
+ *                     pointsAwarded:
+ *                       type: integer
+ *                     message:
+ *                       type: string
+ *                     level:
+ *                       type: integer
+ *                     nextLevelPoints:
+ *                       type: integer
+ *       400:
+ *         description: Invalid points value or missing reason
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/self-points', auth, isChild, awardSelfPoints);
 
 export default router;

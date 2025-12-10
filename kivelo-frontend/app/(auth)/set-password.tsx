@@ -11,7 +11,7 @@ import {
   ActivityIndicator // ✅ ADD THIS IMPORT
 } from "react-native";
 import { TextInput, Button, Text } from "react-native-paper";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
 
 export default function SetPasswordScreen() {
@@ -21,7 +21,7 @@ export default function SetPasswordScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSetting, setIsSetting] = useState(false);
-  const params = useLocalSearchParams();
+  
 
   // Check if user should be on this screen
   useEffect(() => {

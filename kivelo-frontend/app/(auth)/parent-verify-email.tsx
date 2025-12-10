@@ -15,8 +15,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const VERIFY_URL = "https://family-wellness.onrender.com/api/auth/verify-email";
-const RESEND_URL = "https://family-wellness.onrender.com/api/auth/resend-verification-code";
+const VERIFY_URL = "https://family-wellness.onrender.com/api/v1/auth/verify-email";
+const RESEND_URL = "https://family-wellness.onrender.com/api/v1/auth/resend-verification-code";
 
 export default function ParentVerifyEmail() {
   const { colors } = useTheme();
@@ -42,7 +42,7 @@ export default function ParentVerifyEmail() {
       }
     };
     loadEmail();
-  }, []);
+  }, [router]);
 
   // Countdown timer
   useEffect(() => {
@@ -112,7 +112,7 @@ export default function ParentVerifyEmail() {
         "Your email is confirmed. Welcome to Kivelo!",
         [{ text: "Continue", onPress: () => router.replace("/(auth)/login") }]
       );
-    } catch (err) {
+    } catch {
       Alert.alert("Network Error", "Please check your connection and try again.");
     } finally {
       setLoading(false);
@@ -138,7 +138,7 @@ export default function ParentVerifyEmail() {
 
       setCountdown(60);
       Alert.alert("Code Sent", "A new verification code has been sent to your email.");
-    } catch (err) {
+    } catch {
       Alert.alert("Network Error", "Failed to resend code.");
     } finally {
       setResending(false);

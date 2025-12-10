@@ -2,6 +2,29 @@ import Family from '../models/Family.js';
 import User from '../models/User.js';
 import CloudinaryService from '../services/cloudinaryService.js';
 
+// Get current user's family
+export const getMyFamily = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    
+    if (!user?.family) {
+      return res.status(404).json({ success: false, message: 'No family found' });
+    }
+
+    const family = await Family.findById(user.family)
+      .populate('members', 'name email avatar role')
+      .populate('createdBy', 'name email');
+
+    if (!family) {
+      return res.status(404).json({ success: false, message: 'Family not found' });
+    }
+
+    res.json({ success: true, family });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
 export const createFamily = async (req, res) => {
   try {
     const { name, description } = req.body;
