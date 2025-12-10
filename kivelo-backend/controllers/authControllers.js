@@ -248,7 +248,7 @@ export const parentRegister = async (req, res) => {
                 <h2 style="color: #333;">Hello ${user.name},</h2>
                 <p style="font-size: 15px; color: #555; line-height: 1.6;">
                   Thank you for joining <strong>Kivelo</strong>! To complete your registration, 
-                  please use the following verification code: ${verificationCode}.
+                  please use the following verification  code:<br><strong><h1>${verificationCode}</h1></strong>
                 </p>
 
                 <p style="font-size: 14px; color: #555; line-height: 1.6;">
@@ -347,7 +347,7 @@ export const resendVerificationCode = async (req, res) => {
               <p style="margin: 0; font-size: 14px;">Empowering Families with Technology</p>
             </div>  
             
-            <strong>${verificationCode}</strong>
+            <strong><h1>${verificationCode}</h1></strong>
             
             <hr style="border: none; border-top: 1px solid #eee; margin: 25px 0;" />
 
