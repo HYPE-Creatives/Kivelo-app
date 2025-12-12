@@ -47,6 +47,19 @@ const createUserResponse = (user, additionalData = {}) => {
     avatar: user.avatar, // Include avatar in response
   };
 
+  // Attach familyCode for parent or child
+  if (user.role === 'parent' && user.family) {
+    baseUser.familyCode = user.familyCode || (user.parent && user.parent.familyCode);
+  }
+  if (user.role === 'child') {
+    // Try to populate parent and get familyCode
+    if (user.parent && user.parent.familyCode) {
+      baseUser.familyCode = user.parent.familyCode;
+    } else if (user.familyCode) {
+      baseUser.familyCode = user.familyCode;
+    }
+  }
+
   return { ...baseUser, ...additionalData };
 };
 
@@ -699,15 +712,17 @@ export const childLoginWithCode = async (req, res) => {
     const { email, code } = req.body;
     if (!email || !code) return res.status(400).json({ success: false, message: 'Email and code are required' });
 
+
     const user = await User.findOne({ email: email.toLowerCase().trim() });
     if (!user || user.role !== 'child') return res.status(401).json({ success: false, message: 'Invalid email or code' });
 
+    // Populate parent for familyCode
     const child = await Child.findOne({
       user: user._id,
       oneTimeCode: code.toUpperCase(),
       isCodeUsed: false,
       codeExpires: { $gt: new Date() },
-    });
+    }).populate({ path: 'parent', select: 'familyCode' });
     if (!child) return res.status(400).json({ success: false, message: 'Invalid or expired code' });
 
     child.isCodeUsed = true;
@@ -734,11 +749,12 @@ export const registerChildWithCode = async (req, res) => {
     const { code, email, name } = req.body;
     if (!code || !email) return res.status(400).json({ success: false, message: 'Code and email are required' });
 
+
     const child = await Child.findOne({
       oneTimeCode: code.toUpperCase(),
       isCodeUsed: false,
       codeExpires: { $gt: new Date() },
-    }).populate('user');
+    }).populate('user').populate({ path: 'parent', select: 'familyCode' });
     if (!child) return res.status(400).json({ success: false, message: 'Invalid or expired code' });
 
     if (child.user.email !== email.toLowerCase().trim()) return res.status(400).json({ success: false, message: 'Email does not match the code registration' });
@@ -775,7 +791,8 @@ export const childSetPassword = async (req, res) => {
     childUser.password = password;
     await childUser.save();
 
-    const childProfile = await Child.findOneAndUpdate({ user: req.user._id }, { hasSetPassword: true }, { new: true });
+
+    const childProfile = await Child.findOneAndUpdate({ user: req.user._id }, { hasSetPassword: true }, { new: true }).populate({ path: 'parent', select: 'familyCode' });
     if (!childProfile) return res.status(404).json({ success: false, message: 'Child profile record not found' });
 
     const { accessToken, refreshToken } = generateToken(req.user._id, req.user.role);
@@ -785,7 +802,7 @@ export const childSetPassword = async (req, res) => {
       success: true,
       accessToken,
       message: 'Password set successfully. You can now access your account.',
-      user: { id: childUser._id, email: childUser.email, name: childUser.name, role: childUser.role, hasSetPassword: true, family: childUser.family },
+      user: createUserResponse(childUser, { hasSetPassword: true, familyCode: childProfile.parent?.familyCode }),
     });
   } catch (error) {
     console.error('Password set error:', error);
