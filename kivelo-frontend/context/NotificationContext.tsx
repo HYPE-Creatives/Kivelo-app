@@ -58,7 +58,7 @@ interface NotificationContextType {
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 const API_URLS = [
-  "http://192.168.66.1:5000/api/v1",  // Local dev server
+  "http://localhost:5000/api/v1",  // Local dev server
   "https://family-wellness.onrender.com/api/v1",
 ];
 

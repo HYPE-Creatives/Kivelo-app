@@ -47,9 +47,11 @@ All protected routes require JWT token in Authorization header:
     //   🏷️ TAGS FOR ORGANIZATION - in all routes
     tags: [
       { name: "Users", description: "User profile management" },
-      { name: "Authentication", description: "User registration, login, and account management" },
+      { name: "Parent Authentication", description: "Parent registration and login (email + password)" },
+      { name: "Child Authentication", description: "Child login flows (one-time code for first login, password for subsequent logins)" },
       { name: "Email Verification", description: "Email verification and account activation" },
-      { name: "Child Accounts", description: "Child account management and authentication" },
+      { name: "Password Recovery", description: "Password reset for parents and children" },
+      { name: "Token Management", description: "JWT token refresh, verification, and logout" },
       { name: "Parent Dashboard", description: "Parent monitoring and child insights" },
       { name: "Mood Tracking", description: "Child mood check-ins and mood history" },
       { name: "Journals", description: "Journal entries (story, art, music etc.)" },

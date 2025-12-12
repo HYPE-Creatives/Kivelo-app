@@ -3,7 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 
 const API_URLS = [
-  "http://192.168.66.1:5000/api/v1",  // Local dev server (use your IP for mobile testing)
+  "http://localhost:5000/api/v1",  // Local dev server
   "https://family-wellness.onrender.com/api/v1",
 ];
 
