@@ -49,7 +49,7 @@ interface AuthContextType {
   role: Role;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  login: (email: string, password: string, expectedRole?: 'parent' | 'child') => Promise<{ success: boolean; message?: string }>;
   loginWithOneTimeCode: (email: string, code: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
   registerParent: (
@@ -234,8 +234,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // ✅ SIMPLIFIED LOGIN
-  const login = async (email: string, password: string) => {
+  // ✅ SIMPLIFIED LOGIN with role validation
+  const login = async (email: string, password: string, expectedRole?: 'parent' | 'child') => {
     try {
       setIsLoading(true);
 
@@ -253,6 +253,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         if (!userData) {
           throw new Error("Invalid user data from server");
+        }
+
+        // ✅ Role validation - ensure user is logging in with correct form
+        if (expectedRole && userData.role !== expectedRole) {
+          if (expectedRole === 'parent' && userData.role === 'child') {
+            return { success: false, message: "This account belongs to a child. Please use the Child login tab." };
+          }
+          if (expectedRole === 'child' && userData.role === 'parent') {
+            return { success: false, message: "This account belongs to a parent. Please use the Parent login tab." };
+          }
+          return { success: false, message: `Please use the correct login form for your account type.` };
         }
 
         // hasSetPassword comes from roleData (at data level), not inside user object

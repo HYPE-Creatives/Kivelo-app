@@ -70,12 +70,12 @@ export default function LoginScreen() {
       let result;
 
       if (userType === "parent") {
-        // Parent always uses email + password
-        result = await login(email, password);
+        // Parent always uses email + password, enforce parent role
+        result = await login(email, password, "parent");
       } else {
         // Child can use either password or code
         if (childLoginMethod === "password") {
-          result = await login(email, password);
+          result = await login(email, password, "child");
         } else {
           result = await loginWithOneTimeCode(email, code);
         }
