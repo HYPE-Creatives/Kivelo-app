@@ -598,11 +598,6 @@ export default function ColorQuest() {
                 const mixKey = `${option[0]}+${option[1]}`;
                 const resultColor = COLOR_MIXTURES[mixKey]?.hex || "#888";
                 
-                let optionStyle = styles.optionButton;
-                if (showFeedback && isSelected) {
-                  optionStyle = isCorrect ? styles.optionCorrect : styles.optionWrong;
-                }
-                
                 return (
                   <TouchableOpacity
                     key={index}

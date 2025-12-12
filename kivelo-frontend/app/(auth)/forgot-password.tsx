@@ -3,9 +3,9 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  Alert,
   ActivityIndicator,
 } from "react-native";
+import { showAlert } from '@/utils/showAlert';
 import { router } from "expo-router";
 import { useState } from "react";
 
@@ -15,7 +15,7 @@ export default function ForgotPassword() {
 
   const handleReset = async () => {
     if (!email) {
-      Alert.alert("Error", "Please enter your email");
+      showAlert("Error", "Please enter your email");
       return;
     }
 
@@ -33,7 +33,7 @@ export default function ForgotPassword() {
 
       // Mock success (temporary)
       await new Promise((resolve) => setTimeout(resolve, 1500));
-      Alert.alert(
+      showAlert(
         "Password Reset",
         `If an account exists for ${email}, a password reset link has been sent.`
       );
@@ -41,7 +41,7 @@ export default function ForgotPassword() {
       setEmail("");
       router.push("/(auth)/login");
     } catch (err: any) {
-      Alert.alert("Error", err.message || "Something went wrong");
+      showAlert("Error", err.message || "Something went wrong");
     } finally {
       setLoading(false);
     }

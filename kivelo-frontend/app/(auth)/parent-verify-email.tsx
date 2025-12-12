@@ -163,7 +163,7 @@ export default function ParentVerifyEmail() {
           >
             <Ionicons name="mail-open" size={48} color="#4CAF50" />
           </View>
-          <Text variant="headlineMedium" style={{ fontWeight: "bold", textAlign: "center" }}>
+          <Text style={{ fontWeight: "bold", textAlign: "center", fontSize: 24 }}>
             Verify Your Email
           </Text>
           <Text style={{ color: "#666", textAlign: "center", marginTop: 8 }}>
@@ -185,7 +185,7 @@ export default function ParentVerifyEmail() {
             {[0, 1, 2, 3, 4, 5].map((index) => (
             <TextInput
                 key={index}
-                ref={(ref) => (inputs.current[index] = ref)}
+                ref={(ref) => { inputs.current[index] = ref; }}
                 style={{
                 width: 40,
                 height: 52,

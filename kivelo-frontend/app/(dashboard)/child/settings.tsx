@@ -6,12 +6,12 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
   Image,
   Dimensions,
   ActivityIndicator,
   Platform,
 } from "react-native";
+import { showAlert } from '@/utils/showAlert';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "../../../context/AuthContext";
@@ -53,7 +53,7 @@ export default function ChildSettings() {
   const [uploading, setUploading] = useState(false);
 
   const handleLogout = () => {
-    Alert.alert(
+    showAlert(
       "👋 See you later!",
       "Are you sure you want to log out?",
       [
@@ -71,7 +71,7 @@ export default function ChildSettings() {
   };
 
   const handleChangePassword = () => {
-    Alert.alert(
+    showAlert(
       "🔐 Change Password",
       "Would you like to set a new password?",
       [
@@ -83,7 +83,7 @@ export default function ChildSettings() {
 
   // Avatar upload handlers
   const handleAvatarPress = () => {
-    Alert.alert(
+    showAlert(
       "📸 Update Your Photo",
       "How would you like to update your profile picture?",
       [
@@ -98,7 +98,7 @@ export default function ChildSettings() {
   const openImageLibrary = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission Needed", "Please allow photo access to change your picture!");
+      showAlert("Permission Needed", "Please allow photo access to change your picture!");
       return;
     }
 
@@ -117,7 +117,7 @@ export default function ChildSettings() {
   const openCamera = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert("Permission Needed", "Please allow camera access to take a photo!");
+      showAlert("Permission Needed", "Please allow camera access to take a photo!");
       return;
     }
 
@@ -159,10 +159,10 @@ export default function ChildSettings() {
       if (!res.ok) throw new Error("Upload failed");
 
       await refreshProfile();
-      Alert.alert("🎉 Awesome!", "Your new photo looks great!");
+      showAlert("🎉 Awesome!", "Your new photo looks great!");
     } catch (err: any) {
       console.error("Avatar upload failed", err);
-      Alert.alert("Oops!", "Couldn't update your photo. Try again!");
+      showAlert("Oops!", "Couldn't update your photo. Try again!");
     } finally {
       setUploading(false);
     }
@@ -178,9 +178,9 @@ export default function ChildSettings() {
       });
       if (!res.ok) throw new Error("Failed to remove");
       await refreshProfile();
-      Alert.alert("Done!", "Photo removed");
+      showAlert("Done!", "Photo removed");
     } catch (err) {
-      Alert.alert("Oops!", "Couldn't remove photo");
+      showAlert("Oops!", "Couldn't remove photo");
     } finally {
       setUploading(false);
     }
@@ -246,21 +246,21 @@ export default function ChildSettings() {
           icon: "notifications",
           label: "Notifications",
           description: "Manage your alerts",
-          onPress: () => Alert.alert("Coming Soon!", "Notification settings will be here soon! 🔔"),
+          onPress: () => showAlert("Coming Soon!", "Notification settings will be here soon! 🔔"),
           gradient: ["#ffecd2", "#fcb69f"],
         },
         {
           icon: "help-circle",
           label: "Help & Support",
           description: "Get help when you need it",
-          onPress: () => Alert.alert("Need Help? 💬", "Ask your parent or guardian for help, or check the FAQ in the app!"),
+          onPress: () => showAlert("Need Help? 💬", "Ask your parent or guardian for help, or check the FAQ in the app!"),
           gradient: ["#a1c4fd", "#c2e9fb"],
         },
         {
           icon: "information-circle",
           label: "About Kivelo",
           description: "Learn about this app",
-          onPress: () => Alert.alert(
+          onPress: () => showAlert(
             "🌟 Kivelo Family Wellness",
             "Version 1.0.0\n\nHelping families stay connected and happy together!\n\n© 2025 MrDOF"
           ),
@@ -329,7 +329,7 @@ export default function ChildSettings() {
                 activeOpacity={0.7}
               >
                 <LinearGradient
-                  colors={item.gradient}
+                  colors={item.gradient as [string, string]}
                   style={styles.iconGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}

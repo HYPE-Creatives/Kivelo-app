@@ -1,0 +1,150 @@
+﻿// app/(dashboard)/parent/family.tsx - Enhanced Family Management with Inline Child Details
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  RefreshControl,
+  Alert,
+  Modal,
+  TextInput,
+  ActivityIndicator,
+  Dimensions,
+  Image,
+  Platform,
+} from "react-native";
+import { showAlert } from '@/utils/showAlert';
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import * as ImagePicker from "expo-image-picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useParent, Child, JournalEntry, MoodEntry } from "../../../context/ParentContext";
+import { useAuth } from "../../../context/AuthContext";
+
+const { width } = Dimensions.get("window");
+const API_BASE = "https://family-wellness.onrender.com/api/v1";
+
+
+export default function FamilyManagement() {
+  const { user, generateOneTimeCode, resetChildPassword } = useAuth();
+  const {
+    children,
+    loading,
+    getChildren,
+    getChildMoodSummary,
+    getChildMoodHistory,
+    getChildJournals,
+  } = useParent();
+
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [expandedChild, setExpandedChild] = useState<string | null>(null);
+  const [showAddChildModal, setShowAddChildModal] = useState(false);
+  const [resettingCode, setResettingCode] = useState<string | null>(null);
+
+  // Family state
+  const [familyData, setFamilyData] = useState<FamilyData | null>(null);
+  const [uploadingFamilyPhoto, setUploadingFamilyPhoto] = useState(false);
+
+  // Add child form state
+  const [newChildName, setNewChildName] = useState("");
+  const [newChildEmail, setNewChildEmail] = useState("");
+  const [newChildDOB, setNewChildDOB] = useState("");
+  const [newChildGender, setNewChildGender] = useState("");
+  const [isAddingChild, setIsAddingChild] = useState(false);
+  const [generatedCode, setGeneratedCode] = useState("");
+
+  useEffect(() => {
+    loadFamilyData();
+    loadChildren();
+  }, []);
+
+  // Load family data
+  const loadFamilyData = async () => {
+    try {
+      const token = await AsyncStorage.getItem("kivelo_access_token");
+      if (!token) return;
+
+      const res = await fetch(`${API_BASE}/families/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.family) {
+          setFamilyData(data.family);
+        }
+      }
+    } catch (err) {
+      console.log("Could not load family data:", err);
+    }
+  };
+
+  // Upload/Update family photo
+  const handleUpdateFamilyPhoto = async () => {
+    if (!familyData?._id) {
+      showAlert("No Family", "Family data not available yet");
+      return;
+    }
+
+    showAlert("Update Family Photo", "Choose how to update your family photo", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "ðŸ“· Camera",
+        onPress: async () => {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== "granted") {
+            showAlert("Permission required", "Please allow camera access in settings");
+            return;
+          }
+          const result = await ImagePicker.launchCameraAsync({
+            quality: 0.7,
+            allowsEditing: true,
+            aspect: [16, 9],
+          });
+          if (!result.canceled && result.assets?.[0]) {
+            await uploadFamilyPhoto(result.assets[0].uri);
+          }
+        },
+      },
+      {
+        text: "ðŸ–¼ï¸ Gallery",
+        onPress: async () => {
+          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (status !== "granted") {
+            showAlert("Permission required", "Please allow photo access in settings");
+            return;
+          }
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            quality: 0.7,
+            allowsEditing: true,
+            aspect: [16, 9],
+          });
+          if (!result.canceled && result.assets?.[0]) {
+            await uploadFamilyPhoto(result.assets[0].uri);
+          }
+        },
+      },
+    ]);
+  };
+
+  const [refreshing, setRefreshing] = useState(false);
+  const [childrenDetails, setChildrenDetails] = useState<ChildWithFullDetails[]>([]);
+  const [newChildDOB, setNewChildDOB] = useState("");
+  const [newChildGender, setNewChildGender] = useState("");
+  const [isAddingChild, setIsAddingChild] = useState(false);
+  const [generatedCode, setGeneratedCode] = useState("");
+
+  useEffect(() => {
+    loadFamilyData();
+    loadChildren();
+  }, []);
+
+  // Load family data
+  const loadFamilyData = async () =

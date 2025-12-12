@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
-  Alert,
   Modal,
   TextInput,
   ActivityIndicator,
@@ -15,6 +14,7 @@ import {
   Image,
   Platform,
 } from "react-native";
+import { showAlert } from '@/utils/showAlert';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -132,18 +132,18 @@ export default function FamilyManagement() {
   // Upload/Update family photo
   const handleUpdateFamilyPhoto = async () => {
     if (!familyData?._id) {
-      Alert.alert("No Family", "Family data not available yet");
+      showAlert("No Family", "Family data not available yet");
       return;
     }
 
-    Alert.alert("Update Family Photo", "Choose how to update your family photo", [
+    showAlert("Update Family Photo", "Choose how to update your family photo", [
       { text: "Cancel", style: "cancel" },
       {
         text: "📷 Camera",
         onPress: async () => {
           const { status } = await ImagePicker.requestCameraPermissionsAsync();
           if (status !== "granted") {
-            Alert.alert("Permission required", "Please allow camera access in settings");
+            showAlert("Permission required", "Please allow camera access in settings");
             return;
           }
           const result = await ImagePicker.launchCameraAsync({
@@ -161,7 +161,7 @@ export default function FamilyManagement() {
         onPress: async () => {
           const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
           if (status !== "granted") {
-            Alert.alert("Permission required", "Please allow photo access in settings");
+            showAlert("Permission required", "Please allow photo access in settings");
             return;
           }
           const result = await ImagePicker.launchImageLibraryAsync({
@@ -212,10 +212,10 @@ export default function FamilyManagement() {
 
       const updated = await res.json();
       setFamilyData(updated);
-      Alert.alert("Success! 🎉", "Family photo updated");
+      showAlert("Success! 🎉", "Family photo updated");
     } catch (err: any) {
       console.error("Family photo upload failed", err);
-      Alert.alert("Upload failed", err.message || "Could not upload photo");
+      showAlert("Upload failed", err.message || "Could not upload photo");
     } finally {
       setUploadingFamilyPhoto(false);
     }
@@ -292,7 +292,7 @@ export default function FamilyManagement() {
   };
 
   const handleResetCode = async (childEmail: string, childId: string) => {
-    Alert.alert("Generate New Code", "Create a new one-time login code for this child?", [
+    showAlert("Generate New Code", "Create a new one-time login code for this child?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Generate",
@@ -301,16 +301,16 @@ export default function FamilyManagement() {
           try {
             const result = await resetChildPassword(user?.id || "", childEmail);
             if (result.success && result.code) {
-              Alert.alert(
+              showAlert(
                 "Code Generated! 🎉",
                 `New code: ${result.code}\n\nThis code expires in 1 hour.`
               );
               await loadChildren();
             } else {
-              Alert.alert("Error", result.message || "Failed to generate code");
+              showAlert("Error", result.message || "Failed to generate code");
             }
           } catch (error: any) {
-            Alert.alert("Error", error.message || "Something went wrong");
+            showAlert("Error", error.message || "Something went wrong");
           } finally {
             setResettingCode(null);
           }
@@ -321,13 +321,13 @@ export default function FamilyManagement() {
 
   const handleAddChild = async () => {
     if (!newChildName.trim() || !newChildEmail.trim() || !newChildDOB.trim()) {
-      Alert.alert("Missing Info", "Please fill in Name, Email, and Date of Birth");
+      showAlert("Missing Info", "Please fill in Name, Email, and Date of Birth");
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(newChildEmail.trim())) {
-      Alert.alert("Invalid Email", "Please enter a valid email address");
+      showAlert("Invalid Email", "Please enter a valid email address");
       return;
     }
 
@@ -343,7 +343,7 @@ export default function FamilyManagement() {
 
       if (result.success && result.code) {
         setGeneratedCode(result.code);
-        Alert.alert(
+        showAlert(
           "Child Registered! 🎉",
           `One-time code for ${newChildName}:\n\n${result.code}\n\nShare this code with your child. It expires in 1 hour.`,
           [
@@ -361,10 +361,10 @@ export default function FamilyManagement() {
           ]
         );
       } else {
-        Alert.alert("Error", result.message || "Failed to register child");
+        showAlert("Error", result.message || "Failed to register child");
       }
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Something went wrong");
+      showAlert("Error", error.message || "Something went wrong");
     } finally {
       setIsAddingChild(false);
     }
@@ -486,7 +486,7 @@ export default function FamilyManagement() {
               </Text>
             </View>
             <TouchableOpacity
-              onPress={() => Alert.alert("Copied!", "Family code copied to clipboard")}
+              onPress={() => showAlert("Copied!", "Family code copied to clipboard")}
             >
               <Ionicons name="copy-outline" size={18} color="#7C3AED" />
             </TouchableOpacity>
@@ -859,12 +859,12 @@ export default function FamilyManagement() {
                         <TouchableOpacity
                           style={[styles.actionBtn, styles.dangerBtn]}
                           onPress={() =>
-                            Alert.alert("Remove Child", "Are you sure you want to remove this child?", [
+                            showAlert("Remove Child", "Are you sure you want to remove this child?", [
                               { text: "Cancel", style: "cancel" },
                               {
                                 text: "Remove",
                                 style: "destructive",
-                                onPress: () => Alert.alert("Coming Soon", "This feature will be available soon"),
+                                onPress: () => showAlert("Coming Soon", "This feature will be available soon"),
                               },
                             ])
                           }

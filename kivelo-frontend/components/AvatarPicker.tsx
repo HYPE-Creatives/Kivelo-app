@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, Image, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { showAlert } from '@/utils/showAlert';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,7 +20,7 @@ export default function AvatarPicker({ size = 84 }: Props) {
   const openImageLibrary = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission required', 'Please allow photo access in settings');
+      showAlert('Permission required', 'Please allow photo access in settings');
       return;
     }
 
@@ -38,7 +39,7 @@ export default function AvatarPicker({ size = 84 }: Props) {
   const openCamera = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission required', 'Please allow camera access in settings');
+      showAlert('Permission required', 'Please allow camera access in settings');
       return;
     }
 
@@ -88,17 +89,17 @@ export default function AvatarPicker({ size = 84 }: Props) {
         // fallback: ignore
       }
 
-      Alert.alert('Success', 'Avatar updated');
+      showAlert('Success', 'Avatar updated');
     } catch (err: any) {
       console.error('Avatar upload failed', err);
-      Alert.alert('Upload failed', err.message || 'Could not upload avatar');
+      showAlert('Upload failed', err.message || 'Could not upload avatar');
     } finally {
       setUploading(false);
     }
   };
 
   const handleRemove = async () => {
-    Alert.alert('Remove photo', 'Are you sure you want to remove your profile photo?', [
+    showAlert('Remove photo', 'Are you sure you want to remove your profile photo?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Remove', style: 'destructive', onPress: async () => {
         try {
@@ -110,10 +111,10 @@ export default function AvatarPicker({ size = 84 }: Props) {
           });
           if (!res.ok) throw new Error('Failed to remove avatar');
           await refreshProfile();
-          Alert.alert('Removed', 'Profile photo removed');
+          showAlert('Removed', 'Profile photo removed');
         } catch (err: any) {
           console.error('Remove avatar failed', err);
-          Alert.alert('Failed', err.message || 'Could not remove avatar');
+          showAlert('Failed', err.message || 'Could not remove avatar');
         } finally {
           setUploading(false);
         }

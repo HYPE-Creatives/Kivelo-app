@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { showAlert } from '@/utils/showAlert';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../../../context/AuthContext';
@@ -17,7 +18,7 @@ export default function ChildProfileEdit() {
 
   const handleSave = async () => {
     if (!name || !email) {
-      Alert.alert('Validation', 'Please enter both name and email.');
+      showAlert('Validation', 'Please enter both name and email.');
       return;
     }
 
@@ -44,11 +45,11 @@ export default function ChildProfileEdit() {
 
       try { await refreshProfile(); } catch { /* ignore */ }
 
-      Alert.alert('Success', 'Profile updated');
+      showAlert('Success', 'Profile updated');
       router.back();
     } catch (err: any) {
       console.error('Profile update failed', err);
-      Alert.alert('Error', err.message || 'Could not update profile');
+      showAlert('Error', err.message || 'Could not update profile');
     } finally {
       setSaving(false);
     }

@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import {
   View,
-  Alert,
   StyleSheet,
   TouchableOpacity,
   KeyboardAvoidingView,
@@ -11,6 +10,7 @@ import {
   Image,
   Dimensions,
 } from "react-native";
+import { showAlert } from '@/utils/showAlert';
 import { TextInput as PaperTextInput, Button } from "react-native-paper";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
@@ -62,7 +62,7 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     const validationError = validateForm();
     if (validationError) {
-      Alert.alert("Oops!", validationError);
+      showAlert("Oops!", validationError);
       return;
     }
 
@@ -85,14 +85,14 @@ export default function LoginScreen() {
         console.log("✅ Login successful");
         // Navigation handled by AuthContext
       } else {
-        Alert.alert(
+        showAlert(
           userType === "child" ? "Oops! 😅" : "Login Failed", 
           result.message || "Invalid credentials"
         );
       }
     } catch (err: any) {
       console.error("Login Error:", err);
-      Alert.alert("Error", "Something went wrong while logging in");
+      showAlert("Error", "Something went wrong while logging in");
     }
   };
 

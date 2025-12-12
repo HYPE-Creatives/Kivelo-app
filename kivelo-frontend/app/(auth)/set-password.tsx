@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from "react";
 import { 
   View, 
-  Alert, 
   StyleSheet, 
   TouchableOpacity, 
   KeyboardAvoidingView, 
@@ -10,6 +9,7 @@ import {
   ScrollView,
   ActivityIndicator // ✅ ADD THIS IMPORT
 } from "react-native";
+import { showAlert } from '@/utils/showAlert';
 import { TextInput, Button, Text } from "react-native-paper";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
@@ -27,31 +27,31 @@ export default function SetPasswordScreen() {
   useEffect(() => {
     if (user && user.role === "child" && user.hasSetPassword) {
       // Child already has password set, redirect to dashboard
-      router.replace("/(dashboard)/child");
+      router.replace("/(dashboard)/child" as any);
     } else if (user && user.role !== "child") {
       // Not a child user, redirect to appropriate dashboard
-      router.replace("/(dashboard)/parent");
+      router.replace("/(dashboard)/parent" as any);
     }
   }, [user, router]);
 
   const handleSetPassword = async () => {
     if (!password.trim() || !confirmPassword.trim()) {
-      Alert.alert("Error", "Please fill in all fields");
+      showAlert("Error", "Please fill in all fields");
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert("Error", "Password must be at least 6 characters long");
+      showAlert("Error", "Password must be at least 6 characters long");
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert("Error", "Passwords do not match");
+      showAlert("Error", "Passwords do not match");
       return;
     }
 
     if (!user?.id) {
-      Alert.alert("Error", "User not found. Please login again.");
+      showAlert("Error", "User not found. Please login again.");
       return;
     }
 
@@ -69,22 +69,22 @@ export default function SetPasswordScreen() {
       const result = await setChildPassword(user.id, password);
 
       if (result.success) {
-        Alert.alert(
+        showAlert(
           "Success", 
           "Password set successfully! You can now login with your email and password.",
           [
             {
               text: "Go to Dashboard",
-              onPress: () => router.replace("/(dashboard)/child")
+              onPress: () => router.replace("/(dashboard)/child" as any)
             }
           ]
         );
       } else {
-        Alert.alert("Error", result.message || "Failed to set password");
+        showAlert("Error", result.message || "Failed to set password");
       }
     } catch (error: any) {
       console.error("Set password error:", error);
-      Alert.alert("Error", "Failed to set password. Please try again.");
+      showAlert("Error", "Failed to set password. Please try again.");
     } finally {
       setIsSetting(false);
     }

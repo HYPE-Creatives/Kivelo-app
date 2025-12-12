@@ -4,6 +4,7 @@ import { useActivity } from "../../../context/ActivityContext";
 import { useGamification } from "../../../context/GamificationContext";
 import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
+import { showAlert } from '@/utils/showAlert';
 
 const CATEGORY_COLORS = {
   education: '#3B82F6',
@@ -46,9 +47,9 @@ export default function ActivitiesScreen() {
               setCompleting(activityId);
               await completeActivity(activityId);
               await refreshStats(); // Update points/streak
-              Alert.alert("Success!", "Activity completed! Points earned! 🎉");
+              showAlert("Success!", "Activity completed! Points earned! 🎉");
             } catch {
-              Alert.alert("Error", "Failed to complete activity");
+              showAlert("Error", "Failed to complete activity");
             } finally {
               setCompleting(null);
             }

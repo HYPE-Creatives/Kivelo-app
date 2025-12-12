@@ -1,5 +1,6 @@
 // app/(dashboard)/child/games.tsx
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from "react-native";
+import { showAlert } from '@/utils/showAlert';
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
@@ -134,14 +135,14 @@ export default function Games() {
       // Navigate to the game
       router.push(`/(dashboard)/child/${game.route}` as any);
     } else {
-      Alert.alert(
+      showAlert(
         game.title,
         `${game.description}\n\nDifficulty: ${game.difficulty}\nAge: ${game.ageRange}`,
         [
           { text: "Cancel", style: "cancel" },
           { 
             text: "Coming Soon!", 
-            onPress: () => Alert.alert("🎮 Coming Soon!", "This game will be available in the next update!")
+            onPress: () => showAlert("🎮 Coming Soon!", "This game will be available in the next update!")
           }
         ]
       );

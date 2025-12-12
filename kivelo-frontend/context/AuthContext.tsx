@@ -203,6 +203,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userData = data.data?.user || data.user;
       if (!userData) return { success: false, message: 'Invalid user data' };
 
+      // familyCode and subscription come at root level for parents from profile endpoint
+      const parentData = userData.role === 'parent' ? {
+        familyCode: userData.familyCode || userData.parent?.familyCode || '',
+        subscription: userData.subscription || userData.parent?.subscription || 'free',
+      } : userData.parent;
+
       const finalUser: User = {
         id: userData._id || userData.id,
         role: userData.role,
@@ -211,7 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         phone: userData.phone,
         dob: userData.dob,
         children: userData.children,
-        parent: userData.parent,
+        parent: parentData,
         childDetails: userData.childDetails,
         hasSetPassword: userData.hasSetPassword,
         avatar: userData.avatar,
@@ -251,6 +257,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // hasSetPassword comes from roleData (at data level), not inside user object
         const hasSetPassword = data.data?.hasSetPassword ?? userData.hasSetPassword ?? true;
+        
+        // familyCode and subscription come from roleData (at data level) for parents
+        const parentData = userData.role === 'parent' ? {
+          familyCode: data.data?.familyCode || userData.parent?.familyCode || '',
+          subscription: data.data?.subscription || userData.parent?.subscription || 'free',
+        } : userData.parent;
 
         const finalUser: User = {
           id: userData._id || userData.id,
@@ -260,7 +272,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           phone: userData.phone,
           dob: userData.dob,
           children: userData.children,
-          parent: userData.parent,
+          parent: parentData,
           childDetails: userData.childDetails,
           hasSetPassword: hasSetPassword,
           avatar: userData.avatar,

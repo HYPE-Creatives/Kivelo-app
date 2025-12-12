@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ScrollView,
   TextInput,
-  Alert,
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
@@ -15,6 +14,7 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
 } from "react-native";
+import { showAlert } from '@/utils/showAlert';
 import { useMood, MoodCheckin } from "@/context/MoodContext";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from 'expo-image-picker';
@@ -79,7 +79,7 @@ export default function MoodCheck() {
 
   const handleSubmitMood = async () => {
     if (!selectedMood) {
-      Alert.alert("Select a Mood", "Please select how you are feeling today!");
+      showAlert("Select a Mood", "Please select how you are feeling today!");
       return;
     }
 
@@ -104,7 +104,7 @@ export default function MoodCheck() {
       const result = await submitMood(moodData);
 
       if (result.success) {
-        Alert.alert(
+        showAlert(
           '✅ Mood Recorded!',
           `Thanks for sharing! You earned 10 points! 🎉`,
           [{ text: 'OK', onPress: () => {
@@ -114,11 +114,11 @@ export default function MoodCheck() {
           }}]
         );
       } else {
-        Alert.alert('Error', result.message || 'Failed to record mood');
+        showAlert('Error', result.message || 'Failed to record mood');
       }
     } catch (error: any) {
       console.error('Submit mood error:', error);
-      Alert.alert('Error', 'Failed to record mood. Please try again.');
+      showAlert('Error', 'Failed to record mood. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

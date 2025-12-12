@@ -5,13 +5,13 @@ import {
   View, 
   Text, 
   TextInput, 
-  Alert, 
   StyleSheet, 
   TouchableOpacity, 
   ScrollView,
   KeyboardAvoidingView,
   Platform 
 } from "react-native";
+import { showAlert } from '@/utils/showAlert';
 import * as Clipboard from "expo-clipboard";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "expo-router";
@@ -36,26 +36,26 @@ export default function Settings() {
         hasEmail: !!childEmail, 
         hasDOB: !!childDOB
       });
-      Alert.alert("Error", "Please fill in all child information fields.");
+      showAlert("Error", "Please fill in all child information fields.");
       return;
     }
 
     if (!user?.id) {
-      Alert.alert("Error", "User not found. Please log in again.");
+      showAlert("Error", "User not found. Please log in again.");
       return;
     }
 
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(childEmail)) {
-      Alert.alert("Error", "Please enter a valid email address for your child.");
+      showAlert("Error", "Please enter a valid email address for your child.");
       return;
     }
 
     // Date validation (basic)
     const dobRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!dobRegex.test(childDOB)) {
-      Alert.alert("Error", "Please enter date of birth in YYYY-MM-DD format.");
+      showAlert("Error", "Please enter date of birth in YYYY-MM-DD format.");
       return;
     }
 
@@ -72,7 +72,7 @@ export default function Settings() {
       if (result.success && result.code) {
         setGeneratedCode(result.code);
 
-        Alert.alert(
+        showAlert(
           "Success", 
           `One-time code generated for ${childName}!\n\nCode: ${result.code}\n\nShare this code with your child.`,
           [
@@ -80,7 +80,7 @@ export default function Settings() {
               text: "Copy Code", 
               onPress: () => {
                 Clipboard.setStringAsync(result.code!);
-                Alert.alert("Copied!", "Code copied to clipboard.");
+                showAlert("Copied!", "Code copied to clipboard.");
               } 
             },
             { text: "OK", style: "cancel" }
@@ -93,11 +93,11 @@ export default function Settings() {
         setChildDOB("");
         setChildGender("");
       } else {
-        Alert.alert("Error", result.message || "Failed to generate code. Please try again.");
+        showAlert("Error", result.message || "Failed to generate code. Please try again.");
       }
     } catch (error: any) {
       console.error("Generate code error:", error);
-      Alert.alert("Error", error.message || "Failed to generate code. Please check your connection.");
+      showAlert("Error", error.message || "Failed to generate code. Please check your connection.");
     } finally {
       setIsGenerating(false);
     }
@@ -105,19 +105,19 @@ export default function Settings() {
 
   const handleResetPassword = async () => {
     if (!resetChildEmail) {
-      Alert.alert("Error", "Please enter the child's email address.");
+      showAlert("Error", "Please enter the child's email address.");
       return;
     }
 
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(resetChildEmail)) {
-      Alert.alert("Error", "Please enter a valid email address.");
+      showAlert("Error", "Please enter a valid email address.");
       return;
     }
 
     if (!user?.id) {
-      Alert.alert("Error", "User not found. Please log in again.");
+      showAlert("Error", "User not found. Please log in again.");
       return;
     }
 
@@ -126,7 +126,7 @@ export default function Settings() {
       const result = await resetChildPassword(user.id, resetChildEmail);
       
       if (result.success) {
-        Alert.alert(
+        showAlert(
           "Success", 
           result.message || "Password reset initiated successfully. Your child will receive a new one-time code.",
           result.code ? [
@@ -134,7 +134,7 @@ export default function Settings() {
               text: "Copy Code", 
               onPress: () => {
                 Clipboard.setStringAsync(result.code!);
-                Alert.alert("Copied!", "Code copied to clipboard.");
+                showAlert("Copied!", "Code copied to clipboard.");
               } 
             },
             { text: "OK", style: "cancel" }
@@ -145,18 +145,18 @@ export default function Settings() {
           setGeneratedCode(result.code);
         }
       } else {
-        Alert.alert("Error", result.message || "Failed to reset password. Please check the email address.");
+        showAlert("Error", result.message || "Failed to reset password. Please check the email address.");
       }
     } catch (error: any) {
       console.error("Reset password error:", error);
-      Alert.alert("Error", error.message || "Failed to reset password. Please check your connection.");
+      showAlert("Error", error.message || "Failed to reset password. Please check your connection.");
     } finally {
       setIsResetting(false);
     }
   };
 
   const handleLogout = async () => {
-    Alert.alert(
+    showAlert(
       "Logout",
       "Are you sure you want to logout?",
       [
@@ -176,7 +176,7 @@ export default function Settings() {
   // handleUpdateEmail removed; 'Edit Profile' uses dedicated screen
 
   const handleChangePassword = () => {
-    Alert.alert("Coming Soon", "Password change feature will be available soon.");
+    showAlert("Coming Soon", "Password change feature will be available soon.");
   };
 
   const handleManageFamily = () => {
@@ -328,7 +328,7 @@ export default function Settings() {
               style={styles.copyButton}
               onPress={() => {
                 Clipboard.setStringAsync(generatedCode);
-                Alert.alert("Copied!", "One-time code copied to clipboard.");
+                showAlert("Copied!", "One-time code copied to clipboard.");
               }}
             >
               <Text style={styles.copyButtonText}>📋 Copy Code</Text>

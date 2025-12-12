@@ -5,9 +5,9 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   ActivityIndicator,
 } from "react-native";
+import { showAlert } from '@/utils/showAlert';
 import {
   TextInput,
   Button,
@@ -75,27 +75,27 @@ export default function Register() {
   const handleRegister = async () => {
     // Basic validation
     if (!name.trim() || !email.trim() || !password || !phone.trim()) {
-      Alert.alert("Missing Fields", "Please fill all required fields.");
+      showAlert("Missing Fields", "Please fill all required fields.");
       return;
     }
 
     if (!termsAccepted) {
-      Alert.alert("Terms Required", "You must agree to the Terms & Conditions.");
+      showAlert("Terms Required", "You must agree to the Terms & Conditions.");
       return;
     }
 
     if (!emailValid || !passwordValid) {
-      Alert.alert("Invalid Input", "Please fix email or password format.");
+      showAlert("Invalid Input", "Please fix email or password format.");
       return;
     }
 
     if (!/^\+234[1-9]\d{9}$/.test(phone)) {
-      Alert.alert("Invalid Phone", "Use format: +234XXXXXXXXXX");
+      showAlert("Invalid Phone", "Use format: +234XXXXXXXXXX");
       return;
     }
 
     if (dob && !/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
-      Alert.alert("Invalid DOB", "Use format: YYYY-MM-DD");
+      showAlert("Invalid DOB", "Use format: YYYY-MM-DD");
       return;
     }
 
@@ -106,7 +106,7 @@ export default function Register() {
         password,
         name.trim(),
         phone,
-        dob || null,
+        dob || "",
         true
       );
 
@@ -114,17 +114,17 @@ export default function Register() {
 
       if (result.success) {
         await AsyncStorage.setItem("pending_email", email);
-        Alert.alert(
+        showAlert(
           "Success!",
           "Account created! Check your email for the verification code.",
           [{ text: "OK", onPress: () => router.push("/(auth)/parent-verify-email") }]
         );
       } else {
-        Alert.alert("Registration Failed", result.message || "Please try again.");
+        showAlert("Registration Failed", result.message || "Please try again.");
       }
     } catch (err: any) {
       console.error("Registration error:", err);
-      Alert.alert("Error", "Registration failed. Please try again.");
+      showAlert("Error", "Registration failed. Please try again.");
     }
   };
 

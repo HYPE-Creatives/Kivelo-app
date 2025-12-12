@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import * as Google from 'expo-auth-session/providers/google';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
-import { Alert , Platform } from 'react-native';
+import { Platform } from 'react-native';
+import { showAlert } from '@/utils/showAlert';
 
  
 
@@ -40,14 +41,14 @@ export const useGoogleAuth = (onSuccess: (accessToken: string) => Promise<void>)
           await onSuccess(authentication.accessToken);
         } catch (error) {
           console.error('Google auth error:', error);
-          Alert.alert('Google Login Failed', 'Failed to complete Google login');
+          showAlert('Google Login Failed', 'Failed to complete Google login');
         } finally {
           setLoading(false);
         }
       } else if (response?.type === 'error') {
         setLoading(false);
         console.error('Google auth error:', response.error);
-        Alert.alert(
+        showAlert(
           'Google Login Failed', 
           `Something went wrong: ${response.error?.message || 'Unknown error'}`
         );
@@ -69,7 +70,7 @@ export const useGoogleAuth = (onSuccess: (accessToken: string) => Promise<void>)
     } catch (error) {
       console.error('Google prompt error:', error);
       setLoading(false);
-      Alert.alert('Error', 'Failed to start Google login');
+      showAlert('Error', 'Failed to start Google login');
     }
   };
 
