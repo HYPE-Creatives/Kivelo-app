@@ -210,34 +210,30 @@ router.post("/register-parent", parentRegister);
  * @swagger
  * /api/v1/auth/login:
  *   post:
- *     summary: Login with email and password (Parent or Child)
- *     tags: [Parent Authentication, Child Authentication]
+ *     summary: Parent Login - Email and Password
+ *     tags: [Parent Authentication]
  *     security:
  *       - ApiKeyAuth: []
  *     description: |
- *       Authenticate user with **email and password** and return JWT tokens.
+ *       **Parent-only login endpoint** - Authenticate parent with email and password.
  *       
- *       **Parent Login Flow:**
- *       - Parent enters email + password via Parent login tab
- *       - Must have verified email before login
- *       - Redirected to Parent Dashboard
+ *       ⚠️ **Role Restriction:** This form is for PARENTS ONLY.
+ *       - If a child account tries to use this form, they will receive an error: "This account belongs to a child. Please use the Child login tab."
  *       
- *       **Child Login Flow (with password):**
- *       - Child enters email + password via Child login tab (after setting password via `/set-child-password`)
- *       - For first-time login, use `/child-login` with one-time code instead
- *       - Redirected to Child Dashboard
+ *       **Login Flow:**
+ *       1. Parent enters email + password via Parent login tab
+ *       2. Backend validates credentials and returns user with `role: "parent"`
+ *       3. Frontend validates role matches expected "parent"
+ *       4. Parent is redirected to Parent Dashboard
  *       
- *       **Frontend Role Validation:**
- *       The mobile/web app enforces role-based login forms:
- *       - Parent login tab only allows parent accounts
- *       - Child login tab only allows child accounts
- *       - If a user tries to login with the wrong form, they get a friendly message to use the correct tab
+ *       **Requirements:**
+ *       - Email must be verified before login
+ *       - Account must be active
  *       
- *       Returns:
- *       - **accessToken** in JSON  
- *       - **refreshToken** stored **automatically in secure cookie**  
- *       
- *       **NOTE:** No refreshToken is ever exposed to client JS.
+ *       **Returns:**
+ *       - `accessToken` in JSON response
+ *       - `refreshToken` stored in secure HTTP-only cookie
+ *       - Parent-specific data: `familyCode`, `subscription`
  *     requestBody:
  *       required: true
  *       content:
@@ -252,24 +248,21 @@ router.post("/register-parent", parentRegister);
  *                 type: string
  *                 format: email
  *                 example: "parent@example.com"
+ *                 description: "Parent's registered email address"
  *               password:
  *                 type: string
  *                 format: password
- *                 example: "password123"
+ *                 example: "Password123"
+ *                 description: "Parent's password"
  *           examples:
  *             parentLogin:
- *               summary: Parent login
+ *               summary: Parent login example
  *               value:
  *                 email: "parent@example.com"
  *                 password: "Password123"
- *             childLogin:
- *               summary: Child login
- *               value:
- *                 email: "child@example.com"
- *                 password: "childpassword123"
  *     responses:
  *       200:
- *         description: Login successful
+ *         description: Parent login successful
  *         content:
  *           application/json:
  *             schema:
@@ -283,27 +276,114 @@ router.post("/register-parent", parentRegister);
  *                   example: "Login successful"
  *                 accessToken:
  *                   type: string
- *                 refreshToken:
- *                   type: string
+ *                   description: "JWT access token for API requests"
  *                 data:
  *                   type: object
  *                   properties:
  *                     user:
  *                       type: object
+ *                       properties:
+ *                         _id:
+ *                           type: string
+ *                         email:
+ *                           type: string
+ *                         name:
+ *                           type: string
+ *                         role:
+ *                           type: string
+ *                           example: "parent"
  *                     familyCode:
  *                       type: string
+ *                       example: "FAM-ABC123"
+ *                       description: "Unique family code for adding children"
  *                     subscription:
  *                       type: string
- *                     hasSetPassword:
- *                       type: boolean
- *                     parentId:
- *                       type: string
+ *                       example: "free"
+ *                       description: "Parent's subscription tier"
  *       400:
  *         description: Missing email or password
  *       401:
  *         description: Invalid credentials
  *       403:
- *         description: Account not verified or deactivated
+ *         description: Account not verified, deactivated, or wrong role
+ *         content:
+ *           application/json:
+ *             examples:
+ *               notVerified:
+ *                 summary: Email not verified
+ *                 value:
+ *                   success: false
+ *                   message: "Your account is not verified. A new verification code has been sent to your email."
+ *                   needsVerification: true
+ *                   email: "parent@example.com"
+ *               wrongRole:
+ *                 summary: Child trying to use parent login (frontend validation)
+ *                 value:
+ *                   success: false
+ *                   message: "This account belongs to a child. Please use the Child login tab."
+ *       500:
+ *         description: Server error during login
+ */
+
+/**
+ * @swagger
+ * /api/v1/auth/login:
+ *   post:
+ *     summary: Child Login - Email and Password (after password set)
+ *     tags: [Child Authentication]
+ *     security:
+ *       - ApiKeyAuth: []
+ *     description: |
+ *       **Child login with password** - For children who have already set their password.
+ *       
+ *       ⚠️ **Role Restriction:** This form is for CHILDREN ONLY.
+ *       - If a parent account tries to use this form, they will receive an error: "This account belongs to a parent. Please use the Parent login tab."
+ *       
+ *       **When to use this endpoint:**
+ *       - Child has previously logged in with one-time code and set their password
+ *       - Child knows their email and password
+ *       
+ *       **For first-time child login:** Use `/api/v1/auth/child-login` with one-time code instead.
+ *       
+ *       **Login Flow:**
+ *       1. Child enters email + password via Child login tab (password method)
+ *       2. Backend validates credentials and returns user with `role: "child"`
+ *       3. Frontend validates role matches expected "child"
+ *       4. Child is redirected to Child Dashboard
+ *       
+ *       **Returns:**
+ *       - `accessToken` in JSON response
+ *       - `refreshToken` stored in secure HTTP-only cookie
+ *       - Child-specific data: `hasSetPassword`, `parentId`
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "child@example.com"
+ *                 description: "Child's registered email address"
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 example: "childpassword123"
+ *                 description: "Child's password (set after first login)"
+ *           examples:
+ *             childLogin:
+ *               summary: Child login with password
+ *               value:
+ *                 email: "child@example.com"
+ *                 password: "childpassword123"
+ *     responses:
+ *       200:
+ *         description: Child login successful
  *         content:
  *           application/json:
  *             schema:
@@ -311,14 +391,49 @@ router.post("/register-parent", parentRegister);
  *               properties:
  *                 success:
  *                   type: boolean
- *                   example: false
+ *                   example: true
  *                 message:
  *                   type: string
- *                 needsVerification:
- *                   type: boolean
- *                   example: true
- *                 email:
+ *                   example: "Login successful"
+ *                 accessToken:
  *                   type: string
+ *                   description: "JWT access token for API requests"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       type: object
+ *                       properties:
+ *                         _id:
+ *                           type: string
+ *                         email:
+ *                           type: string
+ *                         name:
+ *                           type: string
+ *                         role:
+ *                           type: string
+ *                           example: "child"
+ *                     hasSetPassword:
+ *                       type: boolean
+ *                       example: true
+ *                       description: "Indicates child has set their password"
+ *                     parentId:
+ *                       type: string
+ *                       description: "Reference to parent's ID"
+ *       400:
+ *         description: Missing email or password
+ *       401:
+ *         description: Invalid credentials
+ *       403:
+ *         description: Account deactivated or wrong role
+ *         content:
+ *           application/json:
+ *             examples:
+ *               wrongRole:
+ *                 summary: Parent trying to use child login (frontend validation)
+ *                 value:
+ *                   success: false
+ *                   message: "This account belongs to a parent. Please use the Parent login tab."
  *       500:
  *         description: Server error during login
  */
