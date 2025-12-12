@@ -6,6 +6,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { View, ActivityIndicator } from "react-native";
 import "./global.css";
 import { AuthProvider } from "../context/AuthContext";
+import { AlertProvider } from "../components/AlertProvider";
 
 // Create a typed alias so TypeScript treats View as a valid JSX component
 const RNView = View as unknown as React.ComponentType<any>;
@@ -40,9 +41,11 @@ function RootContent() {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <RootContent />
-      </AuthProvider>
+      <AlertProvider>
+        <AuthProvider>
+          <RootContent />
+        </AuthProvider>
+      </AlertProvider>
     </SafeAreaProvider>
   );
 }
