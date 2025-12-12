@@ -9,18 +9,25 @@ import {
   ScrollView,
   Text,
   Image,
+  Dimensions,
 } from "react-native";
 import { TextInput as PaperTextInput, Button } from "react-native-paper";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 
-type LoginMode = "password" | "oneTimeCode";
+const { width } = Dimensions.get("window");
+
+type UserType = "parent" | "child";
+type ChildLoginMethod = "password" | "code";
 
 export default function LoginScreen() {
   const router = useRouter();
   const { login, loginWithOneTimeCode, isLoading } = useAuth();
   
-  const [mode, setMode] = useState<LoginMode>("password");
+  const [userType, setUserType] = useState<UserType>("parent");
+  const [childLoginMethod, setChildLoginMethod] = useState<ChildLoginMethod>("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
@@ -36,12 +43,17 @@ export default function LoginScreen() {
       return "Please enter a valid email";
     }
 
-    if (mode === "password" && !password) {
+    if (userType === "parent" && !password) {
       return "Password is required";
     }
 
-    if (mode === "oneTimeCode" && !code) {
-      return "One-time code is required";
+    if (userType === "child") {
+      if (childLoginMethod === "password" && !password) {
+        return "Password is required";
+      }
+      if (childLoginMethod === "code" && !code) {
+        return "Login code is required";
+      }
     }
 
     return null;
@@ -50,24 +62,33 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     const validationError = validateForm();
     if (validationError) {
-      Alert.alert("Error", validationError);
+      Alert.alert("Oops!", validationError);
       return;
     }
 
     try {
       let result;
 
-      if (mode === "password") {
+      if (userType === "parent") {
+        // Parent always uses email + password
         result = await login(email, password);
       } else {
-        result = await loginWithOneTimeCode(email, code);
+        // Child can use either password or code
+        if (childLoginMethod === "password") {
+          result = await login(email, password);
+        } else {
+          result = await loginWithOneTimeCode(email, code);
+        }
       }
 
       if (result.success) {
         console.log("✅ Login successful");
-        // Navigation will happen automatically via AuthContext
+        // Navigation handled by AuthContext
       } else {
-        Alert.alert("Login Failed", result.message || "Invalid credentials");
+        Alert.alert(
+          userType === "child" ? "Oops! 😅" : "Login Failed", 
+          result.message || "Invalid credentials"
+        );
       }
     } catch (err: any) {
       console.error("Login Error:", err);
@@ -84,135 +105,281 @@ export default function LoginScreen() {
   };
 
   const handleForgotPassword = () => {
-    Alert.alert('Forgot Password', 
-      "Parents: Please use your email and password to login.\n\nChildren: Ask your parent to generate a new one-time code."
-    );
+    router.push("/(auth)/forgot-password");
   };
 
-  
+  // Render Parent Login Form
+  const renderParentLogin = () => (
+    <View style={styles.formContainer}>
+      <View style={styles.formHeader}>
+        <Ionicons name="person" size={32} color="#2E8B57" />
+        <Text style={styles.formTitle}>Parent Sign In</Text>
+        <Text style={styles.formSubtitle}>Welcome back! Sign in to manage your family</Text>
+      </View>
+
+      <PaperTextInput
+        label="Email"
+        value={email}
+        onChangeText={setEmail}
+        style={styles.input}
+        autoCapitalize="none"
+        keyboardType="email-address"
+        mode="outlined"
+        outlineColor="#e2e8f0"
+        activeOutlineColor="#2E8B57"
+        left={<PaperTextInput.Icon icon="email" color="#64748b" />}
+      />
+
+      <PaperTextInput
+        label="Password"
+        value={password}
+        onChangeText={setPassword}
+        style={styles.input}
+        secureTextEntry={!showPassword}
+        right={
+          <PaperTextInput.Icon 
+            icon={showPassword ? 'eye-off' : 'eye'} 
+            onPress={() => setShowPassword(!showPassword)} 
+          />
+        }
+        left={<PaperTextInput.Icon icon="lock" color="#64748b" />}
+        mode="outlined"
+        outlineColor="#e2e8f0"
+        activeOutlineColor="#2E8B57"
+      />
+
+      <TouchableOpacity style={styles.forgotPassword} onPress={handleForgotPassword}>
+        <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+      </TouchableOpacity>
+
+      <Button 
+        mode="contained" 
+        onPress={handleLogin} 
+        loading={isLoading}
+        disabled={isLoading}
+        contentStyle={styles.loginButtonContent}
+        style={styles.loginButton}
+        labelStyle={styles.loginButtonLabel}
+      >
+        {isLoading ? "Signing In..." : "Sign In"}
+      </Button>
+
+      <View style={styles.registerContainer}>
+        <Text style={styles.registerText}>Don{"'"}t have an account?</Text>
+        <TouchableOpacity onPress={handleRegisterRedirect}>
+          <Text style={styles.registerLink}> Register</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  // Render Child Login Form
+  const renderChildLogin = () => (
+    <View style={styles.childFormContainer}>
+      <View style={styles.childFormHeader}>
+        <Text style={styles.childWelcomeEmoji}>👋</Text>
+        <Text style={styles.childFormTitle}>Hey there!</Text>
+        <Text style={styles.childFormSubtitle}>Let's get you signed in</Text>
+      </View>
+
+      {/* Child Login Method Toggle */}
+      <View style={styles.childMethodToggle}>
+        <TouchableOpacity 
+          style={[
+            styles.childMethodButton, 
+            childLoginMethod === "password" && styles.childMethodButtonActive
+          ]}
+          onPress={() => setChildLoginMethod("password")}
+        >
+          <Ionicons 
+            name="key" 
+            size={20} 
+            color={childLoginMethod === "password" ? "#fff" : "#8B5CF6"} 
+          />
+          <Text style={[
+            styles.childMethodText,
+            childLoginMethod === "password" && styles.childMethodTextActive
+          ]}>
+            Password
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[
+            styles.childMethodButton, 
+            childLoginMethod === "code" && styles.childMethodButtonActive
+          ]}
+          onPress={() => setChildLoginMethod("code")}
+        >
+          <Ionicons 
+            name="qr-code" 
+            size={20} 
+            color={childLoginMethod === "code" ? "#fff" : "#8B5CF6"} 
+          />
+          <Text style={[
+            styles.childMethodText,
+            childLoginMethod === "code" && styles.childMethodTextActive
+          ]}>
+            Login Code
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <PaperTextInput
+        label="Your Email"
+        value={email}
+        onChangeText={setEmail}
+        style={styles.childInput}
+        autoCapitalize="none"
+        keyboardType="email-address"
+        mode="outlined"
+        outlineColor="#DDD6FE"
+        activeOutlineColor="#8B5CF6"
+        left={<PaperTextInput.Icon icon="email" color="#8B5CF6" />}
+      />
+
+      {childLoginMethod === "password" ? (
+        <PaperTextInput
+          label="Your Password"
+          value={password}
+          onChangeText={setPassword}
+          style={styles.childInput}
+          secureTextEntry={!showPassword}
+          right={
+            <PaperTextInput.Icon 
+              icon={showPassword ? 'eye-off' : 'eye'} 
+              onPress={() => setShowPassword(!showPassword)} 
+            />
+          }
+          left={<PaperTextInput.Icon icon="lock" color="#8B5CF6" />}
+          mode="outlined"
+          outlineColor="#DDD6FE"
+          activeOutlineColor="#8B5CF6"
+        />
+      ) : (
+        <PaperTextInput
+          label="Login Code (from parent)"
+          value={code}
+          onChangeText={(text) => setCode(text.toUpperCase())}
+          style={styles.childInput}
+          autoCapitalize="characters"
+          mode="outlined"
+          outlineColor="#DDD6FE"
+          activeOutlineColor="#8B5CF6"
+          left={<PaperTextInput.Icon icon="ticket" color="#8B5CF6" />}
+        />
+      )}
+
+      <TouchableOpacity 
+        style={styles.childLoginButton} 
+        onPress={handleLogin}
+        disabled={isLoading}
+        activeOpacity={0.8}
+      >
+        <LinearGradient
+          colors={["#8B5CF6", "#7C3AED"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.childLoginButtonGradient}
+        >
+          {isLoading ? (
+            <Text style={styles.childLoginButtonText}>Signing In... ⏳</Text>
+          ) : (
+            <Text style={styles.childLoginButtonText}>Let's Go! 🚀</Text>
+          )}
+        </LinearGradient>
+      </TouchableOpacity>
+
+      {/* Help text for children */}
+      <View style={styles.childHelpContainer}>
+        <Ionicons name="help-circle" size={18} color="#A78BFA" />
+        <Text style={styles.childHelpText}>
+          {childLoginMethod === "code" 
+            ? "Ask your parent for your login code!" 
+            : "Use the password you created earlier"}
+        </Text>
+      </View>
+    </View>
+  );
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Back Button */}
         <TouchableOpacity style={styles.backButton} onPress={handleGoBackHome}>
-          <Text style={styles.backButtonText}>← Back</Text>
+          <Ionicons name="arrow-back" size={20} color="#475569" />
+          <Text style={styles.backButtonText}>Back</Text>
         </TouchableOpacity>
 
+        {/* Logo & Header */}
         <View style={styles.header}>
           <Image 
             source={require('../../assets/images/Family-Wellness-logo.png')} 
             style={styles.logo} 
           />
-          <Text style={styles.title}>Welcome back</Text>
-          <Text style={styles.subtitle}>Sign in to your account</Text>
+          <Text style={styles.title}>Welcome to Kivelo</Text>
         </View>
 
-        {/* Login Mode Toggle */}
-        <View style={styles.modeToggle}>
+        {/* User Type Toggle */}
+        <View style={styles.userTypeToggle}>
           <TouchableOpacity 
-            style={[styles.modeButton, mode === "password" && styles.activeModeButton]}
-            onPress={() => setMode("password")}
+            style={[
+              styles.userTypeButton, 
+              userType === "parent" && styles.parentTypeButtonActive
+            ]}
+            onPress={() => {
+              setUserType("parent");
+              setEmail("");
+              setPassword("");
+              setCode("");
+            }}
           >
-            <Text style={[styles.modeText, mode === "password" && styles.activeModeText]}>
-              Parent Login
+            <Ionicons 
+              name="person" 
+              size={24} 
+              color={userType === "parent" ? "#fff" : "#2E8B57"} 
+            />
+            <Text style={[
+              styles.userTypeText,
+              userType === "parent" && styles.userTypeTextActive
+            ]}>
+              I'm a Parent
             </Text>
           </TouchableOpacity>
+          
           <TouchableOpacity 
-            style={[styles.modeButton, mode === "oneTimeCode" && styles.activeModeButton]}
-            onPress={() => setMode("oneTimeCode")}
+            style={[
+              styles.userTypeButton, 
+              userType === "child" && styles.childTypeButtonActive
+            ]}
+            onPress={() => {
+              setUserType("child");
+              setEmail("");
+              setPassword("");
+              setCode("");
+            }}
           >
-            <Text style={[styles.modeText, mode === "oneTimeCode" && styles.activeModeText]}>
-              Child Login
+            <Ionicons 
+              name="happy" 
+              size={24} 
+              color={userType === "child" ? "#fff" : "#8B5CF6"} 
+            />
+            <Text style={[
+              styles.userTypeText,
+              userType === "child" && styles.childUserTypeTextActive
+            ]}>
+              I'm a Child
             </Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.formContainer}>
-          {/* Email Input */}
-          <PaperTextInput
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            style={styles.input}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            mode="outlined"
-            outlineColor="#e2e8f0"
-            activeOutlineColor="#2E8B57"
-          />
-
-          {/* Conditional Input Fields */}
-          {mode === "password" ? (
-            <PaperTextInput
-              label="Password"
-              value={password}
-              onChangeText={setPassword}
-              style={styles.input}
-              secureTextEntry={!showPassword}
-              right={
-                <PaperTextInput.Icon 
-                  icon={showPassword ? 'eye-off' : 'eye'} 
-                  onPress={() => setShowPassword(!showPassword)} 
-                />
-              }
-              mode="outlined"
-              outlineColor="#e2e8f0"
-              activeOutlineColor="#2E8B57"
-            />
-          ) : (
-            <PaperTextInput
-              label="One-Time Code"
-              value={code}
-              onChangeText={setCode}
-              style={styles.input}
-              keyboardType="numeric"
-              mode="outlined"
-              outlineColor="#e2e8f0"
-              activeOutlineColor="#2E8B57"
-            />
-          )}
-
-          {/* Forgot Password */}
-          {mode === "password" && (
-            <TouchableOpacity style={styles.forgotPassword} onPress={handleForgotPassword}>
-              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Login Button */}
-          <Button 
-            mode="contained" 
-            onPress={handleLogin} 
-            loading={isLoading}
-            disabled={isLoading}
-            contentStyle={styles.loginButtonContent}
-            style={styles.loginButton}
-          >
-            {isLoading ? "Signing In..." : "Sign In"}
-          </Button>
-
-          {/* Register Link */}
-          <View style={styles.registerContainer}>
-            <Text style={styles.registerText}>Don{"'"}t have an account?</Text>
-            <TouchableOpacity onPress={handleRegisterRedirect}>
-              <Text style={styles.registerLink}> Register</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Info Section */}
-        <View style={styles.infoContainer}>
-          <Text style={styles.infoTitle}>Login Help</Text>
-          <Text style={styles.infoText}>
-            • Parents: Use your email and password{'\n'}
-            • Children: Use your email and one-time code{'\n'}
-            • Contact support if you need assistance
-          </Text>
-        </View>
+        {/* Conditional Form Rendering */}
+        {userType === "parent" ? renderParentLogin() : renderChildLogin()}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -221,22 +388,25 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#f8fafc",
   },
   scrollContainer: {
     flexGrow: 1,
-    justifyContent: "center",
     padding: 20,
+    paddingTop: 50,
   },
   backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     alignSelf: 'flex-start',
     marginBottom: 20,
     paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 12,
+    backgroundColor: '#fff',
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+    gap: 6,
   },
   backButtonText: {
     color: '#475569',
@@ -245,60 +415,87 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
-    marginBottom: 30,
+    marginBottom: 24,
   },
   logo: {
-    width: 120,
-    height: 120,
+    width: 100,
+    height: 100,
     marginBottom: 12,
   },
   title: {
-    fontSize: 32,
+    fontSize: 26,
     fontWeight: "bold",
-    color: "#2E8B57",
-    marginBottom: 8,
+    color: "#1e293b",
     textAlign: "center",
   },
-  subtitle: {
-    fontSize: 16,
-    color: "#666",
-    textAlign: "center",
-  },
-  modeToggle: {
+  
+  // User Type Toggle
+  userTypeToggle: {
     flexDirection: 'row',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 8,
-    padding: 4,
-    marginBottom: 20,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 6,
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  modeButton: {
+  userTypeButton: {
     flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 8,
   },
-  activeModeButton: {
+  parentTypeButtonActive: {
     backgroundColor: '#2E8B57',
   },
-  modeText: {
-    color: '#64748b',
-    fontWeight: '500',
+  childTypeButtonActive: {
+    backgroundColor: '#8B5CF6',
   },
-  activeModeText: {
-    color: 'white',
+  userTypeText: {
+    fontSize: 15,
     fontWeight: '600',
+    color: '#64748b',
   },
+  userTypeTextActive: {
+    color: '#fff',
+  },
+  childUserTypeTextActive: {
+    color: '#fff',
+  },
+
+  // Parent Form Styles
   formContainer: {
     backgroundColor: "white",
     padding: 24,
-    borderRadius: 12,
+    borderRadius: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
     elevation: 3,
-    marginBottom: 20,
+  },
+  formHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  formTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginTop: 12,
+  },
+  formSubtitle: {
+    fontSize: 14,
+    color: '#64748b',
+    marginTop: 4,
+    textAlign: 'center',
   },
   input: {
     marginBottom: 16,
@@ -306,28 +503,33 @@ const styles = StyleSheet.create({
   },
   forgotPassword: {
     alignSelf: "flex-end",
-    marginBottom: 24,
+    marginBottom: 20,
   },
   forgotPasswordText: {
-    color: "#1976d2",
+    color: "#2E8B57",
     fontSize: 14,
     fontWeight: "500",
   },
   loginButton: {
     marginBottom: 16,
     backgroundColor: "#2E8B57",
+    borderRadius: 12,
   },
   loginButtonContent: {
     paddingVertical: 8,
+  },
+  loginButtonLabel: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   registerContainer: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 16,
+    marginTop: 8,
   },
   registerText: {
-    color: "#666",
+    color: "#64748b",
     fontSize: 14,
   },
   registerLink: {
@@ -335,20 +537,94 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 14,
   },
-  infoContainer: {
-    backgroundColor: "#e3f2fd",
-    padding: 16,
-    borderRadius: 8,
+
+  // Child Form Styles
+  childFormContainer: {
+    backgroundColor: "#F5F3FF",
+    padding: 24,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: "#DDD6FE",
   },
-  infoTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#1976d2",
+  childFormHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  childWelcomeEmoji: {
+    fontSize: 48,
     marginBottom: 8,
   },
-  infoText: {
+  childFormTitle: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#5B21B6',
+  },
+  childFormSubtitle: {
+    fontSize: 16,
+    color: '#7C3AED',
+    marginTop: 4,
+  },
+  childMethodToggle: {
+    flexDirection: 'row',
+    backgroundColor: '#EDE9FE',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 20,
+    gap: 4,
+  },
+  childMethodButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    gap: 6,
+  },
+  childMethodButtonActive: {
+    backgroundColor: '#8B5CF6',
+  },
+  childMethodText: {
     fontSize: 14,
-    color: "#1565c0",
-    lineHeight: 20,
+    fontWeight: '600',
+    color: '#8B5CF6',
+  },
+  childMethodTextActive: {
+    color: '#fff',
+  },
+  childInput: {
+    marginBottom: 16,
+    backgroundColor: "#fff",
+  },
+  childLoginButton: {
+    marginTop: 8,
+    marginBottom: 16,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  childLoginButtonGradient: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  childLoginButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  childHelpContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EDE9FE',
+    padding: 12,
+    borderRadius: 10,
+    gap: 8,
+  },
+  childHelpText: {
+    fontSize: 13,
+    color: '#7C3AED',
+    flex: 1,
   },
 });
