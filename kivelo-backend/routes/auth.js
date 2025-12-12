@@ -218,14 +218,20 @@ router.post("/register-parent", parentRegister);
  *       Authenticate user with **email and password** and return JWT tokens.
  *       
  *       **Parent Login Flow:**
- *       - Parent enters email + password
+ *       - Parent enters email + password via Parent login tab
  *       - Must have verified email before login
  *       - Redirected to Parent Dashboard
  *       
  *       **Child Login Flow (with password):**
- *       - Child enters email + password (after setting password via `/set-child-password`)
+ *       - Child enters email + password via Child login tab (after setting password via `/set-child-password`)
  *       - For first-time login, use `/child-login` with one-time code instead
  *       - Redirected to Child Dashboard
+ *       
+ *       **Frontend Role Validation:**
+ *       The mobile/web app enforces role-based login forms:
+ *       - Parent login tab only allows parent accounts
+ *       - Child login tab only allows child accounts
+ *       - If a user tries to login with the wrong form, they get a friendly message to use the correct tab
  *       
  *       Returns:
  *       - **accessToken** in JSON  
