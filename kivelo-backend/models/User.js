@@ -12,11 +12,31 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: function () {
+      // Password not required for OAuth users
+      if (this.authProvider && this.authProvider !== 'local') return false;
       return this.role === 'parent' || (this.role === 'child' && this.hasSetPassword);
     },
     minlength: 6,
     select: false
   },
+  
+  // OAuth fields
+  authProvider: {
+    type: String,
+    enum: ['local', 'google', 'apple'],
+    default: 'local'
+  },
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true // Allows null values but ensures uniqueness for non-null
+  },
+  appleId: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
+  
   role: {
     type: String,
     enum: ['parent', 'child'],

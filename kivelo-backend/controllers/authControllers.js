@@ -384,6 +384,145 @@ export const resendVerificationCode = async (req, res) => {
 };
 
 // ========================= LOGIN =========================
+// ========================= ROLE-ENFORCED LOGIN FUNCTIONS =========================
+
+/**
+ * Parent Login - Only allows parent accounts
+ */
+export const parentLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ success: false, message: 'Email and password are required' });
+
+    const user = await User.findOne({ email: email.toLowerCase().trim() }).select('+password');
+    if (!user) return res.status(401).json({ success: false, message: 'Invalid email or password' });
+
+    // ROLE ENFORCEMENT: Only allow parents
+    if (user.role !== 'parent') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'This account belongs to a child. Please use the Child login tab.',
+        wrongRole: true,
+        actualRole: user.role
+      });
+    }
+
+    if (!user.isVerified) {
+      const newVerificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const codeExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      user.verificationCode = newVerificationCode;
+      user.verificationCodeExpires = codeExpiry;
+      await user.save();
+
+      await sendEmail(
+        user.email,
+        'Verify Your Kivelo Account - Security Code',
+        `<div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
+          <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); overflow: hidden;">
+            <div style="background-color: #4CAF50; color: white; text-align: center; padding: 20px;">
+              <h1 style="margin: 0;">Kivelo</h1>
+              <p style="margin: 0; font-size: 14px;">Empowering Families with Technology</p>
+            </div>
+            <div style="padding: 20px;">
+              <h2>Your Verification Code</h2>
+              <p>Use this code to verify your Kivelo account:</p>
+              <h1>${newVerificationCode}</h1>
+              <p>This code expires in 24 hours.</p>
+            </div>
+          </div>
+        </div>`
+      );
+
+      return res.status(403).json({
+        success: false,
+        message: 'Your account is not verified. A new verification code has been sent to your email.',
+        needsVerification: true,
+        email: user.email,
+      });
+    }
+
+    if (!user.isActive) return res.status(403).json({ success: false, message: 'Account is deactivated. Please contact support.' });
+
+    const isPasswordValid = await bcrypt.compare(password.trim(), user.password);
+    if (!isPasswordValid) return res.status(401).json({ success: false, message: 'Invalid email or password' });
+
+    user.lastLogin = new Date();
+    await user.save();
+
+    const { accessToken, refreshToken } = generateToken(user._id, user.role);
+    await setRefreshTokenCookieAndSave(res, user, refreshToken);
+
+    const parent = await Parent.findOne({ user: user._id });
+    if (!parent) return res.status(404).json({ success: false, message: 'Parent profile not found' });
+
+    res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      accessToken,
+      data: { 
+        user: createUserResponse(user), 
+        familyCode: parent.familyCode, 
+        subscription: parent.subscription 
+      },
+    });
+  } catch (error) {
+    console.error('Parent login error:', error);
+    res.status(500).json({ success: false, message: 'Server error during login. Please try again.' });
+  }
+};
+
+/**
+ * Child Login with Password - Only allows child accounts
+ */
+export const childLoginPassword = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ success: false, message: 'Email and password are required' });
+
+    const user = await User.findOne({ email: email.toLowerCase().trim() }).select('+password');
+    if (!user) return res.status(401).json({ success: false, message: 'Invalid email or password' });
+
+    // ROLE ENFORCEMENT: Only allow children
+    if (user.role !== 'child') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'This account belongs to a parent. Please use the Parent login tab.',
+        wrongRole: true,
+        actualRole: user.role
+      });
+    }
+
+    if (!user.isActive) return res.status(403).json({ success: false, message: 'Account is deactivated. Please contact support.' });
+
+    const isPasswordValid = await bcrypt.compare(password.trim(), user.password);
+    if (!isPasswordValid) return res.status(401).json({ success: false, message: 'Invalid email or password' });
+
+    user.lastLogin = new Date();
+    await user.save();
+
+    const { accessToken, refreshToken } = generateToken(user._id, user.role);
+    await setRefreshTokenCookieAndSave(res, user, refreshToken);
+
+    const child = await Child.findOne({ user: user._id });
+    if (!child) return res.status(404).json({ success: false, message: 'Child profile not found' });
+
+    res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      accessToken,
+      data: { 
+        user: createUserResponse(user), 
+        hasSetPassword: child.hasSetPassword || false, 
+        parentId: child.parent 
+      },
+    });
+  } catch (error) {
+    console.error('Child login error:', error);
+    res.status(500).json({ success: false, message: 'Server error during login. Please try again.' });
+  }
+};
+
+// ========================= UNIVERSAL LOGIN (Legacy) =========================
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -875,6 +1014,7 @@ export default {
   generateOneTimeCode,
   registerChildWithCode,
   childLoginWithCode,
+  childLoginPassword,
   childSetPassword,
   childResetPassword,
   refreshAccessToken,

@@ -9,11 +9,13 @@ import {
   Text,
   Image,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
 import { showAlert } from '@/utils/showAlert';
 import { TextInput as PaperTextInput, Button } from "react-native-paper";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../context/AuthContext";
+import { useGoogleAuth } from "@/hooks/useGoogleAuth";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 
@@ -24,7 +26,7 @@ type ChildLoginMethod = "password" | "code";
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login, loginWithOneTimeCode, isLoading } = useAuth();
+  const { login, loginWithOneTimeCode, loginWithGoogle, isLoading } = useAuth();
   
   const [userType, setUserType] = useState<UserType>("parent");
   const [childLoginMethod, setChildLoginMethod] = useState<ChildLoginMethod>("password");
@@ -32,6 +34,25 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  // Google OAuth handler
+  const handleGoogleSuccess = async (tokens: { idToken: string | null; accessToken: string | null }) => {
+    if (!tokens.idToken) {
+      showAlert("Google Sign-In Failed", "No authentication token received");
+      return;
+    }
+
+    const result = await loginWithGoogle(tokens.idToken, tokens.accessToken);
+    
+    if (result.success) {
+      console.log("✅ Google login successful");
+      // Navigation handled by AuthContext
+    } else {
+      showAlert("Google Sign-In Failed", result.message || "Failed to sign in with Google");
+    }
+  };
+
+  const { googleLoading, googleRequest, handleGoogleLogin } = useGoogleAuth(handleGoogleSuccess);
 
   const validateForm = () => {
     if (!email.trim()) {
@@ -156,13 +177,51 @@ export default function LoginScreen() {
         mode="contained" 
         onPress={handleLogin} 
         loading={isLoading}
-        disabled={isLoading}
+        disabled={isLoading || googleLoading}
         contentStyle={styles.loginButtonContent}
         style={styles.loginButton}
         labelStyle={styles.loginButtonLabel}
       >
         {isLoading ? "Signing In..." : "Sign In"}
       </Button>
+
+      {/* Divider */}
+      <View style={styles.dividerContainer}>
+        <View style={styles.divider} />
+        <Text style={styles.dividerText}>or continue with</Text>
+        <View style={styles.divider} />
+      </View>
+
+      {/* Social Sign-In Buttons - Side by Side */}
+      <View style={styles.socialButtonsContainer}>
+        {/* Google Sign-In Button */}
+        <TouchableOpacity 
+          style={[styles.socialButton, styles.googleButton, (!googleRequest || googleLoading) && styles.socialButtonDisabled]}
+          onPress={handleGoogleLogin}
+          disabled={!googleRequest || googleLoading || isLoading}
+        >
+          {googleLoading ? (
+            <ActivityIndicator size="small" color="#4285F4" />
+          ) : (
+            <>
+              <Image 
+                source={{ uri: 'https://www.google.com/favicon.ico' }} 
+                style={styles.socialIcon}
+              />
+              <Text style={styles.googleButtonText}>Google</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        {/* Apple Sign-In Button (Coming Soon) */}
+        <TouchableOpacity 
+          style={[styles.socialButton, styles.appleButton]}
+          onPress={() => showAlert("Coming Soon!", "Apple Sign-In will be available soon. Stay tuned! 🍎")}
+        >
+          <Ionicons name="logo-apple" size={20} color="#fff" />
+          <Text style={styles.appleButtonText}>Apple</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.registerContainer}>
         <Text style={styles.registerText}>Don{"'"}t have an account?</Text>
@@ -522,6 +581,109 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  
+  // Divider styles
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e2e8f0',
+  },
+  dividerText: {
+    color: '#94a3b8',
+    fontSize: 13,
+    paddingHorizontal: 12,
+    fontWeight: '500',
+  },
+  
+  // Google Sign-In Button
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+    gap: 12,
+  },
+  googleButtonDisabled: {
+    opacity: 0.6,
+  },
+  googleIcon: {
+    width: 20,
+    height: 20,
+  },
+  googleButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#374151',
+  },
+
+  // Social Buttons Container (side by side)
+  socialButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 16,
+  },
+  socialButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  socialButtonDisabled: {
+    opacity: 0.6,
+  },
+  socialIcon: {
+    width: 20,
+    height: 20,
+  },
+
+  // Google Sign-In Button
+  googleButton: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+
+  // Apple Sign-In Button
+  appleButton: {
+    backgroundColor: '#000',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  appleButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  
   registerContainer: {
     flexDirection: "row",
     justifyContent: "center",

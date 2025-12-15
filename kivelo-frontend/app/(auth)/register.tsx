@@ -6,6 +6,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { showAlert } from '@/utils/showAlert';
 import {
@@ -19,11 +20,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "../../context/AuthContext";
+import { useGoogleAuth } from "@/hooks/useGoogleAuth";
 
 export default function Register() {
   const { colors } = useTheme();
   const router = useRouter();
-  const { registerParent, isLoading } = useAuth();
+  const { registerParent, loginWithGoogle, isLoading } = useAuth();
 
   // Form state
   const [name, setName] = useState("");
@@ -36,6 +38,25 @@ export default function Register() {
   // Validation states
   const [emailValid, setEmailValid] = useState(true);
   const [passwordValid, setPasswordValid] = useState(true);
+
+  // Google OAuth handler
+  const handleGoogleSuccess = async (tokens: { idToken: string | null; accessToken: string | null }) => {
+    if (!tokens.idToken) {
+      showAlert("Google Sign-Up Failed", "No authentication token received");
+      return;
+    }
+
+    const result = await loginWithGoogle(tokens.idToken, tokens.accessToken);
+    
+    if (result.success) {
+      console.log("✅ Google registration/login successful");
+      // Navigation handled by AuthContext
+    } else {
+      showAlert("Google Sign-Up Failed", result.message || "Failed to sign up with Google");
+    }
+  };
+
+  const { googleLoading, googleRequest, handleGoogleLogin } = useGoogleAuth(handleGoogleSuccess);
 
   // Validation helpers
   const validateEmail = (text: string) => {
@@ -240,6 +261,69 @@ export default function Register() {
         >
           {isLoading ? <ActivityIndicator color="#fff" /> : "Create Account"}
         </Button>
+
+        {/* Divider */}
+        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}>
+          <View style={{ flex: 1, height: 1, backgroundColor: "#ddd" }} />
+          <Text style={{ marginHorizontal: 12, color: "#888", fontSize: 13 }}>or</Text>
+          <View style={{ flex: 1, height: 1, backgroundColor: "#ddd" }} />
+        </View>
+
+        {/* Social Sign Up Buttons - Side by Side */}
+        <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
+          {/* Google Sign Up Button */}
+          <TouchableOpacity
+            onPress={handleGoogleLogin}
+            disabled={!googleRequest || googleLoading}
+            style={{
+              flex: 1,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "#fff",
+              borderWidth: 1,
+              borderColor: "#ddd",
+              borderRadius: 8,
+              paddingVertical: 12,
+              gap: 8,
+              opacity: (!googleRequest || googleLoading) ? 0.6 : 1,
+            }}
+          >
+            {googleLoading ? (
+              <ActivityIndicator size="small" color="#4285F4" />
+            ) : (
+              <>
+                <Image
+                  source={{ uri: "https://developers.google.com/identity/images/g-logo.png" }}
+                  style={{ width: 20, height: 20 }}
+                />
+                <Text style={{ fontSize: 14, fontWeight: "600", color: "#444" }}>
+                  Google
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+
+          {/* Apple Sign Up Button (Coming Soon) */}
+          <TouchableOpacity
+            onPress={() => showAlert("Coming Soon!", "Apple Sign-Up will be available soon. Stay tuned! 🍎")}
+            style={{
+              flex: 1,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "#000",
+              borderRadius: 8,
+              paddingVertical: 12,
+              gap: 8,
+            }}
+          >
+            <Ionicons name="logo-apple" size={20} color="#fff" />
+            <Text style={{ fontSize: 14, fontWeight: "600", color: "#fff" }}>
+              Apple
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Login Link */}
         <TouchableOpacity onPress={() => router.push("/(auth)/login")}>

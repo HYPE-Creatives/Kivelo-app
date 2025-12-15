@@ -3,9 +3,11 @@ import path from "path";
 import { fileURLToPath } from "url";
 import auth from "../middleware/auth.js";
 import { auditLogger } from "../middleware/auditMiddleware.js";
+import { googleAuth } from "../controllers/oauthController.js";
 import authControllers, {
   parentRegister,
   login,
+  parentLogin,
   forgotPassword,
   verifyResetToken,
   resetPassword,
@@ -16,6 +18,7 @@ import authControllers, {
   generateOneTimeCode,
   registerChildWithCode,
   childLoginWithCode,
+  childLoginPassword,
   childSetPassword,
   childResetPassword,
   refreshAccessToken,
@@ -52,6 +55,8 @@ const __dirname = path.dirname(__filename);
  * tags:
  *   - name: Parent Authentication
  *     description: Parent registration and login (email + password)
+ *   - name: OAuth Authentication
+ *     description: Social login with Google, Apple (Parent only)
  *   - name: Child Authentication
  *     description: Child login flows (one-time code for first login, password for subsequent logins)
  *   - name: Email Verification
@@ -208,7 +213,7 @@ router.post("/register-parent", parentRegister);
 
 /**
  * @swagger
- * /api/v1/auth/login:
+ * /api/v1/auth/parent-login:
  *   post:
  *     summary: Parent Login - Email and Password
  *     tags: [Parent Authentication]
@@ -217,8 +222,8 @@ router.post("/register-parent", parentRegister);
  *     description: |
  *       **Parent-only login endpoint** - Authenticate parent with email and password.
  *       
- *       ⚠️ **Role Restriction:** This form is for PARENTS ONLY.
- *       - If a child account tries to use this form, they will receive an error: "This account belongs to a child. Please use the Child login tab."
+ *       ⚠️ **Role Restriction:** This endpoint is for PARENTS ONLY.
+ *       - If a child account tries to login here, frontend validates and returns: "This account belongs to a child. Please use the Child login tab."
  *       
  *       **Login Flow:**
  *       1. Parent enters email + password via Parent login tab
@@ -254,12 +259,6 @@ router.post("/register-parent", parentRegister);
  *                 format: password
  *                 example: "Password123"
  *                 description: "Parent's password"
- *           examples:
- *             parentLogin:
- *               summary: Parent login example
- *               value:
- *                 email: "parent@example.com"
- *                 password: "Password123"
  *     responses:
  *       200:
  *         description: Parent login successful
@@ -285,10 +284,13 @@ router.post("/register-parent", parentRegister);
  *                       properties:
  *                         _id:
  *                           type: string
+ *                           example: "507f1f77bcf86cd799439011"
  *                         email:
  *                           type: string
+ *                           example: "parent@example.com"
  *                         name:
  *                           type: string
+ *                           example: "John Doe"
  *                         role:
  *                           type: string
  *                           example: "parent"
@@ -302,10 +304,32 @@ router.post("/register-parent", parentRegister);
  *                       description: "Parent's subscription tier"
  *       400:
  *         description: Missing email or password
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Email and password are required"
  *       401:
  *         description: Invalid credentials
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Invalid email or password"
  *       403:
- *         description: Account not verified, deactivated, or wrong role
+ *         description: Account not verified or deactivated
  *         content:
  *           application/json:
  *             examples:
@@ -316,30 +340,31 @@ router.post("/register-parent", parentRegister);
  *                   message: "Your account is not verified. A new verification code has been sent to your email."
  *                   needsVerification: true
  *                   email: "parent@example.com"
- *               wrongRole:
- *                 summary: Child trying to use parent login (frontend validation)
+ *               deactivated:
+ *                 summary: Account deactivated
  *                 value:
  *                   success: false
- *                   message: "This account belongs to a child. Please use the Child login tab."
+ *                   message: "Account is deactivated. Please contact support."
  *       500:
  *         description: Server error during login
  */
+router.post("/parent-login", auditLogger((req) => `parent.login:email=${req.body.email}`), parentLogin);
 
 /**
  * @swagger
- * /api/v1/auth/login:
+ * /api/v1/auth/child-login-password:
  *   post:
- *     summary: Child Login - Email and Password (after password set)
+ *     summary: Child Login - Email and Password
  *     tags: [Child Authentication]
  *     security:
  *       - ApiKeyAuth: []
  *     description: |
  *       **Child login with password** - For children who have already set their password.
  *       
- *       ⚠️ **Role Restriction:** This form is for CHILDREN ONLY.
- *       - If a parent account tries to use this form, they will receive an error: "This account belongs to a parent. Please use the Parent login tab."
+ *       ⚠️ **Role Restriction:** This endpoint is for CHILDREN ONLY.
+ *       - If a parent account tries to login here, frontend validates and returns: "This account belongs to a parent. Please use the Parent login tab."
  *       
- *       **When to use this endpoint:**
+ *       **When to use:**
  *       - Child has previously logged in with one-time code and set their password
  *       - Child knows their email and password
  *       
@@ -375,12 +400,6 @@ router.post("/register-parent", parentRegister);
  *                 format: password
  *                 example: "childpassword123"
  *                 description: "Child's password (set after first login)"
- *           examples:
- *             childLogin:
- *               summary: Child login with password
- *               value:
- *                 email: "child@example.com"
- *                 password: "childpassword123"
  *     responses:
  *       200:
  *         description: Child login successful
@@ -406,10 +425,13 @@ router.post("/register-parent", parentRegister);
  *                       properties:
  *                         _id:
  *                           type: string
+ *                           example: "507f1f77bcf86cd799439012"
  *                         email:
  *                           type: string
+ *                           example: "child@example.com"
  *                         name:
  *                           type: string
+ *                           example: "Emma Doe"
  *                         role:
  *                           type: string
  *                           example: "child"
@@ -419,25 +441,172 @@ router.post("/register-parent", parentRegister);
  *                       description: "Indicates child has set their password"
  *                     parentId:
  *                       type: string
+ *                       example: "507f1f77bcf86cd799439011"
  *                       description: "Reference to parent's ID"
  *       400:
  *         description: Missing email or password
- *       401:
- *         description: Invalid credentials
- *       403:
- *         description: Account deactivated or wrong role
  *         content:
  *           application/json:
- *             examples:
- *               wrongRole:
- *                 summary: Parent trying to use child login (frontend validation)
- *                 value:
- *                   success: false
- *                   message: "This account belongs to a parent. Please use the Parent login tab."
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Email and password are required"
+ *       401:
+ *         description: Invalid credentials
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Invalid email or password"
+ *       403:
+ *         description: Account deactivated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 message:
+ *                   type: string
+ *                   example: "Account is deactivated. Please contact support."
  *       500:
  *         description: Server error during login
  */
+router.post("/child-login-password", auditLogger((req) => `child.login:email=${req.body.email}`), childLoginPassword);
+
+// Legacy login endpoint (kept for backwards compatibility - uses same controller)
 router.post("/login", auditLogger((req) => `user.login:email=${req.body.email}`), login);
+
+// ========================= OAUTH ROUTES =========================
+
+/**
+ * @swagger
+ * /api/v1/auth/google:
+ *   post:
+ *     summary: Google OAuth Login/Register (Parent only)
+ *     tags: [OAuth Authentication]
+ *     security:
+ *       - ApiKeyAuth: []
+ *     description: |
+ *       **Parent-only Google OAuth endpoint** - Login or register with Google account.
+ *       
+ *       ⚠️ **Role Restriction:** OAuth is available for PARENTS ONLY.
+ *       
+ *       **How it works:**
+ *       1. Mobile app uses `expo-auth-session` to get Google ID token
+ *       2. App sends ID token to this endpoint
+ *       3. Backend verifies token with Google
+ *       4. If user exists → Login
+ *       5. If new user → Create parent account
+ *       6. If email exists with password → Link Google to existing account
+ *       
+ *       **Returns:**
+ *       - `accessToken` in JSON response
+ *       - `refreshToken` in HTTP-only cookie
+ *       - Parent data: `familyCode`, `subscription`
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - idToken
+ *             properties:
+ *               idToken:
+ *                 type: string
+ *                 description: "Google ID token from expo-auth-session"
+ *                 example: "eyJhbGciOiJSUzI1NiIsInR5cCI6..."
+ *               accessToken:
+ *                 type: string
+ *                 description: "Google access token (optional)"
+ *           examples:
+ *             googleLogin:
+ *               summary: Google OAuth login
+ *               value:
+ *                 idToken: "eyJhbGciOiJSUzI1NiIsInR5cCI6..."
+ *     responses:
+ *       200:
+ *         description: Login successful (existing user)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Login successful"
+ *                 accessToken:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       type: object
+ *                       properties:
+ *                         _id:
+ *                           type: string
+ *                         email:
+ *                           type: string
+ *                         name:
+ *                           type: string
+ *                         role:
+ *                           type: string
+ *                           example: "parent"
+ *                         authProvider:
+ *                           type: string
+ *                           example: "google"
+ *                     familyCode:
+ *                       type: string
+ *                       example: "FAM-ABC123"
+ *                     subscription:
+ *                       type: string
+ *                       example: "free"
+ *       201:
+ *         description: Account created (new Google user)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Account created successfully with Google"
+ *                 accessToken:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *       400:
+ *         description: Missing ID token
+ *       401:
+ *         description: Invalid or expired Google token
+ *       403:
+ *         description: OAuth is only for parent accounts
+ *       409:
+ *         description: Email already registered with different provider
+ *       500:
+ *         description: Server error during OAuth
+ */
+router.post("/google", auditLogger((req) => `oauth.google:token_provided`), googleAuth);
 
 // ========================= PASSWORD RESET FLOW =========================
 

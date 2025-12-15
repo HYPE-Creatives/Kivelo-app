@@ -50,6 +50,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string, expectedRole?: 'parent' | 'child') => Promise<{ success: boolean; message?: string }>;
+  loginWithGoogle: (idToken: string, accessToken?: string | null) => Promise<{ success: boolean; message?: string }>;
   loginWithOneTimeCode: (email: string, code: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
   registerParent: (
@@ -113,17 +114,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             errorMessage = response.statusText || errorMessage;
           }
           
-          // For client errors (4xx), don't try other URLs - it's a valid response
-          // Only retry on server errors (5xx) or network issues
-          if (response.status >= 400 && response.status < 500) {
-            // This is a valid auth/validation error, throw it immediately
-            throw new Error(errorMessage);
+          // For 404 (route not found), try next URL - route might exist on another server
+          // For other 4xx errors (auth/validation), throw immediately
+          // For 5xx errors, try next URL
+          if (response.status === 404 || response.status >= 500) {
+            lastError = { success: false, message: errorMessage };
+            console.warn(`⚠️ Route not found or server error at ${baseUrl}:`, errorMessage);
+            continue;
           }
           
-          // Server error (5xx) - try next URL
-          lastError = { success: false, message: errorMessage };
-          console.warn(`⚠️ Server error with ${baseUrl}:`, errorMessage);
-          continue;
+          // This is a valid auth/validation error (401, 403, etc.), throw it immediately
+          throw new Error(errorMessage);
         }
 
         const data = await response.json();
@@ -239,7 +240,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
 
-      const { data } = await apiCallWithFallback("/auth/login", {
+      // Use role-specific endpoints for proper backend enforcement
+      const endpoint = expectedRole === 'parent' 
+        ? "/auth/parent-login" 
+        : expectedRole === 'child' 
+          ? "/auth/child-login-password" 
+          : "/auth/login"; // Legacy fallback
+
+      const { data } = await apiCallWithFallback(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
@@ -253,17 +261,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         if (!userData) {
           throw new Error("Invalid user data from server");
-        }
-
-        // ✅ Role validation - ensure user is logging in with correct form
-        if (expectedRole && userData.role !== expectedRole) {
-          if (expectedRole === 'parent' && userData.role === 'child') {
-            return { success: false, message: "This account belongs to a child. Please use the Child login tab." };
-          }
-          if (expectedRole === 'child' && userData.role === 'parent') {
-            return { success: false, message: "This account belongs to a parent. Please use the Parent login tab." };
-          }
-          return { success: false, message: `Please use the correct login form for your account type.` };
         }
 
         // hasSetPassword comes from roleData (at data level), not inside user object
@@ -304,6 +301,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         return { success: true, message: "Login successful!" };
       } else {
+        // Backend now returns role-specific error messages
         return { success: false, message: data.message || "Login failed" };
       }
     } catch (error: any) {
@@ -313,7 +311,74 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     }
   };
+  // ✅ GOOGLE OAUTH LOGIN (Parent only)
+  const loginWithGoogle = async (idToken: string, accessToken?: string | null) => {
+    try {
+      setIsLoading(true);
 
+      const { data } = await apiCallWithFallback("/auth/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken, accessToken }),
+      });
+
+      console.log("🔍 Google Login Response:", data);
+
+      if (data.success) {
+        const userData = data.data?.user || data.user;
+        console.log("🖼️ Google Login - User data:", userData);
+        
+        if (!userData) {
+          throw new Error("Invalid user data from server");
+        }
+
+        // Google OAuth is parent-only, verify role
+        if (userData.role !== 'parent') {
+          return { success: false, message: "Google sign-in is only available for parent accounts" };
+        }
+
+        const parentData = {
+          familyCode: data.data?.familyCode || userData.parent?.familyCode || '',
+          subscription: data.data?.subscription || userData.parent?.subscription || 'free',
+        };
+
+        const finalUser: User = {
+          id: userData._id || userData.id,
+          role: userData.role,
+          email: userData.email,
+          name: userData.name,
+          phone: userData.phone,
+          dob: userData.dob,
+          children: userData.children,
+          parent: parentData,
+          hasSetPassword: true, // OAuth users don't need password
+          avatar: userData.avatar,
+        };
+
+        const tokens: AuthTokens = {
+          accessToken: data.accessToken || data.token,
+          refreshToken: data.refreshToken || "",
+        };
+
+        if (!tokens.accessToken) {
+          throw new Error("No access token received");
+        }
+
+        await storeAuthData(finalUser, tokens);
+        setUser(finalUser);
+        setIsAuthenticated(true);
+
+        return { success: true, message: data.message || "Login successful with Google!" };
+      } else {
+        return { success: false, message: data.message || "Google login failed" };
+      }
+    } catch (error: any) {
+      console.error("Google login error:", error);
+      return { success: false, message: error.message || "Network error during Google login" };
+    } finally {
+      setIsLoading(false);
+    }
+  };
   // ✅ ONE-TIME CODE LOGIN
   const loginWithOneTimeCode = async (email: string, code: string) => {
     try {
@@ -602,6 +667,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         isAuthenticated,
         login,
+        loginWithGoogle,
         loginWithOneTimeCode,
         logout,
         registerParent,
