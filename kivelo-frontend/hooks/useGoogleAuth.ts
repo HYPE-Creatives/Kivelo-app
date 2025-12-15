@@ -31,9 +31,11 @@ export const useGoogleAuth = (onSuccess: (tokens: GoogleAuthResponse) => Promise
   // Check environment
   const isExpoGo = Constants.appOwnership === 'expo';
   const isWeb = Platform.OS === 'web';
+  const isAndroid = Platform.OS === 'android';
+  const isIOS = Platform.OS === 'ios';
   const isMobileExpoGo = isExpoGo && !isWeb;
   
-  // For web, use localhost redirect
+  // For web, use localhost redirect. For native, use app scheme
   const redirectUri = isWeb
     ? AuthSession.makeRedirectUri({ preferLocalhost: true })
     : AuthSession.makeRedirectUri({ scheme: 'family-wellness-app', path: 'auth' });
@@ -42,8 +44,14 @@ export const useGoogleAuth = (onSuccess: (tokens: GoogleAuthResponse) => Promise
   console.log('📱 Running in Expo Go:', isExpoGo);
   console.log('🌐 Platform:', Platform.OS);
 
-  // Use web client ID
-  const clientId = GOOGLE_CLIENT_IDS.web;
+  // Use platform-specific client ID for native builds, web client ID for web/Expo Go
+  const clientId = isWeb 
+    ? GOOGLE_CLIENT_IDS.web 
+    : isAndroid 
+      ? GOOGLE_CLIENT_IDS.android 
+      : GOOGLE_CLIENT_IDS.ios;
+
+  console.log('🔑 Using Client ID:', clientId?.substring(0, 20) + '...');
 
   // Create auth request
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
