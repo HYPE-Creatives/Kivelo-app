@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import * as Google from 'expo-auth-session/providers/google';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
@@ -14,42 +13,49 @@ const GOOGLE_CLIENT_IDS = {
   android: "765956834253-iqe4gdf3mar2nu482nu48i66v428bfdp.apps.googleusercontent.com",
 };
 
-// Expo Auth Proxy URL for Expo Go
-const EXPO_PROXY_REDIRECT = 'https://auth.expo.io/@fatai01/family-wellness-app';
-
 interface GoogleAuthResponse {
   idToken: string | null;
   accessToken: string | null;
 }
 
+// Google OAuth discovery document
+const discovery = {
+  authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+  tokenEndpoint: 'https://oauth2.googleapis.com/token',
+  revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
+};
+
 export const useGoogleAuth = (onSuccess: (tokens: GoogleAuthResponse) => Promise<void>) => {
   const [loading, setLoading] = useState(false);
 
-  // Check if running in Expo Go
+  // Check environment
   const isExpoGo = Constants.appOwnership === 'expo';
   const isWeb = Platform.OS === 'web';
+  const isMobileExpoGo = isExpoGo && !isWeb;
   
-  // Determine redirect URI based on platform and environment
+  // For web, use localhost redirect
   const redirectUri = isWeb
     ? AuthSession.makeRedirectUri({ preferLocalhost: true })
-    : isExpoGo 
-      ? EXPO_PROXY_REDIRECT 
-      : AuthSession.makeRedirectUri({ scheme: 'kivelo', path: 'auth' });
+    : AuthSession.makeRedirectUri({ scheme: 'family-wellness-app', path: 'auth' });
 
   console.log('🔗 Google OAuth Redirect URI:', redirectUri);
   console.log('📱 Running in Expo Go:', isExpoGo);
   console.log('🌐 Platform:', Platform.OS);
 
-  // Use implicit flow for web to get ID token directly (no code exchange needed)
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    webClientId: GOOGLE_CLIENT_IDS.web,
-    androidClientId: GOOGLE_CLIENT_IDS.android,
-    iosClientId: GOOGLE_CLIENT_IDS.ios,
-    scopes: ['openid', 'profile', 'email'],
-    redirectUri,
-    // Use implicit flow on web to get ID token directly in the redirect
-    ...(isWeb && { responseType: AuthSession.ResponseType.IdToken }),
-  });
+  // Use web client ID
+  const clientId = GOOGLE_CLIENT_IDS.web;
+
+  // Create auth request
+  const [request, response, promptAsync] = AuthSession.useAuthRequest(
+    {
+      clientId,
+      scopes: ['openid', 'profile', 'email'],
+      redirectUri,
+      responseType: AuthSession.ResponseType.IdToken,
+      usePKCE: false,
+    },
+    discovery
+  );
 
   useEffect(() => {
     const handleGoogleResponse = async () => {
@@ -98,6 +104,15 @@ export const useGoogleAuth = (onSuccess: (tokens: GoogleAuthResponse) => Promise
   }, [response, onSuccess]);
 
   const handleGoogleLogin = async () => {
+    // Expo Go on mobile doesn't support OAuth redirect properly
+    if (isMobileExpoGo) {
+      showAlert(
+        'Not Available in Expo Go', 
+        'Google Sign-In requires a production build. Please use email/password login, or test on web (press W in terminal).'
+      );
+      return;
+    }
+
     setLoading(true);
     try {
       if (!request) {
@@ -110,7 +125,6 @@ export const useGoogleAuth = (onSuccess: (tokens: GoogleAuthResponse) => Promise
         clientId: request.clientId,
       }, null, 2));
       
-      // promptAsync without options - the redirect URI is already set in the request
       await promptAsync();
     } catch (error) {
       console.error('Google prompt error:', error);

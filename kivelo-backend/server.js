@@ -66,7 +66,7 @@ const config = {
           "http://10.0.2.2:3000",
           "http://10.94.166.34:8081",
           "https://hype-creatives.github.io",
-          "https://auth.expo.io/@fatai01/family-wellness-app"
+          "https://auth.expo.io"
         ]
   },
   security: {
