@@ -42,7 +42,8 @@
       "expo-secure-store"
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "baseUrl": "/Kivelo-app"
     },
     "extra": {
       "router": {},
