@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
+import * as Crypto from 'expo-crypto';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { showAlert } from '@/utils/showAlert';
@@ -53,7 +54,21 @@ export const useGoogleAuth = (onSuccess: (tokens: GoogleAuthResponse) => Promise
 
   console.log('🔑 Using Client ID:', clientId?.substring(0, 20) + '...');
 
-  // Create auth request
+  // Generate nonce for implicit flow (required by Google)
+  const [nonce, setNonce] = useState<string | undefined>(undefined);
+  
+  useEffect(() => {
+    const generateNonce = async () => {
+      const randomBytes = await Crypto.getRandomBytesAsync(32);
+      const nonceValue = Array.from(randomBytes)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+      setNonce(nonceValue);
+    };
+    generateNonce();
+  }, []);
+
+  // Create auth request with nonce
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
     {
       clientId,
@@ -61,6 +76,7 @@ export const useGoogleAuth = (onSuccess: (tokens: GoogleAuthResponse) => Promise
       redirectUri,
       responseType: AuthSession.ResponseType.IdToken,
       usePKCE: false,
+      extraParams: nonce ? { nonce } : undefined,
     },
     discovery
   );
