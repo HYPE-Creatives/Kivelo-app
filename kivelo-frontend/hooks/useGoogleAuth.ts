@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { showAlert } from '@/utils/showAlert';
@@ -17,6 +17,12 @@ interface GoogleAuthResponse {
 export const useGoogleAuth = (onSuccess: (tokens: GoogleAuthResponse) => Promise<void>) => {
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
+  const onSuccessRef = useRef(onSuccess);
+  
+  // Keep ref updated
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+  }, [onSuccess]);
 
   const isExpoGo = Constants.appOwnership === 'expo';
   const isWeb = Platform.OS === 'web';
@@ -38,6 +44,10 @@ export const useGoogleAuth = (onSuccess: (tokens: GoogleAuthResponse) => Promise
       return;
     }
 
+    console.log('🔍 useGoogleAuth mounted, checking URL...');
+    console.log('📍 Current URL:', window.location.href);
+    console.log('📍 Hash:', window.location.hash);
+
     // Check if URL has id_token (OAuth callback)
     const hash = window.location.hash;
     if (hash && hash.includes('id_token=')) {
@@ -46,15 +56,19 @@ export const useGoogleAuth = (onSuccess: (tokens: GoogleAuthResponse) => Promise
       
       if (idToken) {
         console.log('🔐 Found id_token in URL, processing...');
+        console.log('🎫 Token length:', idToken.length);
         setLoading(true);
         
-        // Clean up URL
+        // Clean up URL immediately
         window.history.replaceState(null, '', window.location.pathname);
         
         // Process the token
-        onSuccess({ idToken, accessToken: null })
+        onSuccessRef.current({ idToken, accessToken: null })
+          .then(() => {
+            console.log('✅ onSuccess completed');
+          })
           .catch(err => {
-            console.error('Google login error:', err);
+            console.error('❌ Google login error:', err);
             showAlert('Google Login Failed', err.message || 'Failed to login with Google');
           })
           .finally(() => setLoading(false));
@@ -62,7 +76,7 @@ export const useGoogleAuth = (onSuccess: (tokens: GoogleAuthResponse) => Promise
     }
     
     setReady(true);
-  }, [isWeb, onSuccess]);
+  }, [isWeb]); // Remove onSuccess from deps to prevent re-runs
 
   const handleGoogleLogin = useCallback(async () => {
     if (isMobileExpoGo) {
@@ -83,7 +97,10 @@ export const useGoogleAuth = (onSuccess: (tokens: GoogleAuthResponse) => Promise
     try {
       const nonce = generateNonce();
       const clientId = GOOGLE_CLIENT_IDS.web;
-      const redirectUri = `${window.location.origin}${window.location.pathname}`;
+      // Ensure consistent redirect URI (no trailing slash variations)
+      let redirectUri = `${window.location.origin}${window.location.pathname}`;
+      // Remove trailing slash if present, then add one back for consistency
+      redirectUri = redirectUri.replace(/\/+$/, '') + '/';
       
       const params = new URLSearchParams({
         client_id: clientId,
