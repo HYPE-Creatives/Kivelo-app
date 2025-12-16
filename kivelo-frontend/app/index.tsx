@@ -1,9 +1,9 @@
-import { View, Text, Image, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
+import { View, Text, Image, TouchableOpacity, ScrollView, ActivityIndicator, Platform } from "react-native";
 import { useRouter, Redirect } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 
 SplashScreen.preventAutoHideAsync();
@@ -15,7 +15,43 @@ export default function LandingPage() {
   });
 
   const router = useRouter();
-  const { user, isLoading, isAuthenticated } = useAuth();
+  const { user, isLoading, isAuthenticated, loginWithGoogle } = useAuth();
+  const [processingOAuth, setProcessingOAuth] = useState(false);
+
+  // Handle OAuth callback at root level
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    
+    const hash = window.location.hash;
+    if (hash && hash.includes('id_token=')) {
+      console.log('🔐 OAuth callback detected at root, processing...');
+      setProcessingOAuth(true);
+      
+      const params = new URLSearchParams(hash.substring(1));
+      const idToken = params.get('id_token');
+      
+      // Clean URL immediately
+      window.history.replaceState(null, '', window.location.pathname);
+      
+      if (idToken) {
+        loginWithGoogle(idToken)
+          .then((result) => {
+            console.log('✅ Google login result:', result);
+            if (!result.success) {
+              console.error('❌ Google login failed:', result.message);
+            }
+          })
+          .catch((err) => {
+            console.error('❌ Google login error:', err);
+          })
+          .finally(() => {
+            setProcessingOAuth(false);
+          });
+      } else {
+        setProcessingOAuth(false);
+      }
+    }
+  }, [loginWithGoogle]);
 
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded || fontError) {
@@ -23,11 +59,16 @@ export default function LandingPage() {
     }
   }, [fontsLoaded, fontError]);
 
-  // Show loading while checking auth status
-  if (isLoading || (!fontsLoaded && !fontError)) {
+  // Show loading while checking auth status or processing OAuth
+  if (isLoading || processingOAuth || (!fontsLoaded && !fontError)) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#4CAF50" }}>
         <ActivityIndicator size="large" color="#fff" />
+        {processingOAuth && (
+          <Text style={{ color: '#fff', marginTop: 16, fontSize: 16 }}>
+            Signing in with Google...
+          </Text>
+        )}
       </View>
     );
   }

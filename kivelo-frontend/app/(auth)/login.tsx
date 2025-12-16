@@ -54,6 +54,18 @@ export default function LoginScreen() {
 
   const { googleLoading, googleRequest, handleGoogleLogin } = useGoogleAuth(handleGoogleSuccess);
 
+  // Show loading screen when processing Google OAuth callback
+  if (googleLoading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#2E8B57" />
+        <Text style={{ marginTop: 16, fontSize: 16, color: '#475569' }}>
+          Signing in with Google...
+        </Text>
+      </View>
+    );
+  }
+
   const validateForm = () => {
     if (!email.trim()) {
       return "Email is required";
