@@ -93,15 +93,17 @@ export default function AuthLayout() {
         {/* Header with Back Button and Logo - Only show on login/register pages */}
         {shouldShowLogo && (
           <View style={styles.headerContainer}>
-            <TouchableOpacity style={styles.backButton} onPress={() => router.replace("/")}>
-              <Ionicons name="arrow-back" size={20} color="#64748b" />
-            </TouchableOpacity>
             <View style={styles.logoContainer}>
               <Image
                 source={require("../../assets/images/Family-Wellness-logo.png")}
                 style={styles.logo}
               />
-              <Text style={styles.appTitle}>Family Wellness</Text>
+              <View style={styles.titleRow}>
+                <TouchableOpacity style={styles.backButton} onPress={() => router.replace("/")}>
+                  <Ionicons name="arrow-back" size={22} color="#fff" />
+                </TouchableOpacity>
+                <Text style={styles.appTitle}>KIVELO</Text>
+              </View>
               <Text style={styles.appSubtitle}>Healthy Families, Happy Lives</Text>
             </View>
           </View>
@@ -141,7 +143,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 24,
-    paddingVertical: 40,
+    paddingTop: 20,
+    paddingBottom: 30,
   },
   scrollContainerNoLogo: {
     justifyContent: "flex-start",
@@ -149,39 +152,43 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     width: '100%',
-    marginBottom: 24,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    marginBottom: 20,
   },
   logoContainer: {
     alignItems: "center",
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 10,
+  },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#16A34A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#16A34A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
   logo: {
-    width: 150,
-    height: 150,
+    width: 120,
+    height: 120,
     resizeMode: "contain",
   },
   appTitle: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: "bold",
     color: "#16A34A",
-    marginTop: 16,
     textAlign: "center",
   },
   appSubtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: "#64748B",
     marginTop: 4,
     textAlign: "center",

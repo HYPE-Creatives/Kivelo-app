@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   StyleSheet,
@@ -17,8 +17,22 @@ import { useAuth } from "../../context/AuthContext";
 import { useGoogleAuth } from "@/hooks/useGoogleAuth";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  withDelay,
+  withSequence,
+  interpolate,
+  Easing,
+  FadeInDown,
+  FadeInUp,
+  Layout,
+} from "react-native-reanimated";
 
 const { width, height } = Dimensions.get("window");
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 type UserType = "parent" | "child";
 type ChildLoginMethod = "password" | "code";
@@ -33,6 +47,37 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  // Animation values
+  const toggleScale = useSharedValue(0.9);
+  const toggleOpacity = useSharedValue(0);
+  const cardTranslateY = useSharedValue(30);
+  const cardOpacity = useSharedValue(0);
+  const footerOpacity = useSharedValue(0);
+
+  // Start animations on mount
+  useEffect(() => {
+    toggleScale.value = withSpring(1, { damping: 12, stiffness: 100 });
+    toggleOpacity.value = withTiming(1, { duration: 400 });
+    cardTranslateY.value = withDelay(150, withSpring(0, { damping: 15 }));
+    cardOpacity.value = withDelay(150, withTiming(1, { duration: 400 }));
+    footerOpacity.value = withDelay(400, withTiming(1, { duration: 400 }));
+  }, []);
+
+  // Animated styles
+  const toggleAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: toggleScale.value }],
+    opacity: toggleOpacity.value,
+  }));
+
+  const cardAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: cardTranslateY.value }],
+    opacity: cardOpacity.value,
+  }));
+
+  const footerAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: footerOpacity.value,
+  }));
 
   // Google OAuth handler
   const handleGoogleSuccess = async (tokens: { idToken: string | null; accessToken: string | null }) => {
@@ -112,7 +157,7 @@ export default function LoginScreen() {
         style={styles.keyboardView}
       >
         {/* User Type Toggle */}
-        <View style={styles.toggleContainer}>
+        <Animated.View style={[styles.toggleContainer, toggleAnimatedStyle]}>
           <TouchableOpacity 
             style={[styles.toggleButton, userType === "parent" && styles.toggleButtonActiveParent]}
             onPress={() => { setUserType("parent"); setEmail(""); setPassword(""); setCode(""); }}
@@ -128,10 +173,10 @@ export default function LoginScreen() {
             <Ionicons name="happy" size={18} color={userType === "child" ? "#fff" : "#8B5CF6"} />
             <Text style={[styles.toggleText, userType === "child" && styles.toggleTextActive]}>Child</Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
 
         {/* Form Card */}
-        <View style={[styles.card, userType === "child" && styles.cardChild]}>
+        <Animated.View style={[styles.card, userType === "child" && styles.cardChild, cardAnimatedStyle]}>
           {userType === "child" && (
             <View style={styles.childMethodToggle}>
               <TouchableOpacity 
@@ -278,15 +323,24 @@ export default function LoginScreen() {
               </Text>
             </View>
           )}
-        </View>
+        </Animated.View>
 
         {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Don't have an account?</Text>
-          <TouchableOpacity onPress={handleRegisterRedirect}>
-            <Text style={[styles.footerLink, userType === "child" && styles.footerLinkChild]}> Register</Text>
-          </TouchableOpacity>
-        </View>
+        <Animated.View style={[styles.footer, footerAnimatedStyle]}>
+          {userType === "parent" ? (
+            <>
+              <Text style={styles.footerText}>Don't have an account?</Text>
+              <TouchableOpacity onPress={handleRegisterRedirect}>
+                <Text style={styles.footerLink}> Register</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <View style={styles.childFooter}>
+              <Ionicons name="people" size={18} color="#8B5CF6" />
+              <Text style={styles.childFooterText}>Need Code? Ask Parent!</Text>
+            </View>
+          )}
+        </Animated.View>
       </KeyboardAvoidingView>
     </View>
   );
@@ -295,7 +349,6 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8fafc",
   },
   loadingContainer: {
     justifyContent: 'center',
@@ -308,15 +361,13 @@ const styles = StyleSheet.create({
   },
   keyboardView: {
     flex: 1,
-    paddingHorizontal: 24,
-    justifyContent: 'center',
   },
   toggleContainer: {
     flexDirection: 'row',
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 4,
-    marginBottom: 20,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -504,18 +555,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 24,
+    marginTop: 20,
+    paddingVertical: 12,
   },
   footerText: {
     color: '#64748b',
-    fontSize: 14,
+    fontSize: 15,
   },
   footerLink: {
     color: '#2E8B57',
-    fontWeight: '600',
-    fontSize: 14,
+    fontWeight: '700',
+    fontSize: 15,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
   },
   footerLinkChild: {
     color: '#8B5CF6',
+  },
+  childFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3E8FF',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  childFooterText: {
+    color: '#7C3AED',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

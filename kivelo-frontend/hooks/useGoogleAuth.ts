@@ -115,11 +115,21 @@ export const useGoogleAuth = (onSuccess: (tokens: GoogleAuthResponse) => Promise
 
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
       
-      console.log('🚀 Redirecting to Google OAuth...');
+      console.log('🚀 Opening Google OAuth in new window...');
       console.log('📋 Redirect URI:', redirectUri);
       
-      // Redirect to Google (not popup)
-      window.location.href = authUrl;
+      // Open in a new window to avoid WebView/embedded browser issues
+      // This ensures a proper browser context with standard user agent
+      const authWindow = window.open(authUrl, '_blank', 'noopener,noreferrer');
+      
+      if (!authWindow) {
+        // Popup was blocked, fall back to redirect
+        console.log('⚠️ Popup blocked, falling back to redirect...');
+        window.location.href = authUrl;
+      } else {
+        // Reset loading since user will come back after OAuth
+        setLoading(false);
+      }
     } catch (error) {
       console.error('Google login error:', error);
       setLoading(false);
