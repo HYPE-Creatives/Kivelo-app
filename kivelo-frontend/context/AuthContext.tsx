@@ -1,11 +1,21 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import { Platform } from "react-native";
 
-const API_URLS = [
-  "http://localhost:5000/api/v1",  // Local dev server
-  "https://family-wellness.onrender.com/api/v1",
-];
+// Detect if running in production (web deployed on Vercel/etc)
+const isProduction = Platform.OS === 'web' && 
+  typeof window !== 'undefined' && 
+  !window.location.hostname.includes('localhost');
+
+// In production, only use the remote API
+// In development, try localhost first then fallback to remote
+const API_URLS = isProduction
+  ? ["https://family-wellness.onrender.com/api/v1"]
+  : [
+      "http://localhost:5000/api/v1",  // Local dev server
+      "https://family-wellness.onrender.com/api/v1",
+    ];
 
 // Types (keep your existing types)
 type Role = "parent" | "child" | "ai" | null;
