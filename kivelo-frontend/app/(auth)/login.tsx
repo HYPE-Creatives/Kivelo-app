@@ -112,10 +112,9 @@ export default function LoginScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        {/* Back to Home Link */}
+        {/* Back Navigation */}
         <TouchableOpacity style={styles.backLink} onPress={handleGoBackHome}>
-          <Ionicons name="chevron-back" size={16} color="#64748b" />
-          <Text style={styles.backLinkText}>Back to Home</Text>
+          <Ionicons name="arrow-back-circle-outline" size={28} color="#94a3b8" />
         </TouchableOpacity>
 
         {/* User Type Toggle */}
@@ -319,16 +318,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
     alignSelf: 'flex-start',
-    marginBottom: 20,
-    gap: 2,
-  },
-  backLinkText: {
-    color: '#64748b',
-    fontSize: 14,
-    fontWeight: '500',
+    marginBottom: 16,
+    padding: 4,
   },
   toggleContainer: {
     flexDirection: 'row',
