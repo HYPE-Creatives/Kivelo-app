@@ -102,7 +102,6 @@ export default function LoginScreen() {
     }
   };
 
-  const handleGoBackHome = () => router.replace("/");
   const handleRegisterRedirect = () => router.push("/(auth)/register");
   const handleForgotPassword = () => router.push("/(auth)/forgot-password");
 
@@ -112,11 +111,6 @@ export default function LoginScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        {/* Back Navigation */}
-        <TouchableOpacity style={styles.backLink} onPress={handleGoBackHome}>
-          <Ionicons name="arrow-back-circle-outline" size={28} color="#94a3b8" />
-        </TouchableOpacity>
-
         {/* User Type Toggle */}
         <View style={styles.toggleContainer}>
           <TouchableOpacity 
@@ -316,11 +310,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
     justifyContent: 'center',
-  },
-  backLink: {
-    alignSelf: 'flex-start',
-    marginBottom: 16,
-    padding: 4,
   },
   toggleContainer: {
     flexDirection: 'row',

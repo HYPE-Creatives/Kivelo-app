@@ -9,9 +9,11 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Text
+  Text,
+  TouchableOpacity
 } from "react-native";
 import { useAuth } from "../../context/AuthContext";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function AuthLayout() {
   const router = useRouter();
@@ -88,15 +90,20 @@ export default function AuthLayout() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Logo Section - Only show on login/register pages */}
+        {/* Header with Back Button and Logo - Only show on login/register pages */}
         {shouldShowLogo && (
-          <View style={styles.logoContainer}>
-            <Image
-              source={require("../../assets/images/Family-Wellness-logo.png")}
-              style={styles.logo}
-            />
-            <Text style={styles.appTitle}>Family Wellness</Text>
-            <Text style={styles.appSubtitle}>Healthy Families, Happy Lives</Text>
+          <View style={styles.headerContainer}>
+            <TouchableOpacity style={styles.backButton} onPress={() => router.replace("/")}>
+              <Ionicons name="arrow-back" size={20} color="#64748b" />
+            </TouchableOpacity>
+            <View style={styles.logoContainer}>
+              <Image
+                source={require("../../assets/images/Family-Wellness-logo.png")}
+                style={styles.logo}
+              />
+              <Text style={styles.appTitle}>Family Wellness</Text>
+              <Text style={styles.appSubtitle}>Healthy Families, Happy Lives</Text>
+            </View>
           </View>
         )}
 
@@ -140,9 +147,26 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     paddingTop: 60,
   },
+  headerContainer: {
+    width: '100%',
+    marginBottom: 24,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+  },
   logoContainer: {
     alignItems: "center",
-    marginBottom: 40,
   },
   logo: {
     width: 150,
