@@ -38,7 +38,7 @@ export const useGoogleAuth = (onSuccess: (tokens: GoogleAuthResponse) => Promise
   // For web, use localhost redirect. For native, use app scheme
   const redirectUri = isWeb
     ? AuthSession.makeRedirectUri({ preferLocalhost: true })
-    : AuthSession.makeRedirectUri({ scheme: 'family-wellness-app', path: 'auth' });
+    : AuthSession.makeRedirectUri({ scheme: 'kivelo-app', path: 'auth' });
 
   console.log('🔗 Google OAuth Redirect URI:', redirectUri);
   console.log('📱 Running in Expo Go:', isExpoGo);

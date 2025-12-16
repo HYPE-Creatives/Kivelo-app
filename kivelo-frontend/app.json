@@ -1,11 +1,11 @@
 {
   "expo": {
     "name": "KIVELO",
-    "slug": "family-wellness-app",
+    "slug": "kivelo-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "family-wellness-app",
+    "scheme": "kivelo-app",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -48,7 +48,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "4cb47578-45fe-4276-bfee-27f80f6fe333"
+        "projectId": "31d6fce6-a297-4fa2-bd3b-119b35128d93"
       }
     },
     "owner": "fatai01"
