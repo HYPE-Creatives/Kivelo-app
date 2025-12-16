@@ -39,12 +39,12 @@ export const useGoogleAuth = (onSuccess: (tokens: GoogleAuthResponse) => Promise
   // Detect if deployed (not localhost)
   const isDeployedWeb = isWeb && typeof window !== 'undefined' && !window.location.hostname.includes('localhost');
   
-  // For deployed web, use the actual site URL
+  // For deployed web, use the base site URL (without current path)
   // For local web dev, use localhost
   // For native, use app scheme
   const redirectUri = isWeb
     ? isDeployedWeb
-      ? `${window.location.origin}${window.location.pathname}`
+      ? `${window.location.origin}/Kivelo-app/`
       : AuthSession.makeRedirectUri({ preferLocalhost: true })
     : AuthSession.makeRedirectUri({ scheme: 'kivelo-app', path: 'auth' });
 
