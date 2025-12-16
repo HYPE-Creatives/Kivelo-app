@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
   Text,
   Image,
   Dimensions,
@@ -19,7 +18,7 @@ import { useGoogleAuth } from "@/hooks/useGoogleAuth";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 
 type UserType = "parent" | "child";
 type ChildLoginMethod = "password" | "code";
@@ -46,7 +45,6 @@ export default function LoginScreen() {
     
     if (result.success) {
       console.log("✅ Google login successful");
-      // Navigation handled by AuthContext
     } else {
       showAlert("Google Sign-In Failed", result.message || "Failed to sign in with Google");
     }
@@ -57,38 +55,22 @@ export default function LoginScreen() {
   // Show loading screen when processing Google OAuth callback
   if (googleLoading) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+      <View style={[styles.container, styles.loadingContainer]}>
         <ActivityIndicator size="large" color="#2E8B57" />
-        <Text style={{ marginTop: 16, fontSize: 16, color: '#475569' }}>
-          Signing in with Google...
-        </Text>
+        <Text style={styles.loadingText}>Signing in with Google...</Text>
       </View>
     );
   }
 
   const validateForm = () => {
-    if (!email.trim()) {
-      return "Email is required";
-    }
-    
+    if (!email.trim()) return "Email is required";
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return "Please enter a valid email";
-    }
-
-    if (userType === "parent" && !password) {
-      return "Password is required";
-    }
-
+    if (!emailRegex.test(email)) return "Please enter a valid email";
+    if (userType === "parent" && !password) return "Password is required";
     if (userType === "child") {
-      if (childLoginMethod === "password" && !password) {
-        return "Password is required";
-      }
-      if (childLoginMethod === "code" && !code) {
-        return "Login code is required";
-      }
+      if (childLoginMethod === "password" && !password) return "Password is required";
+      if (childLoginMethod === "code" && !code) return "Login code is required";
     }
-
     return null;
   };
 
@@ -101,12 +83,9 @@ export default function LoginScreen() {
 
     try {
       let result;
-
       if (userType === "parent") {
-        // Parent always uses email + password, enforce parent role
         result = await login(email, password, "parent");
       } else {
-        // Child can use either password or code
         if (childLoginMethod === "password") {
           result = await login(email, password, "child");
         } else {
@@ -114,345 +93,216 @@ export default function LoginScreen() {
         }
       }
 
-      if (result.success) {
-        console.log("✅ Login successful");
-        // Navigation handled by AuthContext
-      } else {
-        showAlert(
-          userType === "child" ? "Oops! 😅" : "Login Failed", 
-          result.message || "Invalid credentials"
-        );
+      if (!result.success) {
+        showAlert(userType === "child" ? "Oops! 😅" : "Login Failed", result.message || "Invalid credentials");
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Login Error:", err);
       showAlert("Error", "Something went wrong while logging in");
     }
   };
 
-  const handleGoBackHome = () => {
-    router.replace("/");
-  };
-
-  const handleRegisterRedirect = () => {
-    router.push("/(auth)/register");
-  };
-
-  const handleForgotPassword = () => {
-    router.push("/(auth)/forgot-password");
-  };
-
-  // Render Parent Login Form
-  const renderParentLogin = () => (
-    <View style={styles.formContainer}>
-      <View style={styles.formHeader}>
-        <Ionicons name="person" size={32} color="#2E8B57" />
-        <Text style={styles.formTitle}>Parent Sign In</Text>
-        <Text style={styles.formSubtitle}>Welcome back! Sign in to manage your family</Text>
-      </View>
-
-      <PaperTextInput
-        label="Email"
-        value={email}
-        onChangeText={setEmail}
-        style={styles.input}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        mode="outlined"
-        outlineColor="#e2e8f0"
-        activeOutlineColor="#2E8B57"
-        left={<PaperTextInput.Icon icon="email" color="#64748b" />}
-      />
-
-      <PaperTextInput
-        label="Password"
-        value={password}
-        onChangeText={setPassword}
-        style={styles.input}
-        secureTextEntry={!showPassword}
-        right={
-          <PaperTextInput.Icon 
-            icon={showPassword ? 'eye-off' : 'eye'} 
-            onPress={() => setShowPassword(!showPassword)} 
-          />
-        }
-        left={<PaperTextInput.Icon icon="lock" color="#64748b" />}
-        mode="outlined"
-        outlineColor="#e2e8f0"
-        activeOutlineColor="#2E8B57"
-      />
-
-      <TouchableOpacity style={styles.forgotPassword} onPress={handleForgotPassword}>
-        <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-      </TouchableOpacity>
-
-      <Button 
-        mode="contained" 
-        onPress={handleLogin} 
-        loading={isLoading}
-        disabled={isLoading || googleLoading}
-        contentStyle={styles.loginButtonContent}
-        style={styles.loginButton}
-        labelStyle={styles.loginButtonLabel}
-      >
-        {isLoading ? "Signing In..." : "Sign In"}
-      </Button>
-
-      {/* Divider */}
-      <View style={styles.dividerContainer}>
-        <View style={styles.divider} />
-        <Text style={styles.dividerText}>or continue with</Text>
-        <View style={styles.divider} />
-      </View>
-
-      {/* Social Sign-In Buttons - Side by Side */}
-      <View style={styles.socialButtonsContainer}>
-        {/* Google Sign-In Button */}
-        <TouchableOpacity 
-          style={[styles.socialButton, styles.googleButton, (!googleRequest || googleLoading) && styles.socialButtonDisabled]}
-          onPress={handleGoogleLogin}
-          disabled={!googleRequest || googleLoading || isLoading}
-        >
-          {googleLoading ? (
-            <ActivityIndicator size="small" color="#4285F4" />
-          ) : (
-            <>
-              <Image 
-                source={{ uri: 'https://www.google.com/favicon.ico' }} 
-                style={styles.socialIcon}
-              />
-              <Text style={styles.googleButtonText}>Google</Text>
-            </>
-          )}
-        </TouchableOpacity>
-
-        {/* Apple Sign-In Button (Coming Soon) */}
-        <TouchableOpacity 
-          style={[styles.socialButton, styles.appleButton]}
-          onPress={() => showAlert("Coming Soon!", "Apple Sign-In will be available soon. Stay tuned! 🍎")}
-        >
-          <Ionicons name="logo-apple" size={20} color="#fff" />
-          <Text style={styles.appleButtonText}>Apple</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.registerContainer}>
-        <Text style={styles.registerText}>Don{"'"}t have an account?</Text>
-        <TouchableOpacity onPress={handleRegisterRedirect}>
-          <Text style={styles.registerLink}> Register</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
-  // Render Child Login Form
-  const renderChildLogin = () => (
-    <View style={styles.childFormContainer}>
-      <View style={styles.childFormHeader}>
-        <Text style={styles.childWelcomeEmoji}>👋</Text>
-        <Text style={styles.childFormTitle}>Hey there!</Text>
-        <Text style={styles.childFormSubtitle}>Let's get you signed in</Text>
-      </View>
-
-      {/* Child Login Method Toggle */}
-      <View style={styles.childMethodToggle}>
-        <TouchableOpacity 
-          style={[
-            styles.childMethodButton, 
-            childLoginMethod === "password" && styles.childMethodButtonActive
-          ]}
-          onPress={() => setChildLoginMethod("password")}
-        >
-          <Ionicons 
-            name="key" 
-            size={20} 
-            color={childLoginMethod === "password" ? "#fff" : "#8B5CF6"} 
-          />
-          <Text style={[
-            styles.childMethodText,
-            childLoginMethod === "password" && styles.childMethodTextActive
-          ]}>
-            Password
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[
-            styles.childMethodButton, 
-            childLoginMethod === "code" && styles.childMethodButtonActive
-          ]}
-          onPress={() => setChildLoginMethod("code")}
-        >
-          <Ionicons 
-            name="qr-code" 
-            size={20} 
-            color={childLoginMethod === "code" ? "#fff" : "#8B5CF6"} 
-          />
-          <Text style={[
-            styles.childMethodText,
-            childLoginMethod === "code" && styles.childMethodTextActive
-          ]}>
-            Login Code
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <PaperTextInput
-        label="Your Email"
-        value={email}
-        onChangeText={setEmail}
-        style={styles.childInput}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        mode="outlined"
-        outlineColor="#DDD6FE"
-        activeOutlineColor="#8B5CF6"
-        left={<PaperTextInput.Icon icon="email" color="#8B5CF6" />}
-      />
-
-      {childLoginMethod === "password" ? (
-        <PaperTextInput
-          label="Your Password"
-          value={password}
-          onChangeText={setPassword}
-          style={styles.childInput}
-          secureTextEntry={!showPassword}
-          right={
-            <PaperTextInput.Icon 
-              icon={showPassword ? 'eye-off' : 'eye'} 
-              onPress={() => setShowPassword(!showPassword)} 
-            />
-          }
-          left={<PaperTextInput.Icon icon="lock" color="#8B5CF6" />}
-          mode="outlined"
-          outlineColor="#DDD6FE"
-          activeOutlineColor="#8B5CF6"
-        />
-      ) : (
-        <PaperTextInput
-          label="Login Code (from parent)"
-          value={code}
-          onChangeText={(text) => setCode(text.toUpperCase())}
-          style={styles.childInput}
-          autoCapitalize="characters"
-          mode="outlined"
-          outlineColor="#DDD6FE"
-          activeOutlineColor="#8B5CF6"
-          left={<PaperTextInput.Icon icon="ticket" color="#8B5CF6" />}
-        />
-      )}
-
-      <TouchableOpacity 
-        style={styles.childLoginButton} 
-        onPress={handleLogin}
-        disabled={isLoading}
-        activeOpacity={0.8}
-      >
-        <LinearGradient
-          colors={["#8B5CF6", "#7C3AED"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.childLoginButtonGradient}
-        >
-          {isLoading ? (
-            <Text style={styles.childLoginButtonText}>Signing In... ⏳</Text>
-          ) : (
-            <Text style={styles.childLoginButtonText}>Let's Go! 🚀</Text>
-          )}
-        </LinearGradient>
-      </TouchableOpacity>
-
-      {/* Help text for children */}
-      <View style={styles.childHelpContainer}>
-        <Ionicons name="help-circle" size={18} color="#A78BFA" />
-        <Text style={styles.childHelpText}>
-          {childLoginMethod === "code" 
-            ? "Ask your parent for your login code!" 
-            : "Use the password you created earlier"}
-        </Text>
-      </View>
-    </View>
-  );
+  const handleGoBackHome = () => router.replace("/");
+  const handleRegisterRedirect = () => router.push("/(auth)/register");
+  const handleForgotPassword = () => router.push("/(auth)/forgot-password");
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView 
-        contentContainerStyle={styles.scrollContainer}
-        showsVerticalScrollIndicator={false}
+    <View style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
       >
         {/* Back Button */}
         <TouchableOpacity style={styles.backButton} onPress={handleGoBackHome}>
-          <Ionicons name="arrow-back" size={20} color="#475569" />
-          <Text style={styles.backButtonText}>Back</Text>
+          <Ionicons name="arrow-back" size={20} color="#64748b" />
         </TouchableOpacity>
 
-        {/* Logo & Header */}
-        <View style={styles.header}>
+        {/* Logo */}
+        <View style={styles.logoContainer}>
           <Image 
             source={require('../../assets/images/Family-Wellness-logo.png')} 
             style={styles.logo} 
           />
-          <Text style={styles.title}>Welcome to Kivelo</Text>
         </View>
 
         {/* User Type Toggle */}
-        <View style={styles.userTypeToggle}>
+        <View style={styles.toggleContainer}>
           <TouchableOpacity 
-            style={[
-              styles.userTypeButton, 
-              userType === "parent" && styles.parentTypeButtonActive
-            ]}
-            onPress={() => {
-              setUserType("parent");
-              setEmail("");
-              setPassword("");
-              setCode("");
-            }}
+            style={[styles.toggleButton, userType === "parent" && styles.toggleButtonActiveParent]}
+            onPress={() => { setUserType("parent"); setEmail(""); setPassword(""); setCode(""); }}
           >
-            <Ionicons 
-              name="person" 
-              size={24} 
-              color={userType === "parent" ? "#fff" : "#2E8B57"} 
-            />
-            <Text style={[
-              styles.userTypeText,
-              userType === "parent" && styles.userTypeTextActive
-            ]}>
-              I'm a Parent
-            </Text>
+            <Ionicons name="person" size={18} color={userType === "parent" ? "#fff" : "#2E8B57"} />
+            <Text style={[styles.toggleText, userType === "parent" && styles.toggleTextActive]}>Parent</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={[
-              styles.userTypeButton, 
-              userType === "child" && styles.childTypeButtonActive
-            ]}
-            onPress={() => {
-              setUserType("child");
-              setEmail("");
-              setPassword("");
-              setCode("");
-            }}
+            style={[styles.toggleButton, userType === "child" && styles.toggleButtonActiveChild]}
+            onPress={() => { setUserType("child"); setEmail(""); setPassword(""); setCode(""); }}
           >
-            <Ionicons 
-              name="happy" 
-              size={24} 
-              color={userType === "child" ? "#fff" : "#8B5CF6"} 
-            />
-            <Text style={[
-              styles.userTypeText,
-              userType === "child" && styles.childUserTypeTextActive
-            ]}>
-              I'm a Child
-            </Text>
+            <Ionicons name="happy" size={18} color={userType === "child" ? "#fff" : "#8B5CF6"} />
+            <Text style={[styles.toggleText, userType === "child" && styles.toggleTextActive]}>Child</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Conditional Form Rendering */}
-        {userType === "parent" ? renderParentLogin() : renderChildLogin()}
-      </ScrollView>
-    </KeyboardAvoidingView>
+        {/* Form Card */}
+        <View style={[styles.card, userType === "child" && styles.cardChild]}>
+          {userType === "child" && (
+            <View style={styles.childMethodToggle}>
+              <TouchableOpacity 
+                style={[styles.methodButton, childLoginMethod === "password" && styles.methodButtonActive]}
+                onPress={() => setChildLoginMethod("password")}
+              >
+                <Ionicons name="lock-closed" size={14} color={childLoginMethod === "password" ? "#fff" : "#8B5CF6"} />
+                <Text style={[styles.methodText, childLoginMethod === "password" && styles.methodTextActive]}>Password</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.methodButton, childLoginMethod === "code" && styles.methodButtonActive]}
+                onPress={() => setChildLoginMethod("code")}
+              >
+                <Ionicons name="key" size={14} color={childLoginMethod === "code" ? "#fff" : "#8B5CF6"} />
+                <Text style={[styles.methodText, childLoginMethod === "code" && styles.methodTextActive]}>Code</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <PaperTextInput
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            style={styles.input}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            mode="outlined"
+            outlineColor={userType === "child" ? "#DDD6FE" : "#e2e8f0"}
+            activeOutlineColor={userType === "child" ? "#8B5CF6" : "#2E8B57"}
+            left={<PaperTextInput.Icon icon="email" color="#94a3b8" />}
+            dense
+          />
+
+          {(userType === "parent" || childLoginMethod === "password") && (
+            <PaperTextInput
+              label="Password"
+              value={password}
+              onChangeText={setPassword}
+              style={styles.input}
+              secureTextEntry={!showPassword}
+              right={<PaperTextInput.Icon icon={showPassword ? 'eye-off' : 'eye'} onPress={() => setShowPassword(!showPassword)} />}
+              left={<PaperTextInput.Icon icon="lock" color="#94a3b8" />}
+              mode="outlined"
+              outlineColor={userType === "child" ? "#DDD6FE" : "#e2e8f0"}
+              activeOutlineColor={userType === "child" ? "#8B5CF6" : "#2E8B57"}
+              dense
+            />
+          )}
+
+          {userType === "child" && childLoginMethod === "code" && (
+            <PaperTextInput
+              label="Login Code"
+              value={code}
+              onChangeText={setCode}
+              style={styles.input}
+              autoCapitalize="characters"
+              mode="outlined"
+              outlineColor="#DDD6FE"
+              activeOutlineColor="#8B5CF6"
+              left={<PaperTextInput.Icon icon="key" color="#94a3b8" />}
+              dense
+            />
+          )}
+
+          {userType === "parent" && (
+            <TouchableOpacity style={styles.forgotPassword} onPress={handleForgotPassword}>
+              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+            </TouchableOpacity>
+          )}
+
+          {userType === "parent" ? (
+            <Button 
+              mode="contained" 
+              onPress={handleLogin} 
+              loading={isLoading}
+              disabled={isLoading || googleLoading}
+              style={styles.loginButton}
+              contentStyle={styles.loginButtonContent}
+              labelStyle={styles.loginButtonLabel}
+            >
+              {isLoading ? "Signing In..." : "Sign In"}
+            </Button>
+          ) : (
+            <TouchableOpacity 
+              style={styles.childLoginButton}
+              onPress={handleLogin}
+              disabled={isLoading}
+            >
+              <LinearGradient
+                colors={['#8B5CF6', '#A78BFA']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.childLoginGradient}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.childLoginText}>Let's Go! 🚀</Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+
+          {userType === "parent" && (
+            <>
+              <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>or</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              <View style={styles.socialRow}>
+                <TouchableOpacity 
+                  style={[styles.socialButton, (!googleRequest || googleLoading) && styles.socialButtonDisabled]}
+                  onPress={handleGoogleLogin}
+                  disabled={!googleRequest || googleLoading || isLoading}
+                >
+                  {googleLoading ? (
+                    <ActivityIndicator size="small" color="#4285F4" />
+                  ) : (
+                    <>
+                      <Image source={{ uri: 'https://www.google.com/favicon.ico' }} style={styles.socialIcon} />
+                      <Text style={styles.socialText}>Google</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={styles.appleButton}
+                  onPress={() => showAlert("Coming Soon!", "Apple Sign-In will be available soon 🍎")}
+                >
+                  <Ionicons name="logo-apple" size={18} color="#fff" />
+                  <Text style={styles.appleText}>Apple</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+
+          {userType === "child" && (
+            <View style={styles.childHelp}>
+              <Ionicons name="help-circle" size={16} color="#8B5CF6" />
+              <Text style={styles.childHelpText}>
+                {childLoginMethod === "code" ? "Ask your parent for your code!" : "Use your password"}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>Don't have an account?</Text>
+          <TouchableOpacity onPress={handleRegisterRedirect}>
+            <Text style={[styles.footerLink, userType === "child" && styles.footerLinkChild]}> Register</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -461,344 +311,250 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f8fafc",
   },
-  scrollContainer: {
-    flexGrow: 1,
-    padding: 20,
-    paddingTop: 50,
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#64748b',
+  },
+  keyboardView: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    justifyContent: 'center',
   },
   backButton: {
-    flexDirection: 'row',
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 40,
+    left: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    marginBottom: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    gap: 6,
-  },
-  backButtonText: {
-    color: '#475569',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  header: {
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  logo: {
-    width: 100,
-    height: 100,
-    marginBottom: 12,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: "bold",
-    color: "#1e293b",
-    textAlign: "center",
-  },
-  
-  // User Type Toggle
-  userTypeToggle: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 6,
-    marginBottom: 24,
-    shadowColor: "#000",
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
   },
-  userTypeButton: {
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  logo: {
+    width: 80,
+    height: 80,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  toggleButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 6,
   },
-  parentTypeButtonActive: {
+  toggleButtonActiveParent: {
     backgroundColor: '#2E8B57',
   },
-  childTypeButtonActive: {
+  toggleButtonActiveChild: {
     backgroundColor: '#8B5CF6',
   },
-  userTypeText: {
-    fontSize: 15,
+  toggleText: {
+    fontSize: 14,
     fontWeight: '600',
     color: '#64748b',
   },
-  userTypeTextActive: {
+  toggleTextActive: {
     color: '#fff',
   },
-  childUserTypeTextActive: {
-    color: '#fff',
-  },
-
-  // Parent Form Styles
-  formContainer: {
-    backgroundColor: "white",
-    padding: 24,
+  card: {
+    backgroundColor: '#fff',
     borderRadius: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
     shadowRadius: 12,
     elevation: 3,
   },
-  formHeader: {
+  cardChild: {
+    backgroundColor: '#FAF5FF',
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+  },
+  childMethodToggle: {
+    flexDirection: 'row',
+    backgroundColor: '#EDE9FE',
+    borderRadius: 10,
+    padding: 3,
+    marginBottom: 16,
+    gap: 3,
+  },
+  methodButton: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 4,
   },
-  formTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#1e293b',
-    marginTop: 12,
+  methodButtonActive: {
+    backgroundColor: '#8B5CF6',
   },
-  formSubtitle: {
-    fontSize: 14,
-    color: '#64748b',
-    marginTop: 4,
-    textAlign: 'center',
+  methodText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8B5CF6',
+  },
+  methodTextActive: {
+    color: '#fff',
   },
   input: {
-    marginBottom: 16,
-    backgroundColor: "white",
+    marginBottom: 12,
+    backgroundColor: '#fff',
+    fontSize: 14,
   },
   forgotPassword: {
-    alignSelf: "flex-end",
-    marginBottom: 20,
+    alignSelf: 'flex-end',
+    marginBottom: 16,
   },
   forgotPasswordText: {
-    color: "#2E8B57",
-    fontSize: 14,
-    fontWeight: "500",
+    color: '#2E8B57',
+    fontSize: 13,
+    fontWeight: '500',
   },
   loginButton: {
-    marginBottom: 16,
-    backgroundColor: "#2E8B57",
+    backgroundColor: '#2E8B57',
     borderRadius: 12,
   },
   loginButtonContent: {
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
   loginButtonLabel: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
-  
-  // Divider styles
-  dividerContainer: {
+  childLoginButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  childLoginGradient: {
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  childLoginText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  divider: {
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: 16,
   },
-  divider: {
+  dividerLine: {
     flex: 1,
     height: 1,
     backgroundColor: '#e2e8f0',
   },
   dividerText: {
     color: '#94a3b8',
-    fontSize: 13,
+    fontSize: 12,
     paddingHorizontal: 12,
-    fontWeight: '500',
   },
-  
-  // Google Sign-In Button
-  googleButton: {
+  socialRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
     gap: 12,
-  },
-  googleButtonDisabled: {
-    opacity: 0.6,
-  },
-  googleIcon: {
-    width: 20,
-    height: 20,
-  },
-  googleButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#374151',
-  },
-
-  // Social Buttons Container (side by side)
-  socialButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 16,
   },
   socialButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
     borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    paddingVertical: 12,
     gap: 8,
   },
   socialButtonDisabled: {
     opacity: 0.6,
   },
   socialIcon: {
-    width: 20,
-    height: 20,
+    width: 18,
+    height: 18,
   },
-
-  // Google Sign-In Button
-  googleButton: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-
-  // Apple Sign-In Button
-  appleButton: {
-    backgroundColor: '#000',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  appleButtonText: {
-    fontSize: 15,
+  socialText: {
+    fontSize: 14,
     fontWeight: '600',
-    color: '#fff',
+    color: '#374151',
   },
-  
-  registerContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 8,
-  },
-  registerText: {
-    color: "#64748b",
-    fontSize: 14,
-  },
-  registerLink: {
-    color: "#2E8B57",
-    fontWeight: "bold",
-    fontSize: 14,
-  },
-
-  // Child Form Styles
-  childFormContainer: {
-    backgroundColor: "#F5F3FF",
-    padding: 24,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: "#DDD6FE",
-  },
-  childFormHeader: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  childWelcomeEmoji: {
-    fontSize: 48,
-    marginBottom: 8,
-  },
-  childFormTitle: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    color: '#5B21B6',
-  },
-  childFormSubtitle: {
-    fontSize: 16,
-    color: '#7C3AED',
-    marginTop: 4,
-  },
-  childMethodToggle: {
-    flexDirection: 'row',
-    backgroundColor: '#EDE9FE',
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 20,
-    gap: 4,
-  },
-  childMethodButton: {
+  appleButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#000',
+    borderRadius: 12,
     paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    gap: 6,
-  },
-  childMethodButtonActive: {
-    backgroundColor: '#8B5CF6',
-  },
-  childMethodText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#8B5CF6',
-  },
-  childMethodTextActive: {
-    color: '#fff',
-  },
-  childInput: {
-    marginBottom: 16,
-    backgroundColor: "#fff",
-  },
-  childLoginButton: {
-    marginTop: 8,
-    marginBottom: 16,
-    borderRadius: 14,
-    overflow: 'hidden',
-  },
-  childLoginButtonGradient: {
-    paddingVertical: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  childLoginButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  childHelpContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#EDE9FE',
-    padding: 12,
-    borderRadius: 10,
     gap: 8,
   },
+  appleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  childHelp: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EDE9FE',
+    padding: 10,
+    borderRadius: 10,
+    marginTop: 12,
+    gap: 6,
+  },
   childHelpText: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#7C3AED',
-    flex: 1,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  footerText: {
+    color: '#64748b',
+    fontSize: 14,
+  },
+  footerLink: {
+    color: '#2E8B57',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  footerLinkChild: {
+    color: '#8B5CF6',
   },
 });
