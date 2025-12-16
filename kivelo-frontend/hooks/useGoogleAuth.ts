@@ -1,12 +1,7 @@
-import { useState, useEffect } from 'react';
-import * as AuthSession from 'expo-auth-session';
-import * as WebBrowser from 'expo-web-browser';
-import * as Crypto from 'expo-crypto';
+import { useState, useEffect, useCallback } from 'react';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { showAlert } from '@/utils/showAlert';
-
-WebBrowser.maybeCompleteAuthSession();
 
 const GOOGLE_CLIENT_IDS = {
   web: "765956834253-ham5mqf94dkcnqlvlhf68lg1lqkqtfnq.apps.googleusercontent.com",
@@ -19,154 +14,103 @@ interface GoogleAuthResponse {
   accessToken: string | null;
 }
 
-// Google OAuth discovery document
-const discovery = {
-  authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-  tokenEndpoint: 'https://oauth2.googleapis.com/token',
-  revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
-};
-
 export const useGoogleAuth = (onSuccess: (tokens: GoogleAuthResponse) => Promise<void>) => {
   const [loading, setLoading] = useState(false);
+  const [ready, setReady] = useState(false);
 
-  // Check environment
   const isExpoGo = Constants.appOwnership === 'expo';
   const isWeb = Platform.OS === 'web';
-  const isAndroid = Platform.OS === 'android';
-  const isIOS = Platform.OS === 'ios';
   const isMobileExpoGo = isExpoGo && !isWeb;
-  
-  // Detect if deployed (not localhost)
-  const isDeployedWeb = isWeb && typeof window !== 'undefined' && !window.location.hostname.includes('localhost');
-  
-  // Redirect URIs - must match exactly what's in Google Console
-  const DEPLOYED_REDIRECT_URI = 'https://hype-creatives.github.io/Kivelo-app/';
-  
-  const redirectUri = isWeb
-    ? isDeployedWeb
-      ? DEPLOYED_REDIRECT_URI
-      : AuthSession.makeRedirectUri({ preferLocalhost: true })
-    : AuthSession.makeRedirectUri({ scheme: 'kivelo-app', path: 'auth' });
 
-  console.log('🔗 Google OAuth Redirect URI:', redirectUri);
-  console.log('📱 Running in Expo Go:', isExpoGo);
-  console.log('🌐 Platform:', Platform.OS);
-
-  // Use platform-specific client ID for native builds, web client ID for web/Expo Go
-  const clientId = isWeb 
-    ? GOOGLE_CLIENT_IDS.web 
-    : isAndroid 
-      ? GOOGLE_CLIENT_IDS.android 
-      : GOOGLE_CLIENT_IDS.ios;
-
-  console.log('🔑 Using Client ID:', clientId?.substring(0, 20) + '...');
-
-  // Generate nonce for implicit flow (required by Google)
-  const [nonce, setNonce] = useState<string | undefined>(undefined);
-  
-  useEffect(() => {
-    const generateNonce = async () => {
-      const randomBytes = await Crypto.getRandomBytesAsync(32);
-      const nonceValue = Array.from(randomBytes)
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
-      setNonce(nonceValue);
-    };
-    generateNonce();
-  }, []);
-
-  // Create auth request with nonce
-  const [request, response, promptAsync] = AuthSession.useAuthRequest(
-    {
-      clientId,
-      scopes: ['openid', 'profile', 'email'],
-      redirectUri,
-      responseType: AuthSession.ResponseType.IdToken,
-      usePKCE: false,
-      extraParams: nonce ? { nonce } : undefined,
-    },
-    discovery
-  );
-
-  useEffect(() => {
-    const handleGoogleResponse = async () => {
-      if (response?.type === 'success') {
-        const { authentication, params } = response;
-        
-        console.log('🔐 Google OAuth Response:', JSON.stringify(response, null, 2));
-        console.log('🎫 Authentication object:', authentication);
-        console.log('📦 Params:', params);
-        
-        try {
-          // ID token can be in authentication object or params (web)
-          const idToken = authentication?.idToken || params?.id_token || null;
-          const accessToken = authentication?.accessToken || params?.access_token || null;
-          
-          console.log('🎟️ ID Token:', idToken ? 'Present' : 'Missing');
-          console.log('🔑 Access Token:', accessToken ? 'Present' : 'Missing');
-          
-          if (!idToken) {
-            throw new Error('No ID token received from Google. Check console for response details.');
-          }
-          
-          await onSuccess({ idToken, accessToken });
-        } catch (error) {
-          console.error('Google auth error:', error);
-          showAlert('Google Login Failed', error instanceof Error ? error.message : 'Failed to complete Google login');
-        } finally {
-          setLoading(false);
-        }
-      } else if (response?.type === 'error') {
-        setLoading(false);
-        console.error('Google auth error:', response.error);
-        showAlert(
-          'Google Login Failed', 
-          `Something went wrong: ${response.error?.message || 'Unknown error'}`
-        );
-      } else if (response?.type === 'dismiss') {
-        setLoading(false);
-        console.log('User dismissed Google login');
-      }
-    };
-
-    if (response) {
-      handleGoogleResponse();
+  // Generate random nonce
+  const generateNonce = () => {
+    const array = new Uint8Array(32);
+    if (typeof window !== 'undefined' && window.crypto) {
+      window.crypto.getRandomValues(array);
     }
-  }, [response, onSuccess]);
+    return Array.from(array).map(b => b.toString(16).padStart(2, '0')).join('');
+  };
 
-  const handleGoogleLogin = async () => {
-    // Expo Go on mobile doesn't support OAuth redirect properly
+  // Check URL for OAuth callback (for web)
+  useEffect(() => {
+    if (!isWeb || typeof window === 'undefined') {
+      setReady(true);
+      return;
+    }
+
+    // Check if URL has id_token (OAuth callback)
+    const hash = window.location.hash;
+    if (hash && hash.includes('id_token=')) {
+      const params = new URLSearchParams(hash.substring(1));
+      const idToken = params.get('id_token');
+      
+      if (idToken) {
+        console.log('🔐 Found id_token in URL, processing...');
+        setLoading(true);
+        
+        // Clean up URL
+        window.history.replaceState(null, '', window.location.pathname);
+        
+        // Process the token
+        onSuccess({ idToken, accessToken: null })
+          .catch(err => {
+            console.error('Google login error:', err);
+            showAlert('Google Login Failed', err.message || 'Failed to login with Google');
+          })
+          .finally(() => setLoading(false));
+      }
+    }
+    
+    setReady(true);
+  }, [isWeb, onSuccess]);
+
+  const handleGoogleLogin = useCallback(async () => {
     if (isMobileExpoGo) {
       showAlert(
         'Not Available in Expo Go', 
-        'Google Sign-In requires a production build. Please use email/password login, or test on web (press W in terminal).'
+        'Google Sign-In requires a production build. Please use email/password login.'
       );
       return;
     }
 
+    if (!isWeb) {
+      showAlert('Not Available', 'Google Sign-In is only available on web for now.');
+      return;
+    }
+
     setLoading(true);
+    
     try {
-      if (!request) {
-        throw new Error('Google auth request not ready');
-      }
-      console.log('🚀 Starting Google OAuth...');
-      console.log('📋 Request config:', JSON.stringify({
-        redirectUri: request.redirectUri,
-        scopes: request.scopes,
-        clientId: request.clientId,
-      }, null, 2));
+      const nonce = generateNonce();
+      const clientId = GOOGLE_CLIENT_IDS.web;
+      const redirectUri = `${window.location.origin}${window.location.pathname}`;
       
-      await promptAsync();
+      const params = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        response_type: 'id_token',
+        scope: 'openid profile email',
+        nonce: nonce,
+        prompt: 'select_account',
+      });
+
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+      
+      console.log('🚀 Redirecting to Google OAuth...');
+      console.log('📋 Redirect URI:', redirectUri);
+      
+      // Redirect to Google (not popup)
+      window.location.href = authUrl;
     } catch (error) {
-      console.error('Google prompt error:', error);
+      console.error('Google login error:', error);
       setLoading(false);
       showAlert('Error', 'Failed to start Google login');
     }
-  };
+  }, [isWeb, isMobileExpoGo]);
 
   return {
     googleLoading: loading,
-    googleRequest: request,
+    googleRequest: { ready },
     handleGoogleLogin,
   };
 };
