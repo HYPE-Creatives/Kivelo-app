@@ -97,8 +97,12 @@ export const useGoogleAuth = (onSuccess: (tokens: GoogleAuthResponse) => Promise
     try {
       const nonce = generateNonce();
       const clientId = GOOGLE_CLIENT_IDS.web;
-      // Always redirect to root - simpler, only need one redirect URI registered
-      const redirectUri = window.location.origin + '/';
+      // Build redirect URI - handle GitHub Pages subdirectory
+      let redirectUri = window.location.origin + '/';
+      // If on GitHub Pages (has pathname like /Kivelo-app/), include it
+      if (window.location.pathname.startsWith('/Kivelo-app')) {
+        redirectUri = window.location.origin + '/Kivelo-app/';
+      }
       
       const params = new URLSearchParams({
         client_id: clientId,
