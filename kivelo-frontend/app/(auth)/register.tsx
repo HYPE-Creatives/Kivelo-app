@@ -700,14 +700,6 @@ export default function Register() {
     <View style={styles.container}>
       {/* Header Section */}
       <Animated.View style={[styles.header, headerAnimatedStyle]}>
-        <View style={styles.iconBadge}>
-          <LinearGradient
-            colors={["#059669", "#10B981"]}
-            style={styles.iconBadgeGradient}
-          >
-            <Ionicons name="person-add" size={28} color="#fff" />
-          </LinearGradient>
-        </View>
         <Text style={styles.title}>Create Account</Text>
         <Text style={styles.subtitle}>
           Join Kivelo and start your family wellness journey
