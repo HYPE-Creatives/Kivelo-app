@@ -11,6 +11,7 @@ import { JournalProvider } from "../../../context/JournalContext";
 import { useEffect } from "react";
 import { BackHandler, View, Image, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Avatar component for header
 function HeaderAvatar() {
@@ -41,6 +42,10 @@ function HeaderAvatar() {
 export default function ChildLayout() {
   const { role } = useAuth();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+
+  // Calculate bottom padding for safe area
+  const bottomInset = Math.max(insets.bottom, 10);
 
   // Prevent hardware back button from going to auth screens
   useEffect(() => {
@@ -72,6 +77,10 @@ export default function ChildLayout() {
                     headerRight: () => <HeaderAvatar />,
                     headerRightContainerStyle: { paddingRight: 16 },
                     headerTitleStyle: { fontWeight: "600" },
+                    tabBarStyle: {
+                      paddingBottom: bottomInset,
+                      height: 60 + bottomInset,
+                    },
                   }}
                 >
                 <Tabs.Screen
@@ -84,11 +93,11 @@ export default function ChildLayout() {
                   }}
                 />
                 <Tabs.Screen
-                  name="ai-helper"
+                  name="journal"
                   options={{
-                    title: "AI Helper",
+                    title: "Journal",
                     tabBarIcon: ({ color, size }) => (
-                      <Ionicons name="sparkles-outline" size={size} color={color} />
+                      <Ionicons name="book-outline" size={size} color={color} />
                     ),
                   }}
                 />
@@ -120,6 +129,13 @@ export default function ChildLayout() {
                   }}
                 />
                 {/* Hide these from tabs but keep them accessible via navigation */}
+                <Tabs.Screen
+                  name="ai-helper"
+                  options={{
+                    href: null,
+                    title: "AI Helper",
+                  }}
+                />
                 <Tabs.Screen
                   name="mood"
                   options={{
@@ -215,13 +231,6 @@ export default function ChildLayout() {
                     href: null,
                     title: "Space Explorer",
                     headerShown: false,
-                  }}
-                />
-                <Tabs.Screen
-                  name="journal"
-                  options={{
-                    href: null,
-                    title: "My Journal",
                   }}
                 />
                 <Tabs.Screen

@@ -4,10 +4,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../../context/AuthContext";
 import { ParentProvider } from "../../../context/ParentContext";
 import { useEffect } from "react";
-import { BackHandler } from "react-native";
+import { BackHandler, Platform } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function ParentLayout() {
   const { role } = useAuth();
+  const insets = useSafeAreaInsets();
+
+  // Calculate bottom padding for safe area
+  const bottomInset = Math.max(insets.bottom, 10);
 
   // Prevent hardware back button from going to auth screens
   useEffect(() => {
@@ -35,8 +40,8 @@ export default function ParentLayout() {
             backgroundColor: "#16A34A",
             borderTopWidth: 0,
             paddingTop: 8,
-            paddingBottom: 50,
-            height: 110,
+            paddingBottom: bottomInset,
+            height: 60 + bottomInset,
             position: "absolute",
             bottom: 0,
             left: 0,

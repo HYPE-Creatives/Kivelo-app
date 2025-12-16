@@ -179,7 +179,7 @@ export default function AIInsights() {
 
       <ScrollView
         style={styles.container}
-        contentContainerStyle={{ paddingBottom: 220 }}
+        contentContainerStyle={{ paddingBottom: 90 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl

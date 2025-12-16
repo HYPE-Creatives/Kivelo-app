@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform 
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { showAlert } from '@/utils/showAlert';
 import * as Clipboard from "expo-clipboard";
 import { useAuth } from "@/context/AuthContext";
@@ -184,11 +185,12 @@ export default function Settings() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={100}
-    >
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={100}
+      >
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -352,17 +354,22 @@ export default function Settings() {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+  },
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
   scrollContent: {
     padding: 20,
-    paddingBottom: 220,
+    paddingBottom: 90,
   },
   header: {
     alignItems: 'center',
