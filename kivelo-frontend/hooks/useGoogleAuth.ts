@@ -97,10 +97,8 @@ export const useGoogleAuth = (onSuccess: (tokens: GoogleAuthResponse) => Promise
     try {
       const nonce = generateNonce();
       const clientId = GOOGLE_CLIENT_IDS.web;
-      // Ensure consistent redirect URI (no trailing slash variations)
-      let redirectUri = `${window.location.origin}${window.location.pathname}`;
-      // Remove trailing slash if present, then add one back for consistency
-      redirectUri = redirectUri.replace(/\/+$/, '') + '/';
+      // Always redirect to root - simpler, only need one redirect URI registered
+      const redirectUri = window.location.origin + '/';
       
       const params = new URLSearchParams({
         client_id: clientId,
