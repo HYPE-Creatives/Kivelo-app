@@ -117,14 +117,6 @@ export default function LoginScreen() {
           <Ionicons name="arrow-back" size={20} color="#64748b" />
         </TouchableOpacity>
 
-        {/* Logo */}
-        <View style={styles.logoContainer}>
-          <Image 
-            source={require('../../assets/images/Family-Wellness-logo.png')} 
-            style={styles.logo} 
-          />
-        </View>
-
         {/* User Type Toggle */}
         <View style={styles.toggleContainer}>
           <TouchableOpacity 
@@ -341,14 +333,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  logo: {
-    width: 80,
-    height: 80,
   },
   toggleContainer: {
     flexDirection: 'row',
