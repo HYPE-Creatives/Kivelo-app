@@ -695,6 +695,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used within AuthProvider");
+  if (!context) {
+    // Return a safe default during initial render before provider is ready
+    // This prevents crashes during expo-router's initial layout rendering
+    return {
+      user: null,
+      role: null,
+      isLoading: true,
+      isAuthenticated: false,
+      login: async () => ({ success: false, message: "Auth not ready" }),
+      loginWithGoogle: async () => ({ success: false, message: "Auth not ready" }),
+      loginWithOneTimeCode: async () => ({ success: false, message: "Auth not ready" }),
+      logout: async () => {},
+      registerParent: async () => ({ success: false, message: "Auth not ready" }),
+      generateOneTimeCode: async () => ({ success: false, message: "Auth not ready" }),
+      setChildPassword: async () => ({ success: false, message: "Auth not ready" }),
+      resetChildPassword: async () => ({ success: false, message: "Auth not ready" }),
+      clearAuthState: async () => {},
+      refreshProfile: async () => ({ success: false, message: "Auth not ready" }),
+    } as ReturnType<typeof useAuth>;
+  }
   return context;
 };

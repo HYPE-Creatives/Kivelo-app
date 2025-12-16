@@ -7,6 +7,7 @@ import { GamificationProvider } from "../../../context/GamificationContext";
 import { ActivityProvider } from "../../../context/ActivityContext";
 import { AIProvider } from "../../../context/AIContext";
 import { NotificationProvider } from "../../../context/NotificationContext";
+import { JournalProvider } from "../../../context/JournalContext";
 import { useEffect } from "react";
 import { BackHandler, View, Image, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -63,15 +64,16 @@ export default function ChildLayout() {
       <GamificationProvider>
         <ActivityProvider>
           <MoodProvider>
-            <AIProvider>
-              <Tabs
-                screenOptions={{
-                  headerShown: true,
-                  headerRight: () => <HeaderAvatar />,
-                  headerRightContainerStyle: { paddingRight: 16 },
-                  headerTitleStyle: { fontWeight: "600" },
-                }}
-              >
+            <JournalProvider>
+              <AIProvider>
+                <Tabs
+                  screenOptions={{
+                    headerShown: true,
+                    headerRight: () => <HeaderAvatar />,
+                    headerRightContainerStyle: { paddingRight: 16 },
+                    headerTitleStyle: { fontWeight: "600" },
+                  }}
+                >
                 <Tabs.Screen
                   name="home"
                   options={{
@@ -215,8 +217,24 @@ export default function ChildLayout() {
                     headerShown: false,
                   }}
                 />
+                <Tabs.Screen
+                  name="journal"
+                  options={{
+                    href: null,
+                    title: "My Journal",
+                  }}
+                />
+                <Tabs.Screen
+                  name="free-draw"
+                  options={{
+                    href: null,
+                    title: "Free Draw",
+                    headerShown: false,
+                  }}
+                />
               </Tabs>
-            </AIProvider>
+              </AIProvider>
+            </JournalProvider>
           </MoodProvider>
         </ActivityProvider>
       </GamificationProvider>

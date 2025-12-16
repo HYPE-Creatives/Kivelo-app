@@ -50,6 +50,15 @@ export default function ChildHome() {
       gradient: ['#FF6B9D', '#FF8FB3']
     },
     { 
+      icon: "book-outline",
+      title: "My Journal", 
+      description: "Write about your day",
+      action: "Open Journal", 
+      onPress: () => router.push("/(dashboard)/child/journal"),
+      color: "#667EEA",
+      gradient: ['#667EEA', '#764BA2']
+    },
+    { 
       icon: "checkmark-circle-outline",
       title: "My Activities", 
       description: pendingActivities > 0 

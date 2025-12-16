@@ -79,6 +79,18 @@ const GAMES = [
   },
   {
     id: 7,
+    icon: "brush-outline",
+    title: "Free Draw",
+    description: "Express yourself with colors and creativity!",
+    color: "#F472B6",
+    difficulty: "Easy",
+    ageRange: "3-99",
+    category: "Creative",
+    route: "free-draw",
+    available: true
+  },
+  {
+    id: 8,
     icon: "musical-notes-outline",
     title: "Rhythm Beat",
     description: "Match the beat and create music!",
@@ -90,7 +102,7 @@ const GAMES = [
     available: false
   },
   {
-    id: 8,
+    id: 9,
     icon: "pizza-outline",
     title: "Chef's Kitchen",
     description: "Learn cooking by making virtual recipes!",
@@ -102,7 +114,7 @@ const GAMES = [
     available: false
   },
   {
-    id: 9,
+    id: 10,
     icon: "fitness-outline",
     title: "Move & Groove",
     description: "Physical activity challenges and dance moves!",
@@ -114,7 +126,7 @@ const GAMES = [
     available: false
   },
   {
-    id: 10,
+    id: 11,
     icon: "earth-outline",
     title: "Geography Quiz",
     description: "Explore the world and learn about countries!",

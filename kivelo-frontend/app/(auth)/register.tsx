@@ -1163,6 +1163,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingVertical: 8,
+    marginBottom: 20,
   },
   loginText: {
     fontSize: 15,

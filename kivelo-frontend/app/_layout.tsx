@@ -4,6 +4,7 @@ import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useState } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { View, ActivityIndicator } from "react-native";
+import { PaperProvider } from "react-native-paper";
 import "./global.css";
 import { AuthProvider } from "../context/AuthContext";
 import { AlertProvider } from "../components/AlertProvider";
@@ -41,11 +42,13 @@ function RootContent() {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <AlertProvider>
-        <AuthProvider>
-          <RootContent />
-        </AuthProvider>
-      </AlertProvider>
+      <PaperProvider>
+        <AlertProvider>
+          <AuthProvider>
+            <RootContent />
+          </AuthProvider>
+        </AlertProvider>
+      </PaperProvider>
     </SafeAreaProvider>
   );
 }

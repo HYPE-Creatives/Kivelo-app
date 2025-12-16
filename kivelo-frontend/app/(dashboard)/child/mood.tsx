@@ -13,12 +13,16 @@ import {
   Platform,
   Keyboard,
   TouchableWithoutFeedback,
+  Modal,
+  Alert,
 } from "react-native";
+import Slider from '@react-native-community/slider';
 import { showAlert } from '@/utils/showAlert';
 import { useMood, MoodCheckin } from "@/context/MoodContext";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
+import DrawingModal from "@/components/DrawingModal";
 
 // Mood emojis with scores
 const MOOD_OPTIONS = [
@@ -31,20 +35,32 @@ const MOOD_OPTIONS = [
 ];
 
 export default function MoodCheck() {
-  const { submitMood, getTodayMood, getMoodHistory } = useMood();
+  const { submitMood, getTodayMood, getMoodHistory, updateMood, deleteMood } = useMood();
 
   const [selectedMood, setSelectedMood] = useState<typeof MOOD_OPTIONS[0] | null>(null);
+  const [moodIntensity, setMoodIntensity] = useState<number>(5);
   const [textNote, setTextNote] = useState("");
   const [expressionMode, setExpressionMode] = useState<'text' | 'voice' | 'drawing' | 'image'>('text');
   const [voiceRecording, setVoiceRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [drawingImage, setDrawingImage] = useState<string | null>(null);
+  const [showDrawingModal, setShowDrawingModal] = useState(false);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasCheckedInToday, setHasCheckedInToday] = useState(false);
   const [todayMood, setTodayMood] = useState<MoodCheckin | null>(null);
   const [recentMoods, setRecentMoods] = useState<MoodCheckin[]>([]);
+
+  // Edit modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingMood, setEditingMood] = useState<MoodCheckin | null>(null);
+  const [editSelectedMood, setEditSelectedMood] = useState<typeof MOOD_OPTIONS[0] | null>(null);
+  const [editMoodIntensity, setEditMoodIntensity] = useState<number>(5);
+  const [editTextNote, setEditTextNote] = useState("");
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const loadTodayMood = useCallback(async () => {
     setIsLoading(true);
@@ -87,7 +103,7 @@ export default function MoodCheck() {
     try {
       const moodData: any = {
         emoji: selectedMood.emoji,
-        moodScore: selectedMood.score,
+        moodScore: moodIntensity,
       };
 
       // Add expression based on mode
@@ -97,8 +113,8 @@ export default function MoodCheck() {
         moodData.voiceNote = 'voice_recording_placeholder'; // In production, upload audio file
       } else if (expressionMode === 'image' && selectedImage) {
         moodData.imageNote = selectedImage; // In production, upload image
-      } else if (expressionMode === 'drawing') {
-        moodData.drawingNote = 'drawing_placeholder'; // In production, save canvas data
+      } else if (expressionMode === 'drawing' && drawingImage) {
+        moodData.drawingNote = drawingImage;
       }
 
       const result = await submitMood(moodData);
@@ -126,11 +142,18 @@ export default function MoodCheck() {
 
   const resetForm = () => {
     setSelectedMood(null);
+    setMoodIntensity(5);
     setTextNote("");
     setExpressionMode('text');
     setVoiceRecording(null);
     setSelectedImage(null);
+    setDrawingImage(null);
     setIsRecording(false);
+  };
+
+  const handleDrawingSave = (imageData: string) => {
+    setDrawingImage(imageData);
+    setShowDrawingModal(false);
   };
 
   const startRecording = async () => {
@@ -209,6 +232,83 @@ export default function MoodCheck() {
     }
   };
 
+  // Open edit modal for a mood
+  const handleEditMood = (mood: MoodCheckin) => {
+    setEditingMood(mood);
+    const moodOption = MOOD_OPTIONS.find(m => m.emoji === mood.emoji) || null;
+    setEditSelectedMood(moodOption);
+    setEditMoodIntensity(mood.moodScore || 5);
+    setEditTextNote(mood.textNote || "");
+    setShowEditModal(true);
+  };
+
+  // Save edited mood
+  const handleSaveEdit = async () => {
+    if (!editingMood || !editSelectedMood) return;
+
+    setIsUpdating(true);
+    try {
+      const updates = {
+        emoji: editSelectedMood.emoji,
+        moodScore: editMoodIntensity,
+        textNote: editTextNote.trim() || undefined,
+      };
+
+      const result = await updateMood(editingMood._id, updates);
+
+      if (result.success) {
+        showAlert("✅ Updated!", "Your mood entry has been updated.");
+        setShowEditModal(false);
+        setEditingMood(null);
+        loadTodayMood();
+        loadRecentMoods();
+      } else {
+        showAlert("Error", result.message || "Failed to update mood");
+      }
+    } catch (error: any) {
+      console.error("Update mood error:", error);
+      showAlert("Error", "Failed to update mood. Please try again.");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  // Delete mood with confirmation
+  const handleDeleteMood = (mood: MoodCheckin) => {
+    Alert.alert(
+      "🗑️ Delete Mood",
+      `Are you sure you want to delete this mood entry from ${formatDate(mood.createdAt)}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => confirmDeleteMood(mood._id),
+        },
+      ]
+    );
+  };
+
+  const confirmDeleteMood = async (moodId: string) => {
+    setIsDeleting(true);
+    try {
+      const result = await deleteMood(moodId);
+
+      if (result.success) {
+        showAlert("✅ Deleted!", "Your mood entry has been removed.");
+        loadTodayMood();
+        loadRecentMoods();
+      } else {
+        showAlert("Error", result.message || "Failed to delete mood");
+      }
+    } catch (error: any) {
+      console.error("Delete mood error:", error);
+      showAlert("Error", "Failed to delete mood. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <View style={styles.loaderContainer}>
@@ -248,6 +348,23 @@ export default function MoodCheck() {
           <View style={[styles.trustZoneBadge, { backgroundColor: getTrustZoneColor(todayMood.trustZone) }]}>
             <Text style={styles.trustZoneText}>{todayMood.trustZone.toUpperCase()} ZONE</Text>
           </View>
+          <View style={styles.todayActions}>
+            <TouchableOpacity
+              style={styles.todayActionButton}
+              onPress={() => handleEditMood(todayMood)}
+            >
+              <Ionicons name="pencil" size={18} color="#3B82F6" />
+              <Text style={styles.todayActionText}>Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.todayActionButton, styles.todayDeleteButton]}
+              onPress={() => handleDeleteMood(todayMood)}
+              disabled={isDeleting}
+            >
+              <Ionicons name="trash-outline" size={18} color="#EF4444" />
+              <Text style={[styles.todayActionText, { color: '#EF4444' }]}>Delete</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -267,13 +384,49 @@ export default function MoodCheck() {
                     transform: [{ scale: 1.1 }],
                   },
                 ]}
-                onPress={() => setSelectedMood(mood)}
+                onPress={() => {
+                  setSelectedMood(mood);
+                  setMoodIntensity(mood.score);
+                }}
               >
                 <Text style={styles.moodEmoji}>{mood.emoji}</Text>
                 <Text style={styles.moodLabel}>{mood.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
+
+          {/* Mood Intensity Slider */}
+          {selectedMood && (
+            <View style={styles.intensitySection}>
+              <Text style={styles.intensityTitle}>How intense is this feeling?</Text>
+              <View style={styles.intensitySliderContainer}>
+                <Text style={styles.intensityLabel}>Mild</Text>
+                <View style={styles.sliderWrapper}>
+                  <Slider
+                    style={styles.slider}
+                    minimumValue={1}
+                    maximumValue={10}
+                    step={1}
+                    value={moodIntensity}
+                    onValueChange={setMoodIntensity}
+                    minimumTrackTintColor={selectedMood.color}
+                    maximumTrackTintColor="#E5E7EB"
+                    thumbTintColor={selectedMood.color}
+                  />
+                  <View style={styles.intensityValue}>
+                    <Text style={[styles.intensityValueText, { color: selectedMood.color }]}>
+                      {moodIntensity}
+                    </Text>
+                    <Text style={styles.intensityValueLabel}>/10</Text>
+                  </View>
+                </View>
+                <Text style={styles.intensityLabel}>Strong</Text>
+              </View>
+              <Text style={styles.intensityHint}>
+                Slide to show how strongly you feel this emotion
+              </Text>
+            </View>
+          )}
 
           {/* Expression Mode Selection */}
           {selectedMood && (
@@ -353,13 +506,32 @@ export default function MoodCheck() {
               {/* Drawing Mode */}
               {expressionMode === 'drawing' && (
                 <View style={styles.drawingContainer}>
-                  <TouchableOpacity
-                    style={styles.drawingButton}
-                    onPress={() => Alert.alert('Coming soon', 'Drawing canvas is not implemented yet')}
-                  >
-                    <Ionicons name="color-palette" size={32} color="#22C55E" />
-                    <Text style={styles.drawingButtonText}>Open Drawing Canvas</Text>
-                  </TouchableOpacity>
+                  {drawingImage ? (
+                    <View style={styles.drawingPreview}>
+                      <Image source={{ uri: drawingImage }} style={styles.drawingPreviewImage} />
+                      <TouchableOpacity 
+                        style={styles.removeDrawingButton} 
+                        onPress={() => setDrawingImage(null)}
+                      >
+                        <Ionicons name="close-circle" size={32} color="#EF4444" />
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={styles.editDrawingButton}
+                        onPress={() => setShowDrawingModal(true)}
+                      >
+                        <Ionicons name="pencil" size={20} color="#fff" />
+                        <Text style={styles.editDrawingText}>Edit</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.drawingButton}
+                      onPress={() => setShowDrawingModal(true)}
+                    >
+                      <Ionicons name="color-palette" size={32} color="#22C55E" />
+                      <Text style={styles.drawingButtonText}>Open Drawing Canvas</Text>
+                    </TouchableOpacity>
+                  )}
                   <Text style={styles.drawingHint}>Express your mood with colors and shapes!</Text>
                 </View>
               )}
@@ -430,10 +602,32 @@ export default function MoodCheck() {
                 <View>
                   <Text style={styles.historyDate}>{formatDate(mood.createdAt)}</Text>
                   <Text style={styles.historyScore}>Score: {mood.moodScore}/10</Text>
+                  {mood.textNote && (
+                    <Text style={styles.historyNote} numberOfLines={1}>
+                      {mood.textNote}
+                    </Text>
+                  )}
                 </View>
               </View>
-              <View style={[styles.historyZone, { backgroundColor: getTrustZoneColor(mood.trustZone) }]}>
-                <Text style={styles.historyZoneText}>{mood.trustZone}</Text>
+              <View style={styles.historyRight}>
+                <View style={[styles.historyZone, { backgroundColor: getTrustZoneColor(mood.trustZone) }]}>
+                  <Text style={styles.historyZoneText}>{mood.trustZone}</Text>
+                </View>
+                <View style={styles.historyActions}>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => handleEditMood(mood)}
+                  >
+                    <Ionicons name="pencil" size={18} color="#3B82F6" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => handleDeleteMood(mood)}
+                    disabled={isDeleting}
+                  >
+                    <Ionicons name="trash-outline" size={18} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           ))}
@@ -448,6 +642,115 @@ export default function MoodCheck() {
       </View>
         </ScrollView>
       </TouchableWithoutFeedback>
+
+      {/* Edit Mood Modal */}
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>✏️ Edit Mood</Text>
+              <TouchableOpacity
+                onPress={() => setShowEditModal(false)}
+                style={styles.modalCloseButton}
+              >
+                <Ionicons name="close" size={24} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSectionTitle}>How were you feeling?</Text>
+            <View style={styles.editMoodGrid}>
+              {MOOD_OPTIONS.map((mood) => (
+                <TouchableOpacity
+                  key={mood.emoji}
+                  style={[
+                    styles.editMoodButton,
+                    editSelectedMood?.emoji === mood.emoji && {
+                      borderColor: mood.color,
+                      backgroundColor: `${mood.color}15`,
+                    },
+                  ]}
+                  onPress={() => {
+                    setEditSelectedMood(mood);
+                    setEditMoodIntensity(mood.score);
+                  }}
+                >
+                  <Text style={styles.editMoodEmoji}>{mood.emoji}</Text>
+                  <Text style={styles.editMoodLabel}>{mood.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Intensity Slider in Edit Modal */}
+            {editSelectedMood && (
+              <View style={styles.editIntensitySection}>
+                <Text style={styles.modalSectionTitle}>Intensity</Text>
+                <View style={styles.editIntensityRow}>
+                  <Text style={styles.intensityLabel}>Mild</Text>
+                  <Slider
+                    style={styles.editSlider}
+                    minimumValue={1}
+                    maximumValue={10}
+                    step={1}
+                    value={editMoodIntensity}
+                    onValueChange={setEditMoodIntensity}
+                    minimumTrackTintColor={editSelectedMood.color}
+                    maximumTrackTintColor="#E5E7EB"
+                    thumbTintColor={editSelectedMood.color}
+                  />
+                  <Text style={styles.intensityLabel}>Strong</Text>
+                </View>
+                <Text style={[styles.editIntensityValue, { color: editSelectedMood.color }]}>
+                  {editMoodIntensity}/10
+                </Text>
+              </View>
+            )}
+
+            <Text style={styles.modalSectionTitle}>Note (optional)</Text>
+            <TextInput
+              style={styles.editTextInput}
+              placeholder="How did you feel?"
+              placeholderTextColor="#9CA3AF"
+              value={editTextNote}
+              onChangeText={setEditTextNote}
+              multiline
+              maxLength={200}
+            />
+            <Text style={styles.charCount}>{editTextNote.length}/200</Text>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowEditModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.saveButton, isUpdating && styles.saveButtonDisabled]}
+                onPress={handleSaveEdit}
+                disabled={isUpdating || !editSelectedMood}
+              >
+                {isUpdating ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Save Changes</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Drawing Modal */}
+      <DrawingModal
+        visible={showDrawingModal}
+        onClose={() => setShowDrawingModal(false)}
+        onSave={handleDrawingSave}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -536,6 +839,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
   },
+  todayActions: {
+    flexDirection: 'row',
+    gap: 16,
+    marginTop: 16,
+  },
+  todayActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 20,
+  },
+  todayDeleteButton: {
+    backgroundColor: '#FEF2F2',
+  },
+  todayActionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#3B82F6',
+  },
   moodSection: {
     marginBottom: 30,
   },
@@ -574,6 +899,65 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     color: "#6B7280",
+  },
+  // Mood Intensity Slider Styles
+  intensitySection: {
+    marginTop: 24,
+    backgroundColor: '#FFFFFF',
+    padding: 20,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  intensityTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  intensitySliderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  intensityLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+    width: 45,
+  },
+  sliderWrapper: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  slider: {
+    width: '100%',
+    height: 40,
+  },
+  intensityValue: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginTop: 4,
+  },
+  intensityValueText: {
+    fontSize: 32,
+    fontWeight: '700',
+  },
+  intensityValueLabel: {
+    fontSize: 16,
+    color: '#9CA3AF',
+    fontWeight: '500',
+    marginLeft: 2,
+  },
+  intensityHint: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    marginTop: 12,
   },
   noteSection: {
     marginTop: 24,
@@ -643,6 +1027,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    flex: 1,
+  },
+  historyRight: {
+    alignItems: "flex-end",
+    gap: 8,
   },
   historyEmoji: {
     fontSize: 32,
@@ -656,6 +1045,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#6B7280",
     marginTop: 2,
+  },
+  historyNote: {
+    fontSize: 11,
+    color: "#9CA3AF",
+    marginTop: 2,
+    maxWidth: 150,
+  },
+  historyActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  actionButton: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: "#F3F4F6",
   },
   historyZone: {
     paddingHorizontal: 12,
@@ -782,6 +1186,41 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#64748b',
   },
+  drawingPreview: {
+    position: 'relative',
+    width: '100%',
+    alignItems: 'center',
+  },
+  drawingPreviewImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+  },
+  removeDrawingButton: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+  },
+  editDrawingButton: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#667EEA',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+  },
+  editDrawingText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
   imageContainer: {
     alignItems: 'center',
     padding: 16,
@@ -818,5 +1257,125 @@ const styles = StyleSheet.create({
     right: 8,
     backgroundColor: 'white',
     borderRadius: 16,
+  },
+  // Edit Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    maxHeight: '85%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+    marginTop: 8,
+  },
+  editMoodGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    justifyContent: 'center',
+  },
+  editMoodButton: {
+    width: '30%',
+    padding: 12,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    alignItems: 'center',
+  },
+  editMoodEmoji: {
+    fontSize: 28,
+    marginBottom: 4,
+  },
+  editMoodLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  editIntensitySection: {
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  editIntensityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  editSlider: {
+    flex: 1,
+    height: 40,
+  },
+  editIntensityValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  editTextInput: {
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 15,
+    color: '#1F2937',
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+  },
+  cancelButton: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  saveButton: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#16A34A',
+    alignItems: 'center',
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

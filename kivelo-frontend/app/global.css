@@ -1,3 +1,20 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Fix for text input on web */
+input, textarea {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+
+/* Ensure React Native Paper inputs work on web */
+[data-testid*="text-input"] {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+
+/* Fix for any element that might block input focus */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
