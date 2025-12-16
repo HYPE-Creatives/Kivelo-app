@@ -3,7 +3,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useState } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { View, ActivityIndicator } from "react-native";
+import { View, ActivityIndicator, Platform } from "react-native";
 import { PaperProvider } from "react-native-paper";
 import "./global.css";
 import { AuthProvider } from "../context/AuthContext";
@@ -15,6 +15,24 @@ const RNActivityIndicator = ActivityIndicator as unknown as React.ComponentType<
 
 // Keep splash screen visible until app is ready
 SplashScreen.preventAutoHideAsync();
+
+// Handle GitHub Pages SPA redirect (web only)
+if (Platform.OS === 'web' && typeof window !== 'undefined') {
+  const redirect = sessionStorage.getItem('spa-redirect');
+  if (redirect) {
+    sessionStorage.removeItem('spa-redirect');
+    window.history.replaceState(null, '', redirect);
+  }
+  
+  // Handle the 404.html redirect query param
+  const location = window.location;
+  if (location.search.startsWith('?/')) {
+    const path = location.search.slice(2).split('&')[0].replace(/~and~/g, '&');
+    const search = location.search.slice(2).split('&').slice(1).join('&').replace(/~and~/g, '&');
+    const fullPath = '/' + path + (search ? '?' + search : '') + location.hash;
+    window.history.replaceState(null, '', '/Kivelo-app' + fullPath);
+  }
+}
 
 function RootContent() {
   const [appReady, setAppReady] = useState(false);
