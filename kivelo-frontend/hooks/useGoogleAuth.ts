@@ -36,9 +36,16 @@ export const useGoogleAuth = (onSuccess: (tokens: GoogleAuthResponse) => Promise
   const isIOS = Platform.OS === 'ios';
   const isMobileExpoGo = isExpoGo && !isWeb;
   
-  // For web, use localhost redirect. For native, use app scheme
+  // Detect if deployed (not localhost)
+  const isDeployedWeb = isWeb && typeof window !== 'undefined' && !window.location.hostname.includes('localhost');
+  
+  // For deployed web, use the actual site URL
+  // For local web dev, use localhost
+  // For native, use app scheme
   const redirectUri = isWeb
-    ? AuthSession.makeRedirectUri({ preferLocalhost: true })
+    ? isDeployedWeb
+      ? `${window.location.origin}${window.location.pathname}`
+      : AuthSession.makeRedirectUri({ preferLocalhost: true })
     : AuthSession.makeRedirectUri({ scheme: 'kivelo-app', path: 'auth' });
 
   console.log('🔗 Google OAuth Redirect URI:', redirectUri);
