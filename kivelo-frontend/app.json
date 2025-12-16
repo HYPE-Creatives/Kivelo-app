@@ -42,8 +42,7 @@
       "expo-secure-store"
     ],
     "experiments": {
-      "typedRoutes": true,
-      "baseUrl": "/family-wellness-app"
+      "typedRoutes": true
     },
     "extra": {
       "router": {},
