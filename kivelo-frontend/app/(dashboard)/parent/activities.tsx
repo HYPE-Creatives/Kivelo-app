@@ -159,6 +159,11 @@ export default function ParentActivities() {
       ...(formDueDate && { dueDate: formDueDate }),
     };
 
+    // Debug: log what we're sending
+    console.log("📤 Creating activity with data:", JSON.stringify(data, null, 2));
+    console.log("📤 Selected children IDs:", selectedChildren);
+    console.log("📤 Children list:", children.map(c => ({ _id: c._id, id: c.id, name: c.name })));
+
     try {
       let result;
       if (editingActivity) {

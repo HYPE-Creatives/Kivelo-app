@@ -12,6 +12,8 @@ const notificationSchema = new mongoose.Schema({
       'mood_alert',
       'streak_milestone', 
       'new_journal',
+      'new_activity',
+      'activity_completed',
       'points_earned',
       'badge_earned',
       'system',
