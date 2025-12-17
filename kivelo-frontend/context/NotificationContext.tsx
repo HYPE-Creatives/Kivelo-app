@@ -4,14 +4,15 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "./AuthContext";
 
 const ACCESS_TOKEN_KEY = "kivelo_access_token";
+const PREFERENCES_KEY = "kivelo_notification_preferences";
 
 // Types - matching backend Notification model
-interface Notification {
+export interface Notification {
   _id: string;
   userId: string;
   title: string;
   message: string;
-  type: "mood_alert" | "streak_milestone" | "new_journal" | "points_earned" | "badge_earned" | "system" | "reminder" | "parent_alert" | "ai_suggestion";
+  type: "mood_alert" | "streak_milestone" | "new_journal" | "new_activity" | "activity_completed" | "points_earned" | "badge_earned" | "system" | "reminder" | "parent_alert" | "ai_suggestion";
   priority: number; // 1-5
   isRead: boolean;
   data?: Record<string, any>;
@@ -21,7 +22,7 @@ interface Notification {
   scheduledFor?: string;
 }
 
-interface NotificationStats {
+export interface NotificationStats {
   total: number;
   unread: number;
   read: number;
@@ -35,12 +36,36 @@ interface PaginationInfo {
   hasPrevPage?: boolean;
 }
 
+// Notification preferences for controlling which notifications to show
+export interface NotificationPreferences {
+  enableNotifications: boolean;
+  moodAlerts: boolean;
+  activityUpdates: boolean;
+  journalUpdates: boolean;
+  streakMilestones: boolean;
+  badgeEarned: boolean;
+  systemNotifications: boolean;
+  aiSuggestions: boolean;
+}
+
+const DEFAULT_PREFERENCES: NotificationPreferences = {
+  enableNotifications: true,
+  moodAlerts: true,
+  activityUpdates: true,
+  journalUpdates: true,
+  streakMilestones: true,
+  badgeEarned: true,
+  systemNotifications: true,
+  aiSuggestions: true,
+};
+
 interface NotificationContextType {
   notifications: Notification[];
   stats: NotificationStats | null;
   pagination: PaginationInfo | null;
   loading: boolean;
   error: string | null;
+  preferences: NotificationPreferences;
   getNotifications: (options?: {
     page?: number;
     limit?: number;
@@ -50,8 +75,10 @@ interface NotificationContextType {
   }) => Promise<void>;
   markAsRead: (notificationId: string) => Promise<boolean>;
   markAllAsRead: () => Promise<boolean>;
+  deleteNotification: (notificationId: string) => Promise<boolean>;
   getStats: () => Promise<void>;
   refreshNotifications: () => Promise<void>;
+  updatePreferences: (prefs: Partial<NotificationPreferences>) => Promise<void>;
   unreadCount: number;
 }
 
@@ -70,9 +97,37 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [workingUrl, setWorkingUrl] = useState<string | null>(null);
+  const [preferences, setPreferences] = useState<NotificationPreferences>(DEFAULT_PREFERENCES);
 
   // Calculate unread count from stats or notifications (with safe fallback)
   const unreadCount = stats?.unread ?? (Array.isArray(notifications) ? notifications.filter(n => !n.isRead).length : 0);
+
+  // Load saved preferences on mount
+  useEffect(() => {
+    loadPreferences();
+  }, []);
+
+  const loadPreferences = async () => {
+    try {
+      const saved = await AsyncStorage.getItem(PREFERENCES_KEY);
+      if (saved) {
+        setPreferences({ ...DEFAULT_PREFERENCES, ...JSON.parse(saved) });
+      }
+    } catch (error) {
+      console.error("Failed to load notification preferences:", error);
+    }
+  };
+
+  // Update and save preferences
+  const updatePreferences = useCallback(async (newPrefs: Partial<NotificationPreferences>) => {
+    try {
+      const updated = { ...preferences, ...newPrefs };
+      setPreferences(updated);
+      await AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(updated));
+    } catch (error) {
+      console.error("Failed to save notification preferences:", error);
+    }
+  }, [preferences]);
 
   // Make authenticated request with fallback URLs
   const makeAuthenticatedRequest = useCallback(async (
@@ -266,6 +321,43 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
   }, [makeAuthenticatedRequest]);
 
+  // Delete a notification
+  const deleteNotification = useCallback(async (notificationId: string): Promise<boolean> => {
+    try {
+      const response = await makeAuthenticatedRequest(`/notifications/${notificationId}`, {
+        method: "DELETE",
+      });
+
+      if (!response) return false; // Logged out
+
+      if (response.success) {
+        // Update local state
+        const deletedNotif = notifications.find(n => n._id === notificationId);
+        setNotifications(prev => prev.filter(n => n._id !== notificationId));
+        
+        // Update stats if the deleted notification was unread
+        if (stats && deletedNotif && !deletedNotif.isRead) {
+          setStats({
+            ...stats,
+            total: stats.total - 1,
+            unread: Math.max(0, stats.unread - 1),
+          });
+        } else if (stats) {
+          setStats({
+            ...stats,
+            total: stats.total - 1,
+            read: Math.max(0, stats.read - 1),
+          });
+        }
+        return true;
+      }
+      return false;
+    } catch (err: any) {
+      console.error("Error deleting notification:", err);
+      return false;
+    }
+  }, [makeAuthenticatedRequest, stats, notifications]);
+
   // Refresh notifications (stats are included in getNotifications response)
   const refreshNotifications = useCallback(async () => {
     // Just call getNotifications since it includes stats
@@ -291,11 +383,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     pagination,
     loading,
     error,
+    preferences,
     getNotifications,
     markAsRead,
     markAllAsRead,
+    deleteNotification,
     getStats,
     refreshNotifications,
+    updatePreferences,
     unreadCount,
   };
 

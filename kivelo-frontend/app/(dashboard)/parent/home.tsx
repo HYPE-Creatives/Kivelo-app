@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "../../../context/AuthContext";
 import { useParent, Child, FamilyActivityFeed, ChildMoodSummary } from "../../../context/ParentContext";
+import { useNotifications } from "../../../context/NotificationContext";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -66,6 +67,7 @@ export default function ParentHome() {
     familyActivityFeed,
     loading 
   } = useParent();
+  const { unreadCount, refreshNotifications } = useNotifications();
   const router = useRouter();
   
   const [refreshing, setRefreshing] = useState(false);
@@ -225,26 +227,43 @@ export default function ParentHome() {
                 </Text>
               </View>
             </View>
-            <TouchableOpacity 
-              style={styles.avatarContainer}
-              onPress={() => router.push("/(dashboard)/parent/settings")}
-            >
-              {user?.avatar?.url ? (
-                <Image 
-                  source={{ uri: user.avatar.url }} 
-                  style={styles.avatarImage}
-                />
-              ) : (
-                <LinearGradient
-                  colors={["rgba(255,255,255,0.3)", "rgba(255,255,255,0.1)"]}
-                  style={styles.avatar}
-                >
-                  <Text style={styles.avatarText}>
-                    {user?.name?.charAt(0)?.toUpperCase() || "P"}
-                  </Text>
-                </LinearGradient>
-              )}
-            </TouchableOpacity>
+            <View style={styles.headerRight}>
+              {/* Notification Bell */}
+              <TouchableOpacity 
+                style={styles.notificationBtn}
+                onPress={() => router.push("/(dashboard)/parent/notifications")}
+              >
+                <Ionicons name="notifications-outline" size={24} color="#FFFFFF" />
+                {unreadCount > 0 && (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              {/* Avatar */}
+              <TouchableOpacity 
+                style={styles.avatarContainer}
+                onPress={() => router.push("/(dashboard)/parent/settings")}
+              >
+                {user?.avatar?.url ? (
+                  <Image 
+                    source={{ uri: user.avatar.url }} 
+                    style={styles.avatarImage}
+                  />
+                ) : (
+                  <LinearGradient
+                    colors={["rgba(255,255,255,0.3)", "rgba(255,255,255,0.1)"]}
+                    style={styles.avatar}
+                  >
+                    <Text style={styles.avatarText}>
+                      {user?.name?.charAt(0)?.toUpperCase() || "P"}
+                    </Text>
+                  </LinearGradient>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Family Overview Stats */}
@@ -572,6 +591,38 @@ const styles = StyleSheet.create({
   },
   headerLeft: {
     flex: 1,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  notificationBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  notificationBadge: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#EF4444",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: "#16A34A",
+  },
+  notificationBadgeText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
   greetingText: {
     fontSize: 14,

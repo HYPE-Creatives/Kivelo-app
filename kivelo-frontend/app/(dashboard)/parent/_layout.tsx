@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../../context/AuthContext";
 import { ParentProvider } from "../../../context/ParentContext";
 import { ActivityProvider } from "../../../context/ActivityContext";
+import { NotificationProvider } from "../../../context/NotificationContext";
 import { useEffect } from "react";
 import { BackHandler, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -33,8 +34,9 @@ export default function ParentLayout() {
   return (
     <ParentProvider>
       <ActivityProvider>
-        <Tabs
-          screenOptions={{
+        <NotificationProvider>
+          <Tabs
+            screenOptions={{
             headerShown: false,
             tabBarActiveTintColor: "#FFFFFF",
             tabBarInactiveTintColor: "rgba(255,255,255,0.7)",
@@ -118,6 +120,13 @@ export default function ParentLayout() {
             }}
           />
           <Tabs.Screen
+            name="notifications"
+            options={{
+              href: null,
+              title: "Notifications",
+            }}
+          />
+          <Tabs.Screen
             name="learning-hub"
             options={{
               href: null,
@@ -138,7 +147,8 @@ export default function ParentLayout() {
               title: "Edit Profile",
             }}
           />
-        </Tabs>
+          </Tabs>
+        </NotificationProvider>
       </ActivityProvider>
     </ParentProvider>
   );

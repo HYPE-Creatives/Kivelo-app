@@ -9,16 +9,20 @@ import {
   TouchableOpacity, 
   ScrollView,
   KeyboardAvoidingView,
-  Platform 
+  Platform,
+  Switch,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { showAlert } from '@/utils/showAlert';
 import * as Clipboard from "expo-clipboard";
 import { useAuth } from "@/context/AuthContext";
+import { useNotifications, NotificationPreferences } from "@/context/NotificationContext";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function Settings() {
   const { user, generateOneTimeCode, resetChildPassword, logout } = useAuth();
+  const { preferences, updatePreferences } = useNotifications();
   const router = useRouter();
 
   const [childName, setChildName] = useState("");
@@ -297,6 +301,158 @@ export default function Settings() {
           </TouchableOpacity>
         </View>
 
+        {/* Notification Settings Section */}
+        <View style={styles.formContainer}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleRow}>
+              <Ionicons name="notifications" size={22} color="#16A34A" />
+              <Text style={styles.sectionTitle}>Notification Settings</Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.viewAllBtn}
+              onPress={() => router.push("/(dashboard)/parent/notifications")}
+            >
+              <Text style={styles.viewAllText}>View All</Text>
+              <Ionicons name="chevron-forward" size={16} color="#16A34A" />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.sectionDescription}>
+            Control which notifications you receive about your children's activities.
+          </Text>
+
+          {/* Master toggle */}
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>Enable Notifications</Text>
+              <Text style={styles.settingHint}>Turn all notifications on or off</Text>
+            </View>
+            <Switch
+              value={preferences.enableNotifications}
+              onValueChange={(value) => updatePreferences({ enableNotifications: value })}
+              trackColor={{ false: "#D1D5DB", true: "#86EFAC" }}
+              thumbColor={preferences.enableNotifications ? "#16A34A" : "#9CA3AF"}
+            />
+          </View>
+
+          {preferences.enableNotifications && (
+            <>
+              <View style={styles.settingDivider} />
+              
+              <View style={styles.settingRow}>
+                <View style={styles.settingInfo}>
+                  <View style={styles.settingLabelRow}>
+                    <Ionicons name="heart" size={16} color="#EF4444" />
+                    <Text style={styles.settingLabel}>Mood Alerts</Text>
+                  </View>
+                  <Text style={styles.settingHint}>When your child checks in with low mood</Text>
+                </View>
+                <Switch
+                  value={preferences.moodAlerts}
+                  onValueChange={(value) => updatePreferences({ moodAlerts: value })}
+                  trackColor={{ false: "#D1D5DB", true: "#86EFAC" }}
+                  thumbColor={preferences.moodAlerts ? "#16A34A" : "#9CA3AF"}
+                />
+              </View>
+
+              <View style={styles.settingRow}>
+                <View style={styles.settingInfo}>
+                  <View style={styles.settingLabelRow}>
+                    <Ionicons name="clipboard" size={16} color="#3B82F6" />
+                    <Text style={styles.settingLabel}>Activity Updates</Text>
+                  </View>
+                  <Text style={styles.settingHint}>When activities are completed</Text>
+                </View>
+                <Switch
+                  value={preferences.activityUpdates}
+                  onValueChange={(value) => updatePreferences({ activityUpdates: value })}
+                  trackColor={{ false: "#D1D5DB", true: "#86EFAC" }}
+                  thumbColor={preferences.activityUpdates ? "#16A34A" : "#9CA3AF"}
+                />
+              </View>
+
+              <View style={styles.settingRow}>
+                <View style={styles.settingInfo}>
+                  <View style={styles.settingLabelRow}>
+                    <Ionicons name="book" size={16} color="#8B5CF6" />
+                    <Text style={styles.settingLabel}>Journal Updates</Text>
+                  </View>
+                  <Text style={styles.settingHint}>When your child writes a new journal entry</Text>
+                </View>
+                <Switch
+                  value={preferences.journalUpdates}
+                  onValueChange={(value) => updatePreferences({ journalUpdates: value })}
+                  trackColor={{ false: "#D1D5DB", true: "#86EFAC" }}
+                  thumbColor={preferences.journalUpdates ? "#16A34A" : "#9CA3AF"}
+                />
+              </View>
+
+              <View style={styles.settingRow}>
+                <View style={styles.settingInfo}>
+                  <View style={styles.settingLabelRow}>
+                    <Ionicons name="flame" size={16} color="#F59E0B" />
+                    <Text style={styles.settingLabel}>Streak Milestones</Text>
+                  </View>
+                  <Text style={styles.settingHint}>When streaks reach milestones</Text>
+                </View>
+                <Switch
+                  value={preferences.streakMilestones}
+                  onValueChange={(value) => updatePreferences({ streakMilestones: value })}
+                  trackColor={{ false: "#D1D5DB", true: "#86EFAC" }}
+                  thumbColor={preferences.streakMilestones ? "#16A34A" : "#9CA3AF"}
+                />
+              </View>
+
+              <View style={styles.settingRow}>
+                <View style={styles.settingInfo}>
+                  <View style={styles.settingLabelRow}>
+                    <Ionicons name="trophy" size={16} color="#F59E0B" />
+                    <Text style={styles.settingLabel}>Badge Earned</Text>
+                  </View>
+                  <Text style={styles.settingHint}>When your child earns a new badge</Text>
+                </View>
+                <Switch
+                  value={preferences.badgeEarned}
+                  onValueChange={(value) => updatePreferences({ badgeEarned: value })}
+                  trackColor={{ false: "#D1D5DB", true: "#86EFAC" }}
+                  thumbColor={preferences.badgeEarned ? "#16A34A" : "#9CA3AF"}
+                />
+              </View>
+
+              <View style={styles.settingRow}>
+                <View style={styles.settingInfo}>
+                  <View style={styles.settingLabelRow}>
+                    <Ionicons name="sparkles" size={16} color="#8B5CF6" />
+                    <Text style={styles.settingLabel}>AI Suggestions</Text>
+                  </View>
+                  <Text style={styles.settingHint}>Parenting tips and insights from AI</Text>
+                </View>
+                <Switch
+                  value={preferences.aiSuggestions}
+                  onValueChange={(value) => updatePreferences({ aiSuggestions: value })}
+                  trackColor={{ false: "#D1D5DB", true: "#86EFAC" }}
+                  thumbColor={preferences.aiSuggestions ? "#16A34A" : "#9CA3AF"}
+                />
+              </View>
+
+              <View style={styles.settingRow}>
+                <View style={styles.settingInfo}>
+                  <View style={styles.settingLabelRow}>
+                    <Ionicons name="information-circle" size={16} color="#6B7280" />
+                    <Text style={styles.settingLabel}>System Notifications</Text>
+                  </View>
+                  <Text style={styles.settingHint}>App updates and announcements</Text>
+                </View>
+                <Switch
+                  value={preferences.systemNotifications}
+                  onValueChange={(value) => updatePreferences({ systemNotifications: value })}
+                  trackColor={{ false: "#D1D5DB", true: "#86EFAC" }}
+                  thumbColor={preferences.systemNotifications ? "#16A34A" : "#9CA3AF"}
+                />
+              </View>
+            </>
+          )}
+        </View>
+
         {/* Account Management Section */}
         <View style={styles.formContainer}>
           <Text style={styles.sectionTitle}>Account Management</Text>
@@ -482,6 +638,58 @@ const styles = StyleSheet.create({
   },
   logoutButtonText: {
     color: '#dc2626',
+  },
+  // Notification Settings Styles
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  viewAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  viewAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#16A34A',
+  },
+  settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  settingInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  settingLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  settingLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#2d3748',
+  },
+  settingHint: {
+    fontSize: 13,
+    color: '#718096',
+    marginTop: 2,
+  },
+  settingDivider: {
+    height: 1,
+    backgroundColor: '#e2e8f0',
+    marginVertical: 8,
   },
   codeContainer: {
     backgroundColor: '#dcfce7',
