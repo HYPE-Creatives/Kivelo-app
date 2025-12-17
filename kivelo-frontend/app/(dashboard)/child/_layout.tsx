@@ -179,6 +179,13 @@ export default function ChildLayout() {
                   }}
                 />
                 <Tabs.Screen
+                  name="settings/change-password"
+                  options={{
+                    href: null,
+                    title: "Change Password",
+                  }}
+                />
+                <Tabs.Screen
                   name="memory-match"
                   options={{
                     href: null,
