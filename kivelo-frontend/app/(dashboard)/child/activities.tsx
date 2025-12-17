@@ -1,5 +1,6 @@
 // app/(dashboard)/child/activities.tsx
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, TextInput, Modal } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useActivity, Activity, Question, Submission } from "../../../context/ActivityContext";
 import { useGamification } from "../../../context/GamificationContext";
 import { useTheme } from "../../../context/ThemeContext";
@@ -371,7 +372,7 @@ export default function ActivitiesScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
           {/* Modal Header */}
           <View style={[styles.modalHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
             <TouchableOpacity onPress={() => setModalVisible(false)}>
@@ -564,7 +565,7 @@ export default function ActivitiesScreen() {
               </TouchableOpacity>
             </View>
           )}
-        </View>
+        </SafeAreaView>
       </Modal>
     </View>
   );
