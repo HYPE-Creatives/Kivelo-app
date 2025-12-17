@@ -122,10 +122,3 @@ export const useGoogleAuth = (
     handleGoogleLogin,
   };
 };
-
-  return {
-    googleLoading: loading,
-    googleRequest: { ready },
-    handleGoogleLogin,
-  };
-};
