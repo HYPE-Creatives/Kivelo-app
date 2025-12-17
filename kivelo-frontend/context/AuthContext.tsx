@@ -86,6 +86,10 @@ interface AuthContextType {
     parentId: string,
     childEmail: string
   ) => Promise<{ success: boolean; message?: string; code?: string }>;
+  changePassword: (
+    currentPassword: string,
+    newPassword: string
+  ) => Promise<{ success: boolean; message?: string }>;
   clearAuthState: () => Promise<void>;
   refreshProfile: () => Promise<{ success: boolean; message?: string }>;
 }
@@ -627,6 +631,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // ✅ CHANGE PASSWORD (Any authenticated user)
+  const changePassword = async (currentPassword: string, newPassword: string) => {
+    try {
+      console.log("🔍 Changing password...");
+
+      const accessToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+      if (!accessToken) {
+        return { success: false, message: "Not authenticated. Please log in again." };
+      }
+
+      if (!currentPassword || !newPassword) {
+        return { success: false, message: "Current password and new password are required." };
+      }
+
+      if (newPassword.length < 6) {
+        return { success: false, message: "New password must be at least 6 characters long." };
+      }
+
+      const payload = {
+        currentPassword,
+        newPassword,
+      };
+
+      console.log("📤 Sending password change request...");
+
+      const { data } = await apiCallWithFallback("/users/update-password", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`
+        },
+        body: JSON.stringify(payload),
+      });
+
+      console.log("📨 Change password response:", data);
+
+      if (data.success) {
+        return {
+          success: true,
+          message: data.message || "Password changed successfully!"
+        };
+      } else {
+        return { success: false, message: data.message || "Failed to change password" };
+      }
+    } catch (error: any) {
+      console.error("Change password error:", error);
+      return { success: false, message: error.message || "Failed to change password. Please try again." };
+    }
+  };
+
   // ✅ RESET CHILD PASSWORD (Parent only) - Regenerates one-time code
   const resetChildPassword = async (parentId: string, childEmail: string) => {
     try {
@@ -690,8 +744,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         generateOneTimeCode,
         setChildPassword,
         resetChildPassword,
-          clearAuthState,
-          refreshProfile,
+        changePassword,
+        clearAuthState,
+        refreshProfile,
       }}
     >
       {children}
@@ -717,6 +772,7 @@ export const useAuth = () => {
       generateOneTimeCode: async () => ({ success: false, message: "Auth not ready" }),
       setChildPassword: async () => ({ success: false, message: "Auth not ready" }),
       resetChildPassword: async () => ({ success: false, message: "Auth not ready" }),
+      changePassword: async () => ({ success: false, message: "Auth not ready" }),
       clearAuthState: async () => {},
       refreshProfile: async () => ({ success: false, message: "Auth not ready" }),
     } as ReturnType<typeof useAuth>;

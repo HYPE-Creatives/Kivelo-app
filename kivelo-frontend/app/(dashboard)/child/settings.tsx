@@ -71,14 +71,7 @@ export default function ChildSettings() {
   };
 
   const handleChangePassword = () => {
-    showAlert(
-      "🔐 Change Password",
-      "Would you like to set a new password?",
-      [
-        { text: "Not Now", style: "cancel" },
-        { text: "Yes", onPress: () => router.push("/(auth)/set-password") }
-      ]
-    );
+    router.push("/(dashboard)/child/settings/change-password");
   };
 
   // Avatar upload handlers
