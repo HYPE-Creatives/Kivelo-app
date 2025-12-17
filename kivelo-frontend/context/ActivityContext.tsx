@@ -2,6 +2,37 @@ import React, { createContext, useContext, useState, useCallback, ReactNode } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Types
+export interface Question {
+  _id: string;
+  questionText: string;
+  questionType: 'text' | 'multiple_choice' | 'true_false' | 'number';
+  options?: string[];
+  correctAnswer?: string;
+  points: number;
+}
+
+export interface SubmissionAnswer {
+  questionId: string;
+  answer: string;
+  isCorrect?: boolean;
+}
+
+export interface Submission {
+  _id: string;
+  childId: {
+    _id: string;
+    name?: string;
+  } | string;
+  answers: SubmissionAnswer[];
+  textResponse?: string;
+  attachments?: string[];
+  submittedAt: string;
+  status: 'pending_review' | 'approved' | 'needs_revision';
+  parentFeedback?: string;
+  reviewedAt?: string;
+  pointsAwarded: number;
+}
+
 export interface Activity {
   _id: string;
   title: string;
@@ -24,6 +55,9 @@ export interface Activity {
   completedBy?: string;
   difficulty: 'easy' | 'medium' | 'hard';
   tags: string[];
+  questions: Question[];
+  submissions: Submission[];
+  requiresSubmission: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -38,6 +72,14 @@ export interface CreateActivityData {
   dueDate?: string;
   difficulty?: 'easy' | 'medium' | 'hard';
   tags?: string[];
+  questions?: {
+    questionText: string;
+    questionType?: 'text' | 'multiple_choice' | 'true_false' | 'number';
+    options?: string[];
+    correctAnswer?: string;
+    points?: number;
+  }[];
+  requiresSubmission?: boolean;
 }
 
 export interface UpdateActivityData {
@@ -50,6 +92,38 @@ export interface UpdateActivityData {
   dueDate?: string;
   difficulty?: 'easy' | 'medium' | 'hard';
   tags?: string[];
+  questions?: {
+    questionText: string;
+    questionType?: 'text' | 'multiple_choice' | 'true_false' | 'number';
+    options?: string[];
+    correctAnswer?: string;
+    points?: number;
+  }[];
+  requiresSubmission?: boolean;
+}
+
+export interface SubmitAnswerData {
+  answers?: {
+    questionId: string;
+    answer: string;
+  }[];
+  textResponse?: string;
+  attachments?: string[];
+}
+
+export interface ReviewSubmissionData {
+  status: 'approved' | 'needs_revision';
+  feedback?: string;
+  pointsAwarded?: number;
+}
+
+export interface AllSubmissionsItem {
+  activityId: string;
+  activityTitle: string;
+  category: string;
+  points: number;
+  questions: Question[];
+  submission: Submission;
 }
 
 interface ActivityContextType {
@@ -62,12 +136,20 @@ interface ActivityContextType {
   deleteActivity: (activityId: string) => Promise<{ success: boolean; message?: string }>;
   completeActivity: (activityId: string) => Promise<void>;
   refreshActivities: () => Promise<void>;
+  // New submission functions
+  submitAnswer: (activityId: string, data: SubmitAnswerData) => Promise<{ success: boolean; message?: string }>;
+  getMySubmission: (activityId: string) => Promise<{ success: boolean; activity?: Activity; submission?: Submission | null }>;
+  getAllSubmissions: () => Promise<{ success: boolean; submissions?: AllSubmissionsItem[]; pendingCount?: number }>;
+  getActivitySubmissions: (activityId: string) => Promise<{ success: boolean; submissions?: Submission[] }>;
+  reviewSubmission: (activityId: string, submissionId: string, data: ReviewSubmissionData) => Promise<{ success: boolean; message?: string }>;
 }
 
 const ActivityContext = createContext<ActivityContextType | undefined>(undefined);
 
-// API URL - using deployed backend only
+// API URLs - try local network IP first for mobile testing, then deployed backend
 const API_URLS = [
+  'http://192.168.66.1:5000/api/v1',
+  'http://localhost:5000/api/v1',
   'https://family-wellness.onrender.com/api/v1'
 ];
 
@@ -169,7 +251,7 @@ export const ActivityProvider = ({ children }: { children: ReactNode }) => {
       setError(null);
 
       const response = await makeAuthenticatedRequest(`/activities/${activityId}/complete`, {
-        method: 'POST',
+        method: 'PATCH',
       });
 
       // No token available
@@ -294,6 +376,147 @@ export const ActivityProvider = ({ children }: { children: ReactNode }) => {
     await getActivities();
   }, [getActivities]);
 
+  // Submit answer for an activity (child only)
+  const submitAnswer = useCallback(async (activityId: string, data: SubmitAnswerData) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await makeAuthenticatedRequest(`/activities/${activityId}/submit`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+
+      if (!response) {
+        return { success: false, message: 'Please log in to submit answers' };
+      }
+
+      // Check if response is JSON before parsing
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.error('Non-JSON response received:', await response.text());
+        return { success: false, message: 'Server error. Please try again.' };
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        await getActivities(); // Refresh list
+        return { success: true, message: result.message };
+      } else {
+        return { success: false, message: result.message || 'Failed to submit answer' };
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to submit answer';
+      setError(errorMessage);
+      console.error('Submit answer error:', err);
+      return { success: false, message: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  }, [getActivities]);
+
+  // Get child's own submission for an activity
+  const getMySubmission = useCallback(async (activityId: string) => {
+    try {
+      const response = await makeAuthenticatedRequest(`/activities/${activityId}/my-submission`);
+
+      if (!response) {
+        return { success: false };
+      }
+
+      const result = await response.json();
+      return { 
+        success: result.success, 
+        activity: result.activity,
+        submission: result.submission 
+      };
+    } catch (err) {
+      console.error('Get submission error:', err);
+      return { success: false };
+    }
+  }, []);
+
+  // Get all submissions (parent only)
+  const getAllSubmissions = useCallback(async () => {
+    try {
+      const response = await makeAuthenticatedRequest('/activities/submissions/all');
+
+      if (!response) {
+        return { success: false };
+      }
+
+      const result = await response.json();
+      return { 
+        success: result.success, 
+        submissions: result.submissions,
+        pendingCount: result.pendingCount 
+      };
+    } catch (err) {
+      console.error('Get all submissions error:', err);
+      return { success: false };
+    }
+  }, []);
+
+  // Get submissions for a specific activity (parent only)
+  const getActivitySubmissions = useCallback(async (activityId: string) => {
+    try {
+      const response = await makeAuthenticatedRequest(`/activities/${activityId}/submissions`);
+
+      if (!response) {
+        return { success: false };
+      }
+
+      const result = await response.json();
+      return { 
+        success: result.success, 
+        submissions: result.submissions 
+      };
+    } catch (err) {
+      console.error('Get activity submissions error:', err);
+      return { success: false };
+    }
+  }, []);
+
+  // Review a submission (parent only)
+  const reviewSubmission = useCallback(async (
+    activityId: string, 
+    submissionId: string, 
+    data: ReviewSubmissionData
+  ) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await makeAuthenticatedRequest(
+        `/activities/${activityId}/submissions/${submissionId}/review`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(data),
+        }
+      );
+
+      if (!response) {
+        return { success: false, message: 'Please log in to review submissions' };
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        await getActivities(); // Refresh list
+        return { success: true, message: result.message };
+      } else {
+        return { success: false, message: result.message || 'Failed to review submission' };
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to review submission';
+      setError(errorMessage);
+      return { success: false, message: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  }, [getActivities]);
+
   return (
     <ActivityContext.Provider
       value={{
@@ -306,6 +529,11 @@ export const ActivityProvider = ({ children }: { children: ReactNode }) => {
         deleteActivity,
         completeActivity,
         refreshActivities,
+        submitAnswer,
+        getMySubmission,
+        getAllSubmissions,
+        getActivitySubmissions,
+        reviewSubmission,
       }}
     >
       {children}

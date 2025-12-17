@@ -4,6 +4,7 @@ import { useAuth } from "../../../context/AuthContext";
 import { useGamification } from "../../../context/GamificationContext";
 import { useActivity } from "../../../context/ActivityContext";
 import { useNotifications } from "../../../context/NotificationContext";
+import { useTheme } from "../../../context/ThemeContext";
 import { useRouter } from "expo-router";
 import { useEffect, useState, useRef } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,6 +15,7 @@ export default function ChildHome() {
   const { stats, getStats } = useGamification();
   const { activities, getActivities } = useActivity();
   const { unreadCount, refreshNotifications } = useNotifications();
+  const { colors, themeColors, isDark } = useTheme();
   const [initialLoad, setInitialLoad] = useState(true);
   const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -96,19 +98,20 @@ export default function ChildHome() {
   // Show loading state during initial data fetch
   if (initialLoad) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-        <Text style={{ marginTop: 12, color: '#666' }}>Loading your dashboard...</Text>
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={themeColors.primary} />
+        <Text style={{ marginTop: 12, color: colors.textSecondary }}>Loading your dashboard...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Animated Header with stats */}
       <Animated.View 
         style={[
           styles.header,
+          { backgroundColor: colors.background },
           {
             opacity: scrollY.interpolate({
               inputRange: [0, 50],
@@ -120,10 +123,10 @@ export default function ChildHome() {
       >
         <View style={styles.headerTop}>
           <View style={styles.headerTitles}>
-            <Text style={styles.welcomeTitle}>
+            <Text style={[styles.welcomeTitle, { color: colors.text }]}>
               Welcome, {displayName}! 👋
             </Text>
-            <Text style={styles.subtitle}>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               Ready for some fun today? 🚀
             </Text>
           </View>
@@ -133,9 +136,9 @@ export default function ChildHome() {
             style={styles.notificationButton}
             onPress={() => router.push("/(dashboard)/child/notifications")}
           >
-            <Ionicons name="notifications-outline" size={24} color="#333" />
+            <Ionicons name="notifications-outline" size={24} color={colors.text} />
             {unreadCount > 0 && (
-              <View style={styles.notificationBadge}>
+              <View style={[styles.notificationBadge, { backgroundColor: themeColors.primary }]}>
                 <Text style={styles.notificationBadgeText}>
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </Text>
@@ -145,20 +148,20 @@ export default function ChildHome() {
         </View>
         
         {/* Stats bar */}
-        <View style={styles.statsBar}>
+        <View style={[styles.statsBar, { backgroundColor: colors.surface }]}>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>⭐ {stats?.points || 0}</Text>
-            <Text style={styles.statLabel}>Points</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>⭐ {stats?.points || 0}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Points</Text>
           </View>
-          <View style={styles.statDivider} />
+          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>🔥 {stats?.streakCount || 0}</Text>
-            <Text style={styles.statLabel}>Streak</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>🔥 {stats?.streakCount || 0}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Streak</Text>
           </View>
-          <View style={styles.statDivider} />
+          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>🏆 {earnedBadges}</Text>
-            <Text style={styles.statLabel}>Badges</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>🏆 {earnedBadges}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Badges</Text>
           </View>
         </View>
       </Animated.View>
@@ -192,7 +195,7 @@ export default function ChildHome() {
             }}
           >
             <TouchableOpacity 
-              style={[styles.card, { borderLeftColor: card.color, borderLeftWidth: 4 }]} 
+              style={[styles.card, { backgroundColor: colors.card, borderLeftColor: card.color, borderLeftWidth: 4 }]} 
               onPress={card.onPress}
               activeOpacity={0.7}
             >
@@ -206,8 +209,8 @@ export default function ChildHome() {
                   </View>
                 )}
               </View>
-              <Text style={styles.cardTitle}>{card.title}</Text>
-              <Text style={styles.cardDescription}>{card.description}</Text>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{card.title}</Text>
+              <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>{card.description}</Text>
               <View style={styles.cardFooter}>
                 <Text style={[styles.cardAction, { color: card.color }]}>{card.action}</Text>
                 <Ionicons name="arrow-forward" size={16} color={card.color} />

@@ -9,10 +9,11 @@ const isProduction = Platform.OS === 'web' &&
   !window.location.hostname.includes('localhost');
 
 // In production, only use the remote API
-// In development, try localhost first then fallback to remote
+// In development, try local network IP first (for mobile), then localhost, then remote
 const API_URLS = isProduction
   ? ["https://family-wellness.onrender.com/api/v1"]
   : [
+      "http://192.168.66.1:5000/api/v1",  // Local network IP for mobile testing
       "http://localhost:5000/api/v1",  // Local dev server
       "https://family-wellness.onrender.com/api/v1",
     ];

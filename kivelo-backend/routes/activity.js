@@ -4,7 +4,12 @@ import {
   createActivity,
   updateActivity,
   deleteActivity,
-  completeActivity
+  completeActivity,
+  submitActivityAnswer,
+  getActivitySubmissions,
+  getAllChildrenSubmissions,
+  reviewSubmission,
+  getMySubmission
 } from '../controllers/activityControllers.js';
 import auth from '../middleware/auth.js';
 import { isChild, isParent } from '../middleware/roleCheck.js';
@@ -326,8 +331,49 @@ router.put('/:id', auth, updateActivity);
  *         $ref: '#/components/responses/NotFoundError'
  *       500:
  *         $ref: '#/components/responses/ServerError'
+ *   post:
+ *     summary: Mark activity as completed (Child only) - Alternative to PATCH
+ *     description: Same as PATCH method. Provided for client convenience.
+ *     tags: [Activities]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The activity ID
+ *     responses:
+ *       200:
+ *         description: Activity marked as completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 activity:
+ *                   $ref: '#/components/schemas/Activity'
+ *                 pointsEarned:
+ *                   type: number
+ *                   example: 20
+ *                 message:
+ *                   type: string
+ *                   example: "Activity marked as completed"
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
  */
 router.patch('/:id/complete', auth, isChild, completeActivity);
+router.post('/:id/complete', auth, isChild, completeActivity);
 
 /**
  * @swagger
@@ -368,5 +414,168 @@ router.patch('/:id/complete', auth, isChild, completeActivity);
  *         $ref: '#/components/responses/ServerError'
  */
 router.delete('/:id', auth, deleteActivity);
+
+/**
+ * @swagger
+ * /api/v1/activities/{id}/submit:
+ *   post:
+ *     summary: Submit answers/response for an activity (Child only)
+ *     tags: [Activities]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The activity ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               answers:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     questionId:
+ *                       type: string
+ *                     answer:
+ *                       type: string
+ *               textResponse:
+ *                 type: string
+ *                 description: General text response
+ *               attachments:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       200:
+ *         description: Submission received
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
+ */
+router.post('/:id/submit', auth, isChild, submitActivityAnswer);
+
+/**
+ * @swagger
+ * /api/v1/activities/{id}/my-submission:
+ *   get:
+ *     summary: Get child's own submission for an activity (Child only)
+ *     tags: [Activities]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The activity ID
+ *     responses:
+ *       200:
+ *         description: Submission details
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
+ */
+router.get('/:id/my-submission', auth, isChild, getMySubmission);
+
+/**
+ * @swagger
+ * /api/v1/activities/submissions/all:
+ *   get:
+ *     summary: Get all children's submissions across all activities (Parent only)
+ *     tags: [Activities]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of all submissions
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ */
+router.get('/submissions/all', auth, isParent, getAllChildrenSubmissions);
+
+/**
+ * @swagger
+ * /api/v1/activities/{activityId}/submissions:
+ *   get:
+ *     summary: Get all submissions for an activity (Parent only)
+ *     tags: [Activities]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: activityId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The activity ID
+ *     responses:
+ *       200:
+ *         description: List of submissions
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ */
+router.get('/:activityId/submissions', auth, isParent, getActivitySubmissions);
+
+/**
+ * @swagger
+ * /api/v1/activities/{activityId}/submissions/{submissionId}/review:
+ *   patch:
+ *     summary: Review a child's submission (Parent only)
+ *     tags: [Activities]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: activityId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: submissionId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [approved, needs_revision]
+ *               feedback:
+ *                 type: string
+ *               pointsAwarded:
+ *                 type: number
+ *     responses:
+ *       200:
+ *         description: Submission reviewed
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ */
+router.patch('/:activityId/submissions/:submissionId/review', auth, isParent, reviewSubmission);
 
 export default router;

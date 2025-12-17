@@ -90,8 +90,10 @@ export default function AIHelper() {
       if (localHistory) {
         const parsed = JSON.parse(localHistory);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setConversation(parsed);
-          setShowQuickActions(parsed.length <= 2);
+          // Update the first AI greeting message with current user's name
+          const updatedMessages = updateGreetingWithCurrentUser(parsed);
+          setConversation(updatedMessages);
+          setShowQuickActions(updatedMessages.length <= 2);
           return;
         }
       }
@@ -106,8 +108,10 @@ export default function AIHelper() {
             text: msg.text,
             timestamp: msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now(),
           }));
-          setConversation(formatted);
-          await saveChatHistory(formatted);
+          // Update greeting with current user's name
+          const updatedFormatted = updateGreetingWithCurrentUser(formatted);
+          setConversation(updatedFormatted);
+          await saveChatHistory(updatedFormatted);
           return;
         }
       } catch (error) {
@@ -146,6 +150,37 @@ export default function AIHelper() {
     } catch (error) {
       console.error("Error saving chat history:", error);
     }
+  };
+
+  // Update greeting messages with the current user's name
+  const updateGreetingWithCurrentUser = (messages: ChatMessage[]): ChatMessage[] => {
+    const currentFirstName = user?.name ? user.name.split(' ')[0] : '';
+    
+    return messages.map((msg, index) => {
+      // Only update first few AI messages that look like greetings
+      if (msg.role === 'ai' && index < 3) {
+        // Check if this is a greeting message (starts with Hi, Hey, Hello)
+        const greetingPatterns = [
+          /^(Hi|Hey|Hello)\s+\w+[!,]/i,  // "Hi Kunle!" or "Hey John,"
+          /^(Hi|Hey|Hello)\s+\w+\s+/i,   // "Hi Kunle " at start
+        ];
+        
+        let updatedText = msg.text;
+        for (const pattern of greetingPatterns) {
+          if (pattern.test(msg.text)) {
+            // Replace the name after the greeting with the current user's name
+            updatedText = msg.text.replace(
+              /^(Hi|Hey|Hello)\s+\w+/i,
+              currentFirstName ? `$1 ${currentFirstName}` : '$1'
+            );
+            break;
+          }
+        }
+        
+        return { ...msg, text: updatedText };
+      }
+      return msg;
+    });
   };
 
   const getMoodBasedGreeting = (moodScore?: number, name?: string) => {

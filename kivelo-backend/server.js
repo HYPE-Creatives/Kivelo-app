@@ -322,6 +322,10 @@ app.use((req, res, next) => {
   const isKnown = all.some((route) => p.startsWith(route));
 
   if (!isKnown) {
+    // Return JSON for API routes, HTML for others
+    if (p.startsWith('/api/')) {
+      return res.status(404).json({ success: false, message: `Route not found: ${req.originalUrl}` });
+    }
     return res.status(404).send(getNotFoundPage(req.originalUrl));
   }
 
@@ -336,6 +340,10 @@ swaggerDocs(app, PORT);
 
 // ========================= FINAL 404 HANDLER =========================
 app.use((req, res) => {
+  // Return JSON for API routes, HTML for others
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ success: false, message: `Route not found: ${req.originalUrl}` });
+  }
   res.status(404).send(getNotFoundPage(req.originalUrl));
 });
 

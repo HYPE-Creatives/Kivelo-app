@@ -3,6 +3,7 @@
 import Activity from "../models/Activity.js";
 import User from "../models/User.js";
 import Child from "../models/Child.js";
+import Parent from "../models/Parent.js";
 import Notification from "../models/Notification.js";
 import { resolveChildAccess } from "../utils/resolveChildAccess.js";
 
@@ -402,6 +403,449 @@ export const completeActivity = async (req, res) => {
 
   } catch (err) {
     console.error("completeActivity:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
+/* ============================================================
+   SUBMIT ANSWER/RESPONSE (Child)
+=============================================================== */
+export const submitActivityAnswer = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    if (req.user.role !== "child") {
+      return res.status(403).json({
+        success: false,
+        message: "Only children can submit activity answers"
+      });
+    }
+
+    const child = await Child.findOne({ user: userId });
+    if (!child) {
+      return res.status(404).json({
+        success: false,
+        message: "Child profile not found"
+      });
+    }
+
+    const activity = await Activity.findById(req.params.id);
+    if (!activity) {
+      return res.status(404).json({
+        success: false,
+        message: "Activity not found"
+      });
+    }
+
+    // Check if child is assigned
+    const isAssigned = activity.assignedTo.some(
+      cid => cid.toString() === child._id.toString()
+    );
+
+    if (!isAssigned) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not assigned to this activity"
+      });
+    }
+
+    // Check for existing submission from this child
+    const existingSubmission = activity.submissions.find(
+      sub => sub.childId.toString() === child._id.toString()
+    );
+
+    if (existingSubmission && existingSubmission.status !== 'needs_revision') {
+      return res.status(400).json({
+        success: false,
+        message: "You have already submitted this activity"
+      });
+    }
+
+    const { answers, textResponse, attachments } = req.body;
+
+    // Process answers and auto-grade if possible
+    let processedAnswers = [];
+    if (answers && activity.questions.length > 0) {
+      processedAnswers = answers.map(ans => {
+        const question = activity.questions.id(ans.questionId);
+        let isCorrect = null;
+        
+        if (question && question.correctAnswer) {
+          isCorrect = question.correctAnswer.toLowerCase().trim() === 
+                      ans.answer.toLowerCase().trim();
+        }
+        
+        return {
+          questionId: ans.questionId,
+          answer: ans.answer,
+          isCorrect
+        };
+      });
+    }
+
+    const submissionData = {
+      childId: child._id,
+      answers: processedAnswers,
+      textResponse: textResponse || '',
+      attachments: attachments || [],
+      submittedAt: new Date(),
+      status: 'pending_review'
+    };
+
+    // Update existing or add new submission
+    if (existingSubmission) {
+      Object.assign(existingSubmission, submissionData);
+    } else {
+      activity.submissions.push(submissionData);
+    }
+
+    // If no questions and no requiresSubmission, auto-complete
+    if (!activity.requiresSubmission && activity.questions.length === 0) {
+      activity.completed = true;
+      activity.completedBy = child._id;
+      activity.completedAt = new Date();
+      
+      // Award points
+      const user = await User.findById(userId);
+      user.points += activity.points;
+      await user.save();
+    }
+
+    await activity.save();
+
+    // Notify parent of submission
+    const parent = await User.findById(activity.createdBy);
+    if (parent) {
+      await Notification.create({
+        userId: parent._id,
+        type: "activity_submission",
+        title: "New Activity Submission",
+        message: `${child.name || 'Your child'} has submitted "${activity.title}"`,
+        data: {
+          activityId: activity._id,
+          childId: child._id,
+          submittedAt: new Date()
+        }
+      });
+    }
+
+    const populated = await Activity.findById(req.params.id)
+      .populate("createdBy", "name")
+      .populate("assignedTo", "name")
+      .populate("submissions.childId", "name");
+
+    return res.json({
+      success: true,
+      activity: populated,
+      message: "Submission received! Waiting for parent review."
+    });
+
+  } catch (err) {
+    console.error("submitActivityAnswer:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
+/* ============================================================
+   GET ACTIVITY SUBMISSIONS (Parent)
+=============================================================== */
+export const getActivitySubmissions = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    if (req.user.role !== "parent") {
+      return res.status(403).json({
+        success: false,
+        message: "Only parents can view submissions"
+      });
+    }
+
+    const { activityId } = req.params;
+
+    const activity = await Activity.findById(activityId)
+      .populate("submissions.childId", "name")
+      .populate("assignedTo", "name")
+      .populate("createdBy", "name");
+
+    if (!activity) {
+      return res.status(404).json({
+        success: false,
+        message: "Activity not found"
+      });
+    }
+
+    // Verify parent owns this activity
+    if (activity.createdBy._id.toString() !== userId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only view submissions for activities you created"
+      });
+    }
+
+    return res.json({
+      success: true,
+      activity: {
+        _id: activity._id,
+        title: activity.title,
+        description: activity.description,
+        questions: activity.questions,
+        points: activity.points
+      },
+      submissions: activity.submissions
+    });
+
+  } catch (err) {
+    console.error("getActivitySubmissions:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
+/* ============================================================
+   GET ALL CHILDREN SUBMISSIONS (Parent)
+=============================================================== */
+export const getAllChildrenSubmissions = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    if (req.user.role !== "parent") {
+      return res.status(403).json({
+        success: false,
+        message: "Only parents can view submissions"
+      });
+    }
+
+    // Get parent's children
+    const parent = await Parent.findOne({ user: userId });
+    if (!parent) {
+      return res.status(404).json({
+        success: false,
+        message: "Parent profile not found"
+      });
+    }
+
+    // Find all activities with submissions from parent's children
+    const activities = await Activity.find({
+      createdBy: userId,
+      'submissions.0': { $exists: true } // Has at least one submission
+    })
+      .populate("submissions.childId", "name")
+      .populate("assignedTo", "name")
+      .sort({ 'submissions.submittedAt': -1 });
+
+    // Flatten submissions with activity info
+    const allSubmissions = [];
+    for (const activity of activities) {
+      for (const submission of activity.submissions) {
+        allSubmissions.push({
+          activityId: activity._id,
+          activityTitle: activity.title,
+          category: activity.category,
+          points: activity.points,
+          questions: activity.questions,
+          submission: submission
+        });
+      }
+    }
+
+    // Sort by submission date
+    allSubmissions.sort((a, b) => 
+      new Date(b.submission.submittedAt) - new Date(a.submission.submittedAt)
+    );
+
+    return res.json({
+      success: true,
+      submissions: allSubmissions,
+      totalCount: allSubmissions.length,
+      pendingCount: allSubmissions.filter(s => s.submission.status === 'pending_review').length
+    });
+
+  } catch (err) {
+    console.error("getAllChildrenSubmissions:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
+/* ============================================================
+   REVIEW SUBMISSION (Parent)
+=============================================================== */
+export const reviewSubmission = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    if (req.user.role !== "parent") {
+      return res.status(403).json({
+        success: false,
+        message: "Only parents can review submissions"
+      });
+    }
+
+    const { activityId, submissionId } = req.params;
+    const { status, feedback, pointsAwarded } = req.body;
+
+    if (!['approved', 'needs_revision'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Status must be 'approved' or 'needs_revision'"
+      });
+    }
+
+    const activity = await Activity.findById(activityId);
+    if (!activity) {
+      return res.status(404).json({
+        success: false,
+        message: "Activity not found"
+      });
+    }
+
+    // Verify parent owns this activity
+    if (activity.createdBy.toString() !== userId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only review submissions for activities you created"
+      });
+    }
+
+    const submission = activity.submissions.id(submissionId);
+    if (!submission) {
+      return res.status(404).json({
+        success: false,
+        message: "Submission not found"
+      });
+    }
+
+    // Update submission
+    submission.status = status;
+    submission.parentFeedback = feedback || '';
+    submission.reviewedAt = new Date();
+    submission.reviewedBy = userId;
+
+    // Award points if approved
+    if (status === 'approved') {
+      const points = pointsAwarded !== undefined ? pointsAwarded : activity.points;
+      submission.pointsAwarded = points;
+
+      // Get child's user and award points
+      const child = await Child.findById(submission.childId);
+      if (child) {
+        const childUser = await User.findById(child.user);
+        if (childUser) {
+          childUser.points += points;
+          await childUser.save();
+
+          // Notify child
+          await Notification.create({
+            userId: child.user,
+            type: "submission_reviewed",
+            title: status === 'approved' ? "Activity Approved! 🎉" : "Activity Needs Revision",
+            message: status === 'approved' 
+              ? `Your submission for "${activity.title}" was approved! You earned ${points} points!`
+              : `Your submission for "${activity.title}" needs some changes. ${feedback || ''}`,
+            data: {
+              activityId: activity._id,
+              status,
+              pointsAwarded: points
+            }
+          });
+        }
+      }
+
+      // Mark activity as completed
+      activity.completed = true;
+      activity.completedBy = submission.childId;
+      activity.completedAt = new Date();
+    } else {
+      // Notify child about revision needed
+      const child = await Child.findById(submission.childId);
+      if (child) {
+        await Notification.create({
+          userId: child.user,
+          type: "submission_reviewed",
+          title: "Activity Needs Revision",
+          message: `Please revise your submission for "${activity.title}". ${feedback || ''}`,
+          data: {
+            activityId: activity._id,
+            status
+          }
+        });
+      }
+    }
+
+    await activity.save();
+
+    const populated = await Activity.findById(activityId)
+      .populate("submissions.childId", "name")
+      .populate("assignedTo", "name");
+
+    return res.json({
+      success: true,
+      activity: populated,
+      message: status === 'approved' 
+        ? "Submission approved and points awarded!" 
+        : "Revision requested"
+    });
+
+  } catch (err) {
+    console.error("reviewSubmission:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
+/* ============================================================
+   GET CHILD'S OWN SUBMISSION (Child)
+=============================================================== */
+export const getMySubmission = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    if (req.user.role !== "child") {
+      return res.status(403).json({
+        success: false,
+        message: "Only children can view their submissions"
+      });
+    }
+
+    const child = await Child.findOne({ user: userId });
+    if (!child) {
+      return res.status(404).json({
+        success: false,
+        message: "Child profile not found"
+      });
+    }
+
+    const activity = await Activity.findById(req.params.id)
+      .populate("createdBy", "name");
+
+    if (!activity) {
+      return res.status(404).json({
+        success: false,
+        message: "Activity not found"
+      });
+    }
+
+    const mySubmission = activity.submissions.find(
+      sub => sub.childId.toString() === child._id.toString()
+    );
+
+    return res.json({
+      success: true,
+      activity: {
+        _id: activity._id,
+        title: activity.title,
+        description: activity.description,
+        questions: activity.questions,
+        points: activity.points,
+        requiresSubmission: activity.requiresSubmission
+      },
+      submission: mySubmission || null
+    });
+
+  } catch (err) {
+    console.error("getMySubmission:", err);
     return res.status(500).json({ success: false, message: err.message });
   }
 };

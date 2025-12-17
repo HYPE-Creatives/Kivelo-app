@@ -468,6 +468,10 @@ export default function Settings() {
           <TouchableOpacity style={styles.accountButton} onPress={handleManageFamily}>
             <Text style={styles.accountButtonText}>👥 Manage Family Members</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity style={styles.accountButton} onPress={() => router.push('/(dashboard)/parent/settings/theme-settings')}>
+            <Text style={styles.accountButtonText}>🎨 Theme & Appearance</Text>
+          </TouchableOpacity>
           
           <TouchableOpacity 
             style={[styles.accountButton, styles.logoutButton]} 

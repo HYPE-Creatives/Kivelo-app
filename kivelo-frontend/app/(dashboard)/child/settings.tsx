@@ -15,6 +15,7 @@ import { showAlert } from '@/utils/showAlert';
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "../../../context/AuthContext";
+import { useTheme } from "../../../context/ThemeContext";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -49,6 +50,7 @@ const apiCallWithFallback = async (
 
 export default function ChildSettings() {
   const { user, logout, refreshProfile } = useAuth();
+  const { colors, themeColors, isDark } = useTheme();
   const router = useRouter();
   const [uploading, setUploading] = useState(false);
 
@@ -236,10 +238,17 @@ export default function ChildSettings() {
       title: "⚙️ Settings",
       items: [
         {
+          icon: "color-palette",
+          label: "Theme & Colors",
+          description: "Make the app look awesome!",
+          onPress: () => router.push("/(dashboard)/child/settings/theme-settings"),
+          gradient: ["#667eea", "#764ba2"],
+        },
+        {
           icon: "notifications",
           label: "Notifications",
           description: "Manage your alerts",
-          onPress: () => showAlert("Coming Soon!", "Notification settings will be here soon! 🔔"),
+          onPress: () => router.push("/(dashboard)/child/settings/notification-settings"),
           gradient: ["#ffecd2", "#fcb69f"],
         },
         {
@@ -264,19 +273,19 @@ export default function ChildSettings() {
   ];
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <LinearGradient colors={["#667eea", "#764ba2"]} style={styles.header}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={["top"]}>
+      <LinearGradient colors={themeColors.gradient} style={styles.header}>
         <Text style={styles.headerTitle}>Settings</Text>
         <Text style={styles.headerSubtitle}>Customize your experience</Text>
       </LinearGradient>
 
       <ScrollView
-        style={styles.container}
+        style={[styles.container, { backgroundColor: colors.background }]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* Profile Card */}
-        <View style={styles.profileCard}>
+        <View style={[styles.profileCard, { backgroundColor: colors.card }]}>
           <TouchableOpacity
             style={styles.avatarContainer}
             onPress={handleAvatarPress}
@@ -285,7 +294,7 @@ export default function ChildSettings() {
             {user?.avatar?.url ? (
               <Image source={{ uri: user.avatar.url }} style={styles.avatarImage} />
             ) : (
-              <LinearGradient colors={["#667eea", "#764ba2"]} style={styles.avatarPlaceholder}>
+              <LinearGradient colors={themeColors.gradient} style={styles.avatarPlaceholder}>
                 <Text style={styles.avatarInitials}>{initials}</Text>
               </LinearGradient>
             )}
@@ -294,18 +303,18 @@ export default function ChildSettings() {
                 <ActivityIndicator color="white" size="small" />
               </View>
             ) : (
-              <View style={styles.cameraBadge}>
+              <View style={[styles.cameraBadge, { backgroundColor: themeColors.primary }]}>
                 <Ionicons name="camera" size={16} color="white" />
               </View>
             )}
           </TouchableOpacity>
 
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{user?.name || "Hey there!"}</Text>
-            <Text style={styles.profileEmail}>{user?.email || "Welcome to Kivelo"}</Text>
-            <View style={styles.profileBadge}>
+            <Text style={[styles.profileName, { color: colors.text }]}>{user?.name || "Hey there!"}</Text>
+            <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>{user?.email || "Welcome to Kivelo"}</Text>
+            <View style={[styles.profileBadge, { backgroundColor: isDark ? '#3B3B1F' : '#fef3c7' }]}>
               <Ionicons name="star" size={14} color="#fbbf24" />
-              <Text style={styles.profileBadgeText}>Super Kid</Text>
+              <Text style={[styles.profileBadgeText, { color: isDark ? '#fbbf24' : '#92400e' }]}>Super Kid</Text>
             </View>
           </View>
         </View>
@@ -313,11 +322,11 @@ export default function ChildSettings() {
         {/* Settings Sections */}
         {settingsSections.map((section, sectionIndex) => (
           <View key={sectionIndex} style={styles.section}>
-            <Text style={styles.sectionTitle}>{section.title}</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{section.title}</Text>
             {section.items.map((item, itemIndex) => (
               <TouchableOpacity
                 key={itemIndex}
-                style={styles.settingItem}
+                style={[styles.settingItem, { backgroundColor: colors.card }]}
                 onPress={item.onPress}
                 activeOpacity={0.7}
               >
@@ -330,11 +339,11 @@ export default function ChildSettings() {
                   <Ionicons name={item.icon as any} size={22} color="white" />
                 </LinearGradient>
                 <View style={styles.itemContent}>
-                  <Text style={styles.itemLabel}>{item.label}</Text>
-                  <Text style={styles.itemDescription}>{item.description}</Text>
+                  <Text style={[styles.itemLabel, { color: colors.text }]}>{item.label}</Text>
+                  <Text style={[styles.itemDescription, { color: colors.textSecondary }]}>{item.description}</Text>
                 </View>
                 <View style={styles.chevronContainer}>
-                  <Ionicons name="chevron-forward" size={20} color="#c4b5fd" />
+                  <Ionicons name="chevron-forward" size={20} color={themeColors.accent} />
                 </View>
               </TouchableOpacity>
             ))}
@@ -356,12 +365,12 @@ export default function ChildSettings() {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Made with</Text>
+          <Text style={[styles.footerText, { color: colors.textSecondary }]}>Made with</Text>
           <Ionicons name="heart" size={16} color="#ef4444" style={styles.heartIcon} />
-          <Text style={styles.footerText}>by</Text>
-          <Text style={styles.footerBrand}> MrDOF</Text>
+          <Text style={[styles.footerText, { color: colors.textSecondary }]}>by</Text>
+          <Text style={[styles.footerBrand, { color: themeColors.primary }]}> MrDOF</Text>
         </View>
-        <Text style={styles.footerVersion}>Kivelo v1.0.0</Text>
+        <Text style={[styles.footerVersion, { color: colors.textSecondary }]}>Kivelo v1.0.0</Text>
       </ScrollView>
     </SafeAreaView>
   );

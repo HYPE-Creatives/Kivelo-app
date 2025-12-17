@@ -16,6 +16,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "../../../context/AuthContext";
 import { useParent, Child, FamilyActivityFeed, ChildMoodSummary } from "../../../context/ParentContext";
 import { useNotifications } from "../../../context/NotificationContext";
+import { useTheme } from "../../../context/ThemeContext";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -68,6 +69,7 @@ export default function ParentHome() {
     loading 
   } = useParent();
   const { unreadCount, refreshNotifications } = useNotifications();
+  const { colors, themeColors, isDark } = useTheme();
   const router = useRouter();
   
   const [refreshing, setRefreshing] = useState(false);
@@ -181,10 +183,10 @@ export default function ParentHome() {
       onPress: () => router.push("/(dashboard)/parent/activities"),
     },
     {
-      icon: "book",
-      title: "Journals",
-      gradient: ["#8B5CF6", "#6D28D9"],
-      onPress: () => router.push("/(dashboard)/parent/journal"),
+      icon: "document-text",
+      title: "Submissions",
+      gradient: ["#10B981", "#059669"],
+      onPress: () => router.push("/(dashboard)/parent/submissions"),
     },
     {
       icon: "analytics",
@@ -195,23 +197,23 @@ export default function ParentHome() {
   ];
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={["top"]}>
       <ScrollView
-        style={styles.container}
+        style={[styles.container, { backgroundColor: colors.background }]}
         contentContainerStyle={{ paddingBottom: 90 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={onRefresh} 
-            colors={["#16A34A"]}
-            tintColor="#16A34A"
+            colors={[themeColors.primary]}
+            tintColor={themeColors.primary}
           />
         }
       >
         {/* Header with Gradient */}
         <LinearGradient
-          colors={["#16A34A", "#15803D", "#166534"]}
+          colors={[themeColors.primary, themeColors.gradient[1], themeColors.gradient[1]]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.header}
@@ -360,10 +362,10 @@ export default function ParentHome() {
           {/* Children Cards */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>My Children</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>My Children</Text>
               {children.length > 0 && (
                 <TouchableOpacity onPress={() => router.push("/(dashboard)/parent/family")}>
-                  <Text style={styles.seeAllLink}>View All</Text>
+                  <Text style={[styles.seeAllLink, { color: themeColors.primary }]}>View All</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -383,18 +385,18 @@ export default function ParentHome() {
               </View>
             ) : children.length === 0 ? (
               <TouchableOpacity 
-                style={styles.emptyCard}
+                style={[styles.emptyCard, { backgroundColor: colors.card }]}
                 onPress={() => router.push("/(dashboard)/parent/family")}
                 activeOpacity={0.8}
               >
                 <View style={styles.emptyIconContainer}>
-                  <Ionicons name="people-outline" size={36} color="#9CA3AF" />
+                  <Ionicons name="people-outline" size={36} color={colors.textSecondary} />
                 </View>
-                <Text style={styles.emptyTitle}>No children yet</Text>
-                <Text style={styles.emptyText}>Add your first child to get started</Text>
+                <Text style={[styles.emptyTitle, { color: colors.text }]}>No children yet</Text>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Add your first child to get started</Text>
                 <View style={styles.emptyBtn}>
-                  <Ionicons name="add" size={18} color="#16A34A" />
-                  <Text style={styles.emptyBtnText}>Add Child</Text>
+                  <Ionicons name="add" size={18} color={themeColors.primary} />
+                  <Text style={[styles.emptyBtnText, { color: themeColors.primary }]}>Add Child</Text>
                 </View>
               </TouchableOpacity>
             ) : (
@@ -409,7 +411,7 @@ export default function ParentHome() {
                   return (
                     <TouchableOpacity
                       key={childId}
-                      style={styles.childCard}
+                      style={[styles.childCard, { backgroundColor: colors.card }]}
                       onPress={() => router.push("/(dashboard)/parent/family")}
                       activeOpacity={0.8}
                     >
@@ -485,29 +487,29 @@ export default function ParentHome() {
           {/* Recent Activity Feed */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Recent Activity</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Activity</Text>
               {familyActivityFeed.length > 0 && (
                 <TouchableOpacity onPress={() => router.push("/(dashboard)/parent/ai-insight")}>
-                  <Text style={styles.seeAllLink}>See All</Text>
+                  <Text style={[styles.seeAllLink, { color: themeColors.primary }]}>See All</Text>
                 </TouchableOpacity>
               )}
             </View>
 
             {loadingData && familyActivityFeed.length === 0 ? (
               <View style={styles.activityLoadingContainer}>
-                <ActivityIndicator size="small" color="#16A34A" />
-                <Text style={styles.loadingText}>Loading activity...</Text>
+                <ActivityIndicator size="small" color={themeColors.primary} />
+                <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading activity...</Text>
               </View>
             ) : familyActivityFeed.length === 0 ? (
-              <View style={styles.emptyActivityCard}>
-                <Ionicons name="time-outline" size={32} color="#D1D5DB" />
-                <Text style={styles.emptyActivityText}>No recent activity yet</Text>
-                <Text style={styles.emptyActivitySubtext}>
+              <View style={[styles.emptyActivityCard, { backgroundColor: colors.card }]}>
+                <Ionicons name="time-outline" size={32} color={colors.textSecondary} />
+                <Text style={[styles.emptyActivityText, { color: colors.text }]}>No recent activity yet</Text>
+                <Text style={[styles.emptyActivitySubtext, { color: colors.textSecondary }]}>
                   Activity will appear here when your children check in
                 </Text>
               </View>
             ) : (
-              <View style={styles.activityList}>
+              <View style={[styles.activityList, { backgroundColor: colors.card }]}>
                 {familyActivityFeed.slice(0, 5).map((activity, index) => {
                   const config = ACTIVITY_TYPE_CONFIG[activity.type] || ACTIVITY_TYPE_CONFIG.mood_checkin;
                   
@@ -541,15 +543,15 @@ export default function ParentHome() {
           {/* Family Wellness Tip */}
           <View style={styles.section}>
             <LinearGradient
-              colors={["#F0FDF4", "#DCFCE7"]}
+              colors={isDark ? [themeColors.gradient[1] + '30', themeColors.gradient[0] + '20'] : ["#F0FDF4", "#DCFCE7"]}
               style={styles.tipCard}
             >
               <View style={styles.tipIconContainer}>
-                <Ionicons name="bulb" size={24} color="#16A34A" />
+                <Ionicons name="bulb" size={24} color={themeColors.primary} />
               </View>
               <View style={styles.tipContent}>
-                <Text style={styles.tipTitle}>Daily Tip</Text>
-                <Text style={styles.tipText}>
+                <Text style={[styles.tipTitle, { color: colors.text }]}>Daily Tip</Text>
+                <Text style={[styles.tipText, { color: colors.textSecondary }]}>
                   {familyStats.averageMood >= 7 
                     ? "Your family is doing great! Keep up the positive interactions and celebrate small wins together."
                     : familyStats.averageMood >= 5
