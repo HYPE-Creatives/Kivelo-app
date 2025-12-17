@@ -153,8 +153,13 @@ export const createActivity = async (req, res) => {
     });
 
   } catch (err) {
-    console.error("createActivity:", err);
-    return res.status(500).json({ success: false, message: err.message });
+    console.error("createActivity ERROR:", err);
+    console.error("createActivity STACK:", err.stack);
+    return res.status(500).json({ 
+      success: false, 
+      message: err.message || "Server error creating activity",
+      error: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 };
 

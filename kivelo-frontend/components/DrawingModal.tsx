@@ -2,6 +2,7 @@
 import React from "react";
 import { Modal, View, StyleSheet, Platform, StatusBar } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import DrawingBoard from "./DrawingBoard";
 
 interface DrawingModalProps {
@@ -9,6 +10,7 @@ interface DrawingModalProps {
   onClose: () => void;
   onSave: (imageData: string) => void;
   backgroundColor?: string;
+  initialImage?: string; // For editing existing drawings
 }
 
 export default function DrawingModal({
@@ -16,6 +18,7 @@ export default function DrawingModal({
   onClose,
   onSave,
   backgroundColor,
+  initialImage,
 }: DrawingModalProps) {
   const handleSave = (imageData: string) => {
     onSave(imageData);
@@ -29,14 +32,17 @@ export default function DrawingModal({
       presentationStyle="fullScreen"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-        <StatusBar barStyle="dark-content" />
-        <DrawingBoard
-          onSave={handleSave}
-          onClose={onClose}
-          backgroundColor={backgroundColor}
-        />
-      </SafeAreaView>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+          <StatusBar barStyle="dark-content" />
+          <DrawingBoard
+            onSave={handleSave}
+            onClose={onClose}
+            backgroundColor={backgroundColor}
+            initialImage={initialImage}
+          />
+        </SafeAreaView>
+      </GestureHandlerRootView>
     </Modal>
   );
 }

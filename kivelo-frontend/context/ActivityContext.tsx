@@ -28,11 +28,38 @@ export interface Activity {
   updatedAt: string;
 }
 
+export interface CreateActivityData {
+  title: string;
+  description: string;
+  category: 'education' | 'physical' | 'creative' | 'chores' | 'social' | 'mindfulness';
+  points: number;
+  duration: number;
+  assignedTo: string[];
+  dueDate?: string;
+  difficulty?: 'easy' | 'medium' | 'hard';
+  tags?: string[];
+}
+
+export interface UpdateActivityData {
+  title?: string;
+  description?: string;
+  category?: 'education' | 'physical' | 'creative' | 'chores' | 'social' | 'mindfulness';
+  points?: number;
+  duration?: number;
+  assignedTo?: string[];
+  dueDate?: string;
+  difficulty?: 'easy' | 'medium' | 'hard';
+  tags?: string[];
+}
+
 interface ActivityContextType {
   activities: Activity[];
   loading: boolean;
   error: string | null;
   getActivities: () => Promise<void>;
+  createActivity: (data: CreateActivityData) => Promise<{ success: boolean; message?: string; activity?: Activity }>;
+  updateActivity: (activityId: string, data: UpdateActivityData) => Promise<{ success: boolean; message?: string; activity?: Activity }>;
+  deleteActivity: (activityId: string) => Promise<{ success: boolean; message?: string }>;
   completeActivity: (activityId: string) => Promise<void>;
   refreshActivities: () => Promise<void>;
 }
@@ -49,7 +76,7 @@ export const ActivityProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Helper function to make API calls with fallback
+  // Helper function to make API calls with fallback and timeout
   const makeAuthenticatedRequest = async (
     endpoint: string,
     options: RequestInit = {}
@@ -71,21 +98,35 @@ export const ActivityProvider = ({ children }: { children: ReactNode }) => {
 
     for (const baseUrl of API_URLS) {
       try {
+        // Add timeout using AbortController
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
         const response = await fetch(`${baseUrl}${endpoint}`, {
           ...options,
           headers,
+          signal: controller.signal,
         });
 
+        clearTimeout(timeoutId);
+
+        // Return response for caller to handle (including 4xx errors)
         if (response.ok || response.status < 500) {
           return response;
         }
+        
+        // 5xx errors - try next URL
+        lastError = new Error(`Server error: ${response.status}`);
       } catch (err) {
         lastError = err as Error;
-        console.log(`Trying next URL after error: ${err}`);
+        if ((err as Error).name === 'AbortError') {
+          lastError = new Error('Request timed out. The server may be waking up, please try again.');
+        }
+        console.log(`API error: ${lastError.message}`);
       }
     }
 
-    throw lastError || new Error('All API endpoints failed');
+    throw lastError || new Error('Failed to connect to server. Please check your internet connection.');
   };
 
   // Get user's activities (child gets assigned, parent gets created)
@@ -153,6 +194,101 @@ export const ActivityProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [getActivities]);
 
+  // Create a new activity (parent only)
+  const createActivity = useCallback(async (data: CreateActivityData) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await makeAuthenticatedRequest('/activities', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+
+      if (!response) {
+        return { success: false, message: 'Please log in to create activities' };
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        await getActivities(); // Refresh list
+        return { success: true, activity: result.activity };
+      } else {
+        return { success: false, message: result.message || 'Failed to create activity' };
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create activity';
+      setError(errorMessage);
+      return { success: false, message: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  }, [getActivities]);
+
+  // Update an activity (parent only)
+  const updateActivity = useCallback(async (activityId: string, data: UpdateActivityData) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await makeAuthenticatedRequest(`/activities/${activityId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+
+      if (!response) {
+        return { success: false, message: 'Please log in to update activities' };
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        await getActivities(); // Refresh list
+        return { success: true, activity: result.activity };
+      } else {
+        return { success: false, message: result.message || 'Failed to update activity' };
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update activity';
+      setError(errorMessage);
+      return { success: false, message: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  }, [getActivities]);
+
+  // Delete an activity (parent only)
+  const deleteActivity = useCallback(async (activityId: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await makeAuthenticatedRequest(`/activities/${activityId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response) {
+        return { success: false, message: 'Please log in to delete activities' };
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        await getActivities(); // Refresh list
+        return { success: true };
+      } else {
+        return { success: false, message: result.message || 'Failed to delete activity' };
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete activity';
+      setError(errorMessage);
+      return { success: false, message: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  }, [getActivities]);
+
   // Refresh activities
   const refreshActivities = useCallback(async () => {
     await getActivities();
@@ -165,6 +301,9 @@ export const ActivityProvider = ({ children }: { children: ReactNode }) => {
         loading,
         error,
         getActivities,
+        createActivity,
+        updateActivity,
+        deleteActivity,
         completeActivity,
         refreshActivities,
       }}

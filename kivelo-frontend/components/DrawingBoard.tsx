@@ -1,5 +1,5 @@
 // components/DrawingBoard.tsx
-import React, { useRef, useState, useCallback, useEffect } from "react";
+import React, { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import {
   View,
   StyleSheet,
@@ -7,16 +7,15 @@ import {
   Text,
   Platform,
   Dimensions,
-  ScrollView,
-  PanResponder,
   GestureResponderEvent,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import Svg, { Path, Rect } from "react-native-svg";
+import { SvgXml } from "react-native-svg";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 // Color palette for kids
 const COLORS = [
@@ -77,7 +76,7 @@ const WebCanvas = ({
   strokes: Stroke[];
   currentStroke: Stroke | null;
   backgroundColor: string;
-  canvasRef: React.RefObject<HTMLCanvasElement>;
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
   width: number;
   height: number;
 }) => {
@@ -85,18 +84,21 @@ const WebCanvas = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext("2d");
+    const ctx = (canvas as any).getContext("2d");
     if (!ctx) return;
 
     // Clear and fill background
     ctx.fillStyle = backgroundColor;
     ctx.fillRect(0, 0, width, height);
 
-    // Draw all strokes
-    const allStrokes = currentStroke ? [...strokes, currentStroke] : strokes;
+    // Draw all strokes - filter out any null/undefined for safety
+    const allStrokes = (currentStroke ? [...strokes, currentStroke] : strokes).filter(
+      (stroke) => stroke !== null && stroke !== undefined
+    );
 
     allStrokes.forEach((stroke) => {
-      if (stroke.points.length < 2) return;
+      // Skip null/undefined strokes or strokes with no/insufficient points
+      if (!stroke || !stroke.points || stroke.points.length < 2) return;
 
       ctx.beginPath();
       ctx.strokeStyle = stroke.color;
@@ -127,7 +129,26 @@ const WebCanvas = ({
   );
 };
 
-// Mobile Canvas using react-native-svg
+// Helper to extract SVG content from data URI
+const getSvgContentFromUri = (uri: string): string | null => {
+  if (!uri?.startsWith('data:image/svg')) return null;
+  try {
+    if (uri.includes('charset=utf-8,')) {
+      const encoded = uri.split('charset=utf-8,')[1];
+      return decodeURIComponent(encoded);
+    }
+    if (uri.includes('base64,')) {
+      const base64 = uri.split('base64,')[1];
+      return atob(base64);
+    }
+    return null;
+  } catch (e) {
+    console.error('Failed to decode SVG:', e);
+    return null;
+  }
+};
+
+// Mobile Canvas using react-native-svg with direct touch handlers (more stable than PanResponder)
 const MobileCanvas = ({
   strokes,
   currentStroke,
@@ -137,6 +158,7 @@ const MobileCanvas = ({
   onStart,
   onMove,
   onEnd,
+  initialImage,
 }: {
   strokes: Stroke[];
   currentStroke: Stroke | null;
@@ -146,53 +168,126 @@ const MobileCanvas = ({
   onStart: (x: number, y: number) => void;
   onMove: (x: number, y: number) => void;
   onEnd: () => void;
+  initialImage?: string;
 }) => {
-  const allStrokes = currentStroke ? [...strokes, currentStroke] : strokes;
+  // Get SVG content from initialImage if provided
+  const initialSvgContent = useMemo(() => {
+    return initialImage ? getSvgContentFromUri(initialImage) : null;
+  }, [initialImage]);
+  // Filter out any null/undefined strokes for safety
+  const allStrokes = useMemo(() => {
+    const combined = currentStroke ? [...strokes, currentStroke] : strokes;
+    return combined.filter(
+      (stroke): stroke is Stroke => stroke !== null && stroke !== undefined && stroke.points && stroke.points.length > 0
+    );
+  }, [strokes, currentStroke]);
+  
+  const isDrawingRef = useRef(false);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => {
-        const { locationX, locationY } = evt.nativeEvent;
-        onStart(locationX, locationY);
-      },
-      onPanResponderMove: (evt) => {
-        const { locationX, locationY } = evt.nativeEvent;
-        onMove(locationX, locationY);
-      },
-      onPanResponderRelease: () => {
-        onEnd();
-      },
-      onPanResponderTerminate: () => {
-        onEnd();
-      },
-    })
-  ).current;
-
-  // Convert points to SVG path string
-  const pointsToPath = (points: Point[]): string => {
-    if (points.length < 1) return "";
-    let path = `M ${points[0].x} ${points[0].y}`;
-    for (let i = 1; i < points.length; i++) {
-      path += ` L ${points[i].x} ${points[i].y}`;
+  // Convert points to SVG path string with smoothing for better curves
+  const pointsToPath = useCallback((points: Point[]): string => {
+    if (!points || points.length < 1) return "";
+    if (points.length === 1) {
+      // Single point - draw a small circle
+      return `M ${points[0].x} ${points[0].y} L ${points[0].x + 0.5} ${points[0].y + 0.5}`;
     }
+    
+    let path = `M ${points[0].x} ${points[0].y}`;
+    
+    // Use quadratic bezier curves for smoother lines
+    for (let i = 1; i < points.length - 1; i++) {
+      const xc = (points[i].x + points[i + 1].x) / 2;
+      const yc = (points[i].y + points[i + 1].y) / 2;
+      path += ` Q ${points[i].x} ${points[i].y} ${xc} ${yc}`;
+    }
+    
+    // Last point
+    if (points.length > 1) {
+      const lastPoint = points[points.length - 1];
+      path += ` L ${lastPoint.x} ${lastPoint.y}`;
+    }
+    
     return path;
-  };
+  }, []);
+
+  // Get coordinates relative to the canvas
+  const getCanvasCoords = useCallback((evt: GestureResponderEvent): { x: number; y: number } | null => {
+    const { locationX, locationY } = evt.nativeEvent;
+    
+    // Clamp values to canvas bounds for stability
+    const x = Math.max(0, Math.min(width, locationX));
+    const y = Math.max(0, Math.min(height, locationY));
+    
+    return { x, y };
+  }, [width, height]);
+
+  const handleTouchStart = useCallback((evt: GestureResponderEvent) => {
+    evt.persist?.(); // Persist event for async access
+    const coords = getCanvasCoords(evt);
+    if (coords) {
+      isDrawingRef.current = true;
+      onStart(coords.x, coords.y);
+    }
+  }, [getCanvasCoords, onStart]);
+
+  const handleTouchMove = useCallback((evt: GestureResponderEvent) => {
+    if (!isDrawingRef.current) return;
+    evt.persist?.(); // Persist event for async access
+    
+    const coords = getCanvasCoords(evt);
+    if (coords) {
+      onMove(coords.x, coords.y);
+    }
+  }, [getCanvasCoords, onMove]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (isDrawingRef.current) {
+      isDrawingRef.current = false;
+      onEnd();
+    }
+  }, [onEnd]);
 
   return (
     <View
-      style={{ width, height, backgroundColor }}
-      {...panResponder.panHandlers}
+      style={{ 
+        width, 
+        height, 
+        backgroundColor: initialSvgContent ? 'transparent' : backgroundColor,
+        overflow: 'hidden',
+        borderRadius: 12,
+      }}
+      onStartShouldSetResponder={() => true}
+      onMoveShouldSetResponder={() => true}
+      onStartShouldSetResponderCapture={() => true}
+      onMoveShouldSetResponderCapture={() => true}
+      onResponderGrant={handleTouchStart}
+      onResponderMove={handleTouchMove}
+      onResponderRelease={handleTouchEnd}
+      onResponderTerminate={handleTouchEnd}
+      onResponderTerminationRequest={() => false}
     >
-      <Svg width={width} height={height} style={{ position: "absolute" }}>
-        <Rect x={0} y={0} width={width} height={height} fill={backgroundColor} />
+      {/* Show initial image as background - full opacity to continue drawing */}
+      {initialSvgContent && (
+        <View style={{ position: "absolute", top: 0, left: 0, width, height }}>
+          <SvgXml xml={initialSvgContent} width={width} height={height} />
+        </View>
+      )}
+      <Svg 
+        width={width} 
+        height={height} 
+        style={{ position: "absolute", top: 0, left: 0 }}
+        pointerEvents="none"
+      >
+        {/* Only fill background if no initial image */}
+        {!initialSvgContent && (
+          <Rect x={0} y={0} width={width} height={height} fill={backgroundColor} />
+        )}
         {allStrokes.map((stroke, strokeIndex) => {
-          if (stroke.points.length < 1) return null;
           const pathData = pointsToPath(stroke.points);
+          if (!pathData) return null;
           return (
             <Path
-              key={strokeIndex}
+              key={`stroke-${strokeIndex}-${stroke.points.length}`}
               d={pathData}
               stroke={stroke.color}
               strokeWidth={stroke.size}
@@ -225,44 +320,80 @@ export default function DrawingBoard({
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<View>(null);
+  
+  // Use refs for current drawing state to avoid stale closures in callbacks
+  const currentStrokeRef = useRef<Stroke | null>(null);
+  const selectedColorRef = useRef(selectedColor);
+  const brushSizeRef = useRef(brushSize);
+  
+  // Keep refs in sync with state
+  useEffect(() => {
+    selectedColorRef.current = selectedColor;
+  }, [selectedColor]);
+  
+  useEffect(() => {
+    brushSizeRef.current = brushSize;
+  }, [brushSize]);
 
-  const canvasWidth = Math.min(SCREEN_WIDTH - 32, 500);
-  const finalCanvasHeight = canvasHeight || Math.min(canvasWidth * 0.75, 400);
+  // Calculate canvas dimensions - use more screen space on mobile
+  const canvasWidth = Platform.OS === "web" 
+    ? Math.min(SCREEN_WIDTH - 32, 500)
+    : Math.min(SCREEN_WIDTH - 32, SCREEN_WIDTH * 0.95);
+  const finalCanvasHeight = canvasHeight || (Platform.OS === "web" 
+    ? Math.min(canvasWidth * 0.75, 400)
+    : Math.min(SCREEN_HEIGHT * 0.45, 350));
 
   const isWeb = Platform.OS === "web";
 
-  // Start drawing (with direct x, y for mobile)
+  // Start drawing (with direct x, y for mobile) - use refs for stable callbacks
   const handleStartMobile = useCallback(
     (x: number, y: number) => {
-      setCurrentStroke({
+      const newStroke: Stroke = {
         points: [{ x, y }],
-        color: selectedColor,
-        size: brushSize,
-      });
+        color: selectedColorRef.current,
+        size: brushSizeRef.current,
+      };
+      currentStrokeRef.current = newStroke;
+      setCurrentStroke(newStroke);
     },
-    [selectedColor, brushSize]
+    [] // No dependencies - uses refs
   );
 
-  // Continue drawing (with direct x, y for mobile)
+  // Continue drawing (with direct x, y for mobile) - optimized with ref
   const handleMoveMobile = useCallback(
     (x: number, y: number) => {
-      setCurrentStroke((prev) => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          points: [...prev.points, { x, y }],
-        };
-      });
+      if (!currentStrokeRef.current) return;
+      
+      // Add point to ref immediately for responsiveness
+      const updatedStroke: Stroke = {
+        ...currentStrokeRef.current,
+        points: [...currentStrokeRef.current.points, { x, y }],
+      };
+      currentStrokeRef.current = updatedStroke;
+      
+      // Update state to trigger re-render
+      setCurrentStroke({ ...updatedStroke });
     },
-    []
+    [] // No dependencies - uses refs
   );
+  
+  // End drawing - sync ref with strokes (use callback form to avoid stale closure)
+  const handleEndMobile = useCallback(() => {
+    const strokeToAdd = currentStrokeRef.current;
+    if (strokeToAdd && strokeToAdd.points && strokeToAdd.points.length > 0) {
+      setUndoStack((prev) => [...prev, strokes]);
+      setStrokes((prev) => [...prev, strokeToAdd]);
+    }
+    currentStrokeRef.current = null;
+    setCurrentStroke(null);
+  }, [strokes]);
 
   // Get position from event (for web)
   const getPosition = useCallback(
     (event: any): Point | null => {
       const canvas = canvasRef.current;
       if (!canvas) return null;
-      const rect = canvas.getBoundingClientRect();
+      const rect = (canvas as any).getBoundingClientRect();
       const clientX = event.clientX ?? event.touches?.[0]?.clientX;
       const clientY = event.clientY ?? event.touches?.[0]?.clientY;
       if (clientX === undefined || clientY === undefined) return null;
@@ -339,29 +470,68 @@ export default function DrawingBoard({
   // Save drawing as base64
   const handleSave = useCallback(async () => {
     if (isWeb && canvasRef.current) {
-      const dataUrl = canvasRef.current.toDataURL("image/png");
+      const dataUrl = (canvasRef.current as any).toDataURL("image/png");
       onSave?.(dataUrl);
     } else {
-      // For mobile, we'll create a simple SVG data URL
-      const svgContent = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="${canvasWidth}" height="${finalCanvasHeight}">
-          <rect width="100%" height="100%" fill="${bgColor}"/>
-          ${strokes
-            .map((stroke) => {
-              if (stroke.points.length < 2) return "";
-              const pathData = stroke.points
-                .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`)
-                .join(" ");
-              return `<path d="${pathData}" stroke="${stroke.color}" stroke-width="${stroke.size}" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`;
-            })
-            .join("")}
-        </svg>
-      `;
-      const base64 = btoa(svgContent);
-      const dataUrl = `data:image/svg+xml;base64,${base64}`;
+      // For mobile, create SVG and encode for Image component compatibility
+      const generatePath = (points: Point[]) => {
+        if (points.length < 1) return "";
+        if (points.length === 1) {
+          return `M ${points[0].x} ${points[0].y} L ${points[0].x + 0.1} ${points[0].y}`;
+        }
+        
+        let path = `M ${points[0].x} ${points[0].y}`;
+        for (let i = 1; i < points.length - 1; i++) {
+          const xc = (points[i].x + points[i + 1].x) / 2;
+          const yc = (points[i].y + points[i + 1].y) / 2;
+          path += ` Q ${points[i].x} ${points[i].y} ${xc} ${yc}`;
+        }
+        if (points.length > 1) {
+          const lastPoint = points[points.length - 1];
+          path += ` L ${lastPoint.x} ${lastPoint.y}`;
+        }
+        return path;
+      };
+
+      // Generate new stroke paths
+      const newStrokePaths = strokes
+        .filter((stroke) => stroke && stroke.points && stroke.points.length > 0)
+        .map((stroke) => {
+          const pathData = generatePath(stroke.points);
+          return `<path d="${pathData}" stroke="${stroke.color}" stroke-width="${stroke.size}" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`;
+        })
+        .join("");
+
+      let svgContent: string;
+
+      // If we have an initial image, merge existing paths with new strokes
+      if (initialImage) {
+        const existingSvg = getSvgContentFromUri(initialImage);
+        if (existingSvg) {
+          // Extract the inner content of the existing SVG (paths, etc.)
+          // Remove the closing </svg> tag, append new strokes, then close
+          const closingTagIndex = existingSvg.lastIndexOf('</svg>');
+          if (closingTagIndex !== -1) {
+            const existingContent = existingSvg.substring(0, closingTagIndex);
+            svgContent = `${existingContent}${newStrokePaths}</svg>`;
+          } else {
+            // Fallback: create new SVG with both
+            svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasWidth}" height="${finalCanvasHeight}" viewBox="0 0 ${canvasWidth} ${finalCanvasHeight}"><rect width="100%" height="100%" fill="${bgColor}"/>${newStrokePaths}</svg>`;
+          }
+        } else {
+          svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasWidth}" height="${finalCanvasHeight}" viewBox="0 0 ${canvasWidth} ${finalCanvasHeight}"><rect width="100%" height="100%" fill="${bgColor}"/>${newStrokePaths}</svg>`;
+        }
+      } else {
+        // No initial image, create fresh SVG
+        svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvasWidth}" height="${finalCanvasHeight}" viewBox="0 0 ${canvasWidth} ${finalCanvasHeight}"><rect width="100%" height="100%" fill="${bgColor}"/>${newStrokePaths}</svg>`;
+      }
+      
+      // Use encodeURIComponent for cross-platform compatibility
+      const dataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgContent)}`;
+      console.log('📝 Saving drawing, data URL length:', dataUrl.length);
       onSave?.(dataUrl);
     }
-  }, [isWeb, strokes, bgColor, canvasWidth, finalCanvasHeight, onSave]);
+  }, [isWeb, strokes, bgColor, canvasWidth, finalCanvasHeight, onSave, initialImage]);
 
   // Web event handlers
   const webHandlers = isWeb
@@ -383,7 +553,7 @@ export default function DrawingBoard({
         <TouchableOpacity onPress={onClose} style={styles.closeButton}>
           <Ionicons name="close" size={24} color="#6B7280" />
         </TouchableOpacity>
-        <Text style={styles.title}>🎨 Let's Draw!</Text>
+        <Text style={styles.title}>{initialImage ? "✏️ Edit Drawing" : "🎨 Let's Draw!"}</Text>
         <TouchableOpacity onPress={handleSave} style={styles.saveButton}>
           <LinearGradient
             colors={["#10B981", "#059669"]}
@@ -393,6 +563,14 @@ export default function DrawingBoard({
           </LinearGradient>
         </TouchableOpacity>
       </Animated.View>
+
+      {/* Edit hint */}
+      {initialImage && strokes.length === 0 && (
+        <Animated.View entering={FadeIn.delay(300)} style={styles.editHint}>
+          <Ionicons name="information-circle-outline" size={16} color="#6B7280" />
+          <Text style={styles.editHintText}>Continue drawing! Your new strokes will be added.</Text>
+        </Animated.View>
+      )}
 
       {/* Canvas */}
       <Animated.View
@@ -426,7 +604,8 @@ export default function DrawingBoard({
               height={finalCanvasHeight}
               onStart={handleStartMobile}
               onMove={handleMoveMobile}
-              onEnd={handleEnd}
+              onEnd={handleEndMobile}
+              initialImage={initialImage}
             />
           )}
         </View>
@@ -765,5 +944,22 @@ const styles = StyleSheet.create({
   bgColorSelected: {
     borderColor: "#667EEA",
     borderWidth: 3,
+  },
+  editHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: "#F3F4F6",
+    borderRadius: 8,
+    marginHorizontal: 16,
+    marginBottom: 8,
+  },
+  editHintText: {
+    fontSize: 12,
+    color: "#6B7280",
+    fontWeight: "500",
   },
 });

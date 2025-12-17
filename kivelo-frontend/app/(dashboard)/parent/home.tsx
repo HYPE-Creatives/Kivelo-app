@@ -173,6 +173,12 @@ export default function ParentHome() {
       onPress: () => router.push("/(dashboard)/parent/family"),
     },
     {
+      icon: "clipboard",
+      title: "Activities",
+      gradient: ["#F59E0B", "#D97706"],
+      onPress: () => router.push("/(dashboard)/parent/activities"),
+    },
+    {
       icon: "book",
       title: "Journals",
       gradient: ["#8B5CF6", "#6D28D9"],
@@ -183,12 +189,6 @@ export default function ParentHome() {
       title: "Insights",
       gradient: ["#3B82F6", "#2563EB"],
       onPress: () => router.push("/(dashboard)/parent/ai-insight"),
-    },
-    {
-      icon: "library",
-      title: "Learn",
-      gradient: ["#10B981", "#047857"],
-      onPress: () => router.push("/(dashboard)/parent/learning-hub"),
     },
   ];
 

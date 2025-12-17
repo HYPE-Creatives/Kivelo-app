@@ -12,11 +12,11 @@ const ACCESS_TOKEN_KEY = "kivelo_access_token";
 export interface JournalEntry {
   _id: string;
   child: string;
-  type: "text" | "audio" | "video" | "drawing" | "photo" | "voice" | "mixed";
+  type: "text" | "audio" | "video" | "drawing" | "mixed";
   title: string;
   content: string;
   assets?: string[];
-  visibility: "private" | "parent-only" | "family" | "public";
+  visibility: "private" | "parent-only" | "public";
   mood: "happy" | "sad" | "angry" | "anxious" | "excited" | "calm" | "tired" | "neutral";
   moodIntensity: number;
   tags?: string[];
@@ -43,12 +43,12 @@ export interface JournalStats {
 }
 
 export interface CreateJournalData {
-  type?: "text" | "audio" | "video" | "drawing" | "photo" | "voice" | "mixed";
+  type?: "text" | "audio" | "video" | "drawing" | "mixed";
   title: string;
   content: string;
   mood?: string;
   moodIntensity?: number;
-  visibility?: "private" | "parent-only" | "family" | "public";
+  visibility?: "private" | "parent-only" | "public";
   tags?: string[];
   assets?: string[];
 }
