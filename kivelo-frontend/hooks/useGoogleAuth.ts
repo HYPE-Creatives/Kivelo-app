@@ -56,14 +56,15 @@ export const useGoogleAuth = (
     if (!isWeb || typeof window === 'undefined') return;
 
     const hash = window.location.hash;
-    
-    // Handle user cancellation or errors in query params
     const queryParams = new URLSearchParams(window.location.search);
+    
+    // Handle user cancellation or errors in query params (Google returns error in query for cancel)
     const queryError = queryParams.get('error');
     
     if (queryError) {
-      // Clean URL
+      // Clean URL immediately
       window.history.replaceState({}, '', window.location.pathname);
+      setLoading(false);
       
       if (queryError === 'access_denied') {
         // User cancelled - no alert needed, just silently return
@@ -73,6 +74,25 @@ export const useGoogleAuth = (
       
       showAlert('Google Login Failed', queryError);
       return;
+    }
+    
+    // Check for error in hash as well (some OAuth flows return errors in hash)
+    if (hash) {
+      const hashParams = new URLSearchParams(hash.substring(1));
+      const hashError = hashParams.get('error');
+      
+      if (hashError) {
+        window.history.replaceState({}, '', window.location.pathname);
+        setLoading(false);
+        
+        if (hashError === 'access_denied') {
+          console.log('User cancelled Google Sign-In');
+          return;
+        }
+        
+        showAlert('Google Login Failed', hashError);
+        return;
+      }
     }
     
     if (!hash || !hash.includes('id_token=')) return;
