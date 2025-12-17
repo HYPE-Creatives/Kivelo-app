@@ -22,6 +22,12 @@ import { showAlert } from '@/utils/showAlert';
 import { router } from "expo-router";
 import { useState, useEffect } from "react";
 
+// API URLs with fallback
+const API_URLS = [
+  "http://localhost:5000/api/v1",
+  "https://family-wellness.onrender.com/api/v1",
+];
+
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -68,21 +74,45 @@ export default function ForgotPassword() {
 
     setLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // const response = await fetch("http://localhost:5000/api/v1/auth/forgot-password", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({ email }),
-      // });
+      // Try each API URL until one works
+      let lastError: Error | null = null;
+      for (const baseUrl of API_URLS) {
+        try {
+          const response = await fetch(`${baseUrl}/auth/forgot-password`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: email.toLowerCase().trim() }),
+          });
 
-      // Mock success (temporary)
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      
-      setEmailSent(true);
-      showAlert(
-        "Check Your Email! 📧",
-        `If an account exists for ${email}, you'll receive a password reset link shortly.`
-      );
+          const data = await response.json();
+
+          if (response.ok && data.success) {
+            setEmailSent(true);
+            showAlert(
+              "Check Your Email! 📧",
+              data.message || `If an account exists for ${email}, you'll receive a password reset code shortly.`
+            );
+            return; // Success - exit the function
+          } else {
+            // Handle specific error cases
+            if (data.needsVerification) {
+              showAlert(
+                "Email Not Verified",
+                "Please verify your email address before resetting your password."
+              );
+              return;
+            }
+            throw new Error(data.message || "Failed to send reset email");
+          }
+        } catch (fetchError: any) {
+          lastError = fetchError;
+          // Continue to next URL if this one fails
+          continue;
+        }
+      }
+
+      // If we get here, all URLs failed
+      throw lastError || new Error("Failed to connect to server");
     } catch (err: any) {
       showAlert("Error", err.message || "Something went wrong");
     } finally {
@@ -143,6 +173,8 @@ export default function ForgotPassword() {
                 mode="outlined"
                 outlineColor="#e2e8f0"
                 activeOutlineColor="#16A34A"
+                textColor="#1e293b"
+                placeholderTextColor="#94a3b8"
                 left={<PaperTextInput.Icon icon="email" color="#94a3b8" />}
                 dense
               />
@@ -176,16 +208,19 @@ export default function ForgotPassword() {
                   <Ionicons name="mail-open" size={48} color="#16A34A" />
                 </View>
                 <Text style={styles.successText}>
-                  We've sent a password reset link to:
+                  We've sent a password reset code to:
                 </Text>
                 <Text style={styles.emailText}>{email}</Text>
               </View>
 
+              {/* Primary action - Enter Reset Code */}
               <TouchableOpacity 
                 style={styles.submitButton}
                 onPress={() => {
-                  setEmailSent(false);
-                  setEmail("");
+                  router.push({
+                    pathname: "/(auth)/reset-password",
+                    params: { email }
+                  });
                 }}
               >
                 <LinearGradient
@@ -194,9 +229,21 @@ export default function ForgotPassword() {
                   end={{ x: 1, y: 0 }}
                   style={styles.submitGradient}
                 >
-                  <Ionicons name="refresh" size={18} color="#fff" />
-                  <Text style={styles.submitText}>Try Different Email</Text>
+                  <Ionicons name="key" size={18} color="#fff" />
+                  <Text style={styles.submitText}>Enter Reset Code</Text>
                 </LinearGradient>
+              </TouchableOpacity>
+
+              {/* Secondary action - Try Different Email */}
+              <TouchableOpacity 
+                style={styles.secondaryButton}
+                onPress={() => {
+                  setEmailSent(false);
+                  setEmail("");
+                }}
+              >
+                <Ionicons name="refresh" size={18} color="#16A34A" />
+                <Text style={styles.secondaryButtonText}>Try Different Email</Text>
               </TouchableOpacity>
             </>
           )}
@@ -293,6 +340,23 @@ const styles = StyleSheet.create({
   },
   submitText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  secondaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    marginTop: 12,
+    gap: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#16A34A',
+    backgroundColor: 'transparent',
+  },
+  secondaryButtonText: {
+    color: '#16A34A',
     fontSize: 16,
     fontWeight: '600',
   },

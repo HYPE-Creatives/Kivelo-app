@@ -650,7 +650,7 @@ export const forgotPassword = async (req, res) => {
     await user.save();
 
     // Send password reset code using SAME email style as verification
-    await sendEmail(
+    const emailResult = await sendEmail(
       user.email,
       'Reset Your Kivelo Password - Security Code',
       `
@@ -678,6 +678,14 @@ export const forgotPassword = async (req, res) => {
       </div>
       `
     );
+
+    if (!emailResult.success) {
+      console.error('Failed to send password reset email:', emailResult.error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to send password reset email. Please try again later.',
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -734,7 +742,61 @@ export const resetPassword = async (req, res) => {
     user.resetPasswordExpires = undefined;
     await user.save();
 
-    await sendEmail(user.email, 'Your Kivelo Password Has Been Reset', `...`);
+    await sendEmail(
+      user.email,
+      'Your Kivelo Password Has Been Reset',
+      `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #f9fafb; padding: 20px;">
+        <div style="max-width: 600px; margin: auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); overflow: hidden;">
+          <div style="background-color: #4CAF50; color: white; text-align: center; padding: 20px;">
+            <h1 style="margin: 0;">Kivelo</h1>
+            <p style="margin: 0; font-size: 14px;">Empowering Families with Technology</p>
+          </div>
+          <div style="padding: 30px;">
+            <div style="text-align: center; margin-bottom: 20px;">
+              <div style="width: 60px; height: 60px; background-color: #4CAF50; border-radius: 50%; margin: 0 auto; display: flex; align-items: center; justify-content: center;">
+                <span style="color: white; font-size: 30px;">✓</span>
+              </div>
+            </div>
+            <h2 style="color: #333; text-align: center;">Password Reset Successful!</h2>
+            <p style="font-size: 15px; color: #555; line-height: 1.6; text-align: center;">
+              Hi ${user.name},<br><br>
+              Your Kivelo account password has been successfully reset.
+            </p>
+            <div style="background-color: #f0f9f0; border-left: 4px solid #4CAF50; padding: 15px; margin: 20px 0; border-radius: 4px;">
+              <p style="margin: 0; color: #333; font-size: 14px;">
+                <strong>🔒 Security Tips:</strong>
+              </p>
+              <ul style="margin: 10px 0 0 0; padding-left: 20px; color: #555; font-size: 13px;">
+                <li>Never share your password with anyone</li>
+                <li>Use a unique password for your Kivelo account</li>
+                <li>If you didn't make this change, contact support immediately</li>
+              </ul>
+            </div>
+            <p style="font-size: 14px; color: #555; line-height: 1.6; text-align: center;">
+              You can now log in to your account with your new password.
+            </p>
+            <div style="text-align: center; margin-top: 25px;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/login" 
+                 style="background-color: #4CAF50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+                Log In Now
+              </a>
+            </div>
+          </div>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 0;" />
+          <div style="padding: 20px; text-align: center;">
+            <p style="font-size: 13px; color: #777; margin: 0;">
+              Need help? Contact our support team at 
+              <a href="mailto:support@kivelo.com" style="color: #4CAF50; text-decoration: none;">support@kivelo.com</a>
+            </p>
+          </div>
+          <div style="background-color: #f1f1f1; text-align: center; padding: 15px; font-size: 12px; color: #888;">
+            © ${new Date().getFullYear()} Kivelo. All rights reserved.
+          </div>
+        </div>
+      </div>
+      `
+    );
 
     res.status(200).json({ success: true, message: 'Password has been reset successfully. You can now log in with your new password.' });
   } catch (error) {
@@ -800,15 +862,22 @@ export const generateOneTimeCode = async (req, res) => {
       const existingChild = await Child.findOne({ user: existingChildUser._id });
       if (existingChild) {
         if (childGender && existingChild.gender !== childGender) existingChild.gender = childGender;
-        existingChild.oneTimeCode = Math.floor(100000 + Math.random() * 900000).toString();
+        
+        // Generate new code - but DON'T invalidate password yet
+        // Password will only be invalidated when child actually USES this code
+        // This prevents accidental lockouts if parent regenerates by mistake
+        const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+        existingChild.oneTimeCode = newCode;
         existingChild.codeExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
         existingChild.isCodeUsed = false;
+        // Note: We don't reset hasSetPassword here - child can still use old password
         await existingChild.save();
+        
         return res.status(200).json({
           success: true,
-          code: existingChild.oneTimeCode,
+          code: newCode,
           expiresAt: existingChild.codeExpires,
-          message: `New code regenerated for ${childName}`,
+          message: `New code generated for ${childName}. Child can still use their current password, or use this code to set a new one.`,
         });
       }
     }
@@ -864,8 +933,16 @@ export const childLoginWithCode = async (req, res) => {
     }).populate({ path: 'parent', select: 'familyCode' });
     if (!child) return res.status(400).json({ success: false, message: 'Invalid or expired code' });
 
+    // Mark code as used AND reset hasSetPassword to force new password setup
+    // This ensures child must set a new password after every code-based login
     child.isCodeUsed = true;
+    child.hasSetPassword = false;
     await child.save();
+    
+    // NOW invalidate the old password since child chose to use the code
+    // This prevents the old password from working after code login
+    user.password = crypto.randomBytes(32).toString('hex');
+    await user.save();
 
     const { accessToken, refreshToken } = generateToken(user._id, user.role);
     await setRefreshTokenCookieAndSave(res, user, refreshToken);
@@ -873,7 +950,8 @@ export const childLoginWithCode = async (req, res) => {
     res.json({
       success: true,
       accessToken,
-      user: createUserResponse(user, { hasSetPassword: child.hasSetPassword }),
+      user: createUserResponse(user, { hasSetPassword: false }),
+      needsPasswordSetup: true,
       message: 'Login successful with one-time code. Please set your password to continue.',
     });
   } catch (error) {

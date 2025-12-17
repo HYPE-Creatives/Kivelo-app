@@ -138,11 +138,16 @@ export default function SetPasswordScreen() {
             secureTextEntry={!showPassword}
             style={styles.input}
             mode="outlined"
-            left={<TextInput.Icon icon="lock" />}
+            outlineColor="#e2e8f0"
+            activeOutlineColor="#16A34A"
+            textColor="#1e293b"
+            placeholderTextColor="#94a3b8"
+            left={<TextInput.Icon icon="lock" color="#94a3b8" />}
             right={
               <TextInput.Icon 
                 icon={showPassword ? "eye-off" : "eye"} 
                 onPress={() => setShowPassword(!showPassword)}
+                color="#94a3b8"
               />
             }
             placeholder="Enter your new password"
@@ -156,7 +161,11 @@ export default function SetPasswordScreen() {
             secureTextEntry={!showPassword}
             style={styles.input}
             mode="outlined"
-            left={<TextInput.Icon icon="lock-check" />}
+            outlineColor="#e2e8f0"
+            activeOutlineColor="#16A34A"
+            textColor="#1e293b"
+            placeholderTextColor="#94a3b8"
+            left={<TextInput.Icon icon="lock-check" color="#94a3b8" />}
             placeholder="Re-enter your password"
             autoComplete="password-new"
           />

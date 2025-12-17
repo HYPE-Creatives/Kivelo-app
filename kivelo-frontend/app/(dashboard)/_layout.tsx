@@ -31,8 +31,12 @@ export default function DashboardLayout() {
     return <Redirect href="/(auth)/login" />;
   }
 
+  console.log("🏠 [DashboardLayout] User state:", JSON.stringify(user, null, 2));
+  console.log("🏠 [DashboardLayout] user.hasSetPassword:", user.hasSetPassword);
+
   // Role-based access control
   if (user.role === 'child' && !user.hasSetPassword) {
+    console.log("🏠 [DashboardLayout] Child needs to set password, redirecting...");
     return <Redirect href="/(auth)/set-password" />;
   }
 

@@ -206,6 +206,8 @@ export default function LoginScreen() {
             mode="outlined"
             outlineColor={userType === "child" ? "#DDD6FE" : "#e2e8f0"}
             activeOutlineColor={userType === "child" ? "#8B5CF6" : "#2E8B57"}
+            textColor="#1e293b"
+            placeholderTextColor="#94a3b8"
             left={<PaperTextInput.Icon icon="email" color="#94a3b8" />}
             dense
           />
@@ -217,11 +219,13 @@ export default function LoginScreen() {
               onChangeText={setPassword}
               style={styles.input}
               secureTextEntry={!showPassword}
-              right={<PaperTextInput.Icon icon={showPassword ? 'eye-off' : 'eye'} onPress={() => setShowPassword(!showPassword)} />}
+              right={<PaperTextInput.Icon icon={showPassword ? 'eye-off' : 'eye'} onPress={() => setShowPassword(!showPassword)} color="#94a3b8" />}
               left={<PaperTextInput.Icon icon="lock" color="#94a3b8" />}
               mode="outlined"
               outlineColor={userType === "child" ? "#DDD6FE" : "#e2e8f0"}
               activeOutlineColor={userType === "child" ? "#8B5CF6" : "#2E8B57"}
+              textColor="#1e293b"
+              placeholderTextColor="#94a3b8"
               dense
             />
           )}
@@ -236,6 +240,8 @@ export default function LoginScreen() {
               mode="outlined"
               outlineColor="#DDD6FE"
               activeOutlineColor="#8B5CF6"
+              textColor="#1e293b"
+              placeholderTextColor="#94a3b8"
               left={<PaperTextInput.Icon icon="key" color="#94a3b8" />}
               dense
             />

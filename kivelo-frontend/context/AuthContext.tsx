@@ -402,6 +402,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (data.success) {
         const userData = data.data?.user || data.user;
+        console.log("🔑 [loginWithOneTimeCode] Raw API response:", JSON.stringify(data, null, 2));
+        console.log("🔑 [loginWithOneTimeCode] userData.hasSetPassword from API:", userData.hasSetPassword);
+        
         // One-time code login always means hasSetPassword is false
         const childUser: User = {
           id: userData._id || userData.id,
@@ -414,12 +417,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           avatar: userData.avatar,
         };
 
+        console.log("🔑 [loginWithOneTimeCode] Created childUser.hasSetPassword:", childUser.hasSetPassword);
+
         const tokens: AuthTokens = {
           accessToken: data.accessToken || data.token,
           refreshToken: data.refreshToken || "",
         };
 
         await storeAuthData(childUser, tokens);
+        console.log("🔑 [loginWithOneTimeCode] Auth data stored, setting user state...");
         setUser(childUser);
         setIsAuthenticated(true);
 

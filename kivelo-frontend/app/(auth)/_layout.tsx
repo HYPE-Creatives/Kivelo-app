@@ -33,6 +33,11 @@ export default function AuthLayout() {
     // If no user, they should stay on auth screens
     if (!user) return;
 
+    console.log("🔍 [AuthLayout] User state:", JSON.stringify(user, null, 2));
+    console.log("🔍 [AuthLayout] user.role:", user.role);
+    console.log("🔍 [AuthLayout] user.hasSetPassword:", user.hasSetPassword);
+    console.log("🔍 [AuthLayout] typeof user.hasSetPassword:", typeof user.hasSetPassword);
+
     // If we have a user, handle redirects
     if (user.role === "parent") {
       console.log("✅ Redirecting parent to dashboard");
@@ -41,12 +46,15 @@ export default function AuthLayout() {
     }
 
     if (user.role === "child") {
+      console.log("🔍 [AuthLayout] Child detected, hasSetPassword =", user.hasSetPassword);
       if (user.hasSetPassword) {
         console.log("✅ Redirecting child to dashboard (password is set)");
         router.replace("/(dashboard)/child");
       } else if (!isSetPasswordRoute) {
         console.log("🔐 Redirecting child to set password page");
         router.replace("/(auth)/set-password");
+      } else {
+        console.log("🔐 Child already on set-password route, staying here");
       }
       // If child is on set-password route and hasn't set password, stay there
       return;
