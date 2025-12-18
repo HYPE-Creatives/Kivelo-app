@@ -72,12 +72,26 @@ export async function getChildrenList(req, res) {
     const parent = await Parent.findOne({ user: req.user.id })
       .populate({
         path: "children",
+        select: "user dob points streakCount moodStats badges activities", // Explicitly select all fields we need
         populate: { path: "user", select: "name email dob gender avatar" }
       });
 
     if (!parent) return res.status(404).json({ message: "Parent profile not found" });
 
-    return res.json({ success: true, children: parent.children, totalChildren: parent.children.length });
+    // Transform children to include all gamification data at top level for easy access
+    const childrenWithStats = parent.children.map(child => ({
+      _id: child._id,
+      user: child.user,
+      dob: child.dob,
+      points: child.points || 0,
+      streakCount: child.streakCount || 0,
+      currentStreak: child.moodStats?.currentStreak || child.streakCount || 0,
+      moodStats: child.moodStats || { averageScore: 0, totalEntries: 0, currentStreak: 0 },
+      badges: child.badges || [],
+      completedActivities: child.activities?.length || 0,
+    }));
+
+    return res.json({ success: true, children: childrenWithStats, totalChildren: childrenWithStats.length });
 
   } catch (error) {
     return res.status(500).json({ message: error.message });

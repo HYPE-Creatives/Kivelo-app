@@ -761,7 +761,13 @@ router.get('/child/:childId/moods', auth, isParent, getChildMoods);
  * /api/v1/parents/child/{childId}/mood-summary:
  *   get:
  *     summary: Get child's mood summary
- *     description: Get aggregated mood statistics and insights for a child
+ *     description: |
+ *       Get comprehensive mood summary for a child including:
+ *       - Latest mood check-in with trust zone
+ *       - Aggregated emoji usage stats
+ *       - Weekly mood statistics
+ *       
+ *       Used by parent home page to display child mood cards.
  *     tags: [Parents, Parent Dashboard]
  *     security:
  *       - bearerAuth: []
@@ -772,19 +778,6 @@ router.get('/child/:childId/moods', auth, isParent, getChildMoods);
  *         schema:
  *           type: string
  *         description: Child ID (can be User ID or Child document ID)
- *       - in: query
- *         name: period
- *         schema:
- *           type: string
- *           enum: [week, month, quarter, year, all]
- *           default: month
- *         description: Time period for mood analysis
- *       - in: query
- *         name: includeTrends
- *         schema:
- *           type: boolean
- *           default: false
- *         description: Include trend analysis in the response
  *     responses:
  *       200:
  *         description: Child mood summary retrieved successfully
@@ -796,32 +789,69 @@ router.get('/child/:childId/moods', auth, isParent, getChildMoods);
  *                 success:
  *                   type: boolean
  *                   example: true
- *                 summary:
- *                   $ref: '#/components/schemas/MoodSummary'
- *                 childInfo:
+ *                 data:
  *                   type: object
  *                   properties:
- *                     id:
+ *                     childId:
  *                       type: string
- *                     name:
+ *                       description: The child's ID
+ *                     childName:
  *                       type: string
- *                     currentStreak:
+ *                       description: The child's name
+ *                     latestMood:
+ *                       type: object
+ *                       description: Most recent mood check-in
+ *                       properties:
+ *                         _id:
+ *                           type: string
+ *                         emoji:
+ *                           type: string
+ *                         textNote:
+ *                           type: string
+ *                         moodScore:
+ *                           type: integer
+ *                           minimum: 1
+ *                           maximum: 10
+ *                         trustZone:
+ *                           type: string
+ *                           enum: [green, yellow, orange, red]
+ *                         createdAt:
+ *                           type: string
+ *                           format: date-time
+ *                     summary:
+ *                       type: array
+ *                       description: Aggregated mood counts by emoji
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           _id:
+ *                             type: string
+ *                             description: Emoji
+ *                           avgScore:
+ *                             type: number
+ *                           count:
+ *                             type: integer
+ *                     weeklyStats:
+ *                       type: object
+ *                       properties:
+ *                         totalCheckins:
+ *                           type: integer
+ *                         avgMoodScore:
+ *                           type: number
+ *                         moods:
+ *                           type: array
+ *                           items:
+ *                             type: object
+ *                     weeklyAverage:
+ *                       type: number
+ *                       description: Average mood score for past week
+ *                     trustZone:
+ *                       type: string
+ *                       enum: [green, yellow, orange, red]
+ *                       description: Current trust zone from latest mood
+ *                     totalCheckins:
  *                       type: integer
- *                     lastMoodCheck:
- *                       type: string
- *                       format: date-time
- *                 insights:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       type:
- *                         type: string
- *                         enum: [warning, alert, suggestion, positive]
- *                       message:
- *                         type: string
- *                       suggestion:
- *                         type: string
+ *                       description: Total check-ins in past week
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  *       403:

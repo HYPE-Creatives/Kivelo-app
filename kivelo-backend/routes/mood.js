@@ -25,7 +25,16 @@ const router = express.Router();
  * /api/v1/mood/checkin:
  *   post:
  *     summary: Submit a mood check-in
- *     description: Child submits daily mood check-in (emoji, voice, drawing, or short text)
+ *     description: |
+ *       Child submits daily mood check-in (emoji, voice, drawing, or short text).
+ *       
+ *       **Side Effects:**
+ *       - Awards 10 points to the child
+ *       - Updates streak count
+ *       - Syncs points and streak to Child model
+ *       - **Always notifies parent** with mood update notification
+ *       - Notification includes emoji, mood score, trust zone, and text note preview
+ *       - Higher priority notifications for red/orange trust zones
  *     tags: [Mood Tracking]
  *     security:
  *       - bearerAuth: []
@@ -37,7 +46,7 @@ const router = express.Router();
  *             $ref: '#/components/schemas/MoodCheckinRequest'
  *     responses:
  *       201:
- *         description: Mood check-in recorded successfully
+ *         description: Mood check-in recorded successfully. Parent notified.
  *         content:
  *           application/json:
  *             schema:
@@ -51,6 +60,10 @@ const router = express.Router();
  *                 message:
  *                   type: string
  *                   example: "Mood recorded successfully!"
+ *       400:
+ *         description: At least one of emoji/textNote/voiceNote/drawing is required
+ *       403:
+ *         description: Only children can submit mood check-ins
  */
 router.post('/checkin', auth, isChild, submitMoodCheckin);
 
@@ -59,6 +72,14 @@ router.post('/checkin', auth, isChild, submitMoodCheckin);
  * /api/v1/mood/checkin/with-media:
  *   post:
  *     summary: Submit mood check-in with file uploads
+ *     description: |
+ *       Submit mood with voice recording or drawing attachment.
+ *       
+ *       **Side Effects:**
+ *       - Awards 10 points to the child
+ *       - Updates streak count
+ *       - Syncs points and streak to Child model
+ *       - **Always notifies parent** with mood update notification
  *     tags: [Mood Tracking]
  *     security:
  *       - bearerAuth: []
@@ -71,16 +92,25 @@ router.post('/checkin', auth, isChild, submitMoodCheckin);
  *               voiceFile:
  *                 type: string
  *                 format: binary
+ *                 description: Voice recording file
  *               drawingFile:
  *                 type: string
  *                 format: binary
+ *                 description: Drawing image file
  *               moodScore:
  *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 10
+ *                 description: Mood score (1-10)
  *               emoji:
  *                 type: string
+ *                 description: Mood emoji
+ *               textNote:
+ *                 type: string
+ *                 description: Optional text note
  *     responses:
  *       201:
- *         description: Mood check-in with media recorded
+ *         description: Mood check-in with media recorded. Parent notified.
  */
 router.post('/checkin/with-media', 
   auth, 
