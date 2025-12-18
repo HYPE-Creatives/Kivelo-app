@@ -652,7 +652,11 @@ export default function MoodCheck() {
         transparent={true}
         onRequestClose={() => setShowEditModal(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalOverlay}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>✏️ Edit Mood</Text>
@@ -664,6 +668,11 @@ export default function MoodCheck() {
               </TouchableOpacity>
             </View>
 
+            <ScrollView 
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.modalScrollContent}
+            >
             <Text style={styles.modalSectionTitle}>How were you feeling?</Text>
             <View style={styles.editMoodGrid}>
               {MOOD_OPTIONS.map((mood) => (
@@ -743,8 +752,10 @@ export default function MoodCheck() {
                 )}
               </TouchableOpacity>
             </View>
+            </ScrollView>
           </View>
-        </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Drawing Modal */}
@@ -1273,6 +1284,10 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     padding: 24,
     maxHeight: '85%',
+  },
+  modalScrollContent: {
+    flexGrow: 1,
+    paddingBottom: 20,
   },
   modalHeader: {
     flexDirection: 'row',
