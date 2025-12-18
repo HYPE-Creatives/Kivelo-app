@@ -215,6 +215,9 @@ export function ParentProvider({ children: childrenProp }: { children: ReactNode
       // Copy user fields to top level for easier access
       name: child.user?.name || child.name || "Unknown",
       email: child.user?.email || child.email || "",
+      // Ensure points and streak are accessible at top level
+      points: child.points || 0,
+      currentStreak: child.moodStats?.currentStreak || child.streakCount || child.currentStreak || 0,
       // Keep the user object intact for avatar access
       user: child.user,
     };
