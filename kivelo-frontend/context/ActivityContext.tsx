@@ -146,9 +146,8 @@ interface ActivityContextType {
 
 const ActivityContext = createContext<ActivityContextType | undefined>(undefined);
 
-// API URLs - try local network IP first for mobile testing, then deployed backend
+// API URLs - try localhost first, then deployed backend
 const API_URLS = [
-  'http://192.168.66.1:5000/api/v1',
   'http://localhost:5000/api/v1',
   'https://family-wellness.onrender.com/api/v1'
 ];

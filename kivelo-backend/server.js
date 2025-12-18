@@ -41,6 +41,7 @@ import gamificationRoutes from './routes/gamification.js';
 import learningRoutes from './routes/learning.js';
 import journalRoutes from './routes/journal.js';
 import notificationRoute from './routes/notificationRoutes.js';
+import conversationRoutes from './routes/conversation.js';
 import "./jobs/auditRetention.js";
 import morgan from "morgan";
 import path from 'path';
@@ -63,8 +64,6 @@ const config = {
           "http://localhost:5000",
           "https://kivelo.app",
           "https://family-wellness.onrender.com",
-          "http://10.0.2.2:3000",
-          "http://10.94.166.34:8081",
           "https://hype-creatives.github.io",
           "https://auth.expo.io"
         ]
@@ -241,6 +240,7 @@ app.use('/api/v1/learning', learningRoutes);
 app.use('/api/v1/journals', journalRoutes);
 app.use('/api/v1/notifications', notificationRoute);
 app.use('/api/v1/settings', settingsRoutes);
+app.use('/api/v1/conversations', conversationRoutes);
 
 // ===============================================================
 // 🔒 STRICT SWAGGER PROTECTION (fixed)
