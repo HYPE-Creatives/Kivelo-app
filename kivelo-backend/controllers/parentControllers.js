@@ -427,13 +427,48 @@ export const getChildMoodSummary = async (req, res) => {
     if (!access) return res.status(403).json({ message: "Access denied" });
 
     const cid = toObjectId(access.userId);
+    
+    // Get the latest mood check-in
+    const latestMood = await MoodCheckin.findOne({ child: cid })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Get aggregated summary by emoji
     const summary = await MoodCheckin.aggregate([
       { $match: { child: cid } },
-      { $group: { _id: "$moodEmoji", avgIntensity: { $avg: "$intensity" }, count: { $sum: 1 } } },
+      { $group: { _id: "$emoji", avgScore: { $avg: "$moodScore" }, count: { $sum: 1 } } },
       { $sort: { count: -1 } }
     ]);
 
-    return res.status(200).json({ success: true, summary });
+    // Get mood stats for the past week
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const weeklyMoods = await MoodCheckin.find({ 
+      child: cid, 
+      createdAt: { $gte: weekAgo } 
+    }).sort({ createdAt: -1 }).lean();
+
+    const avgMoodScore = weeklyMoods.length > 0
+      ? weeklyMoods.reduce((sum, m) => sum + (m.moodScore || 5), 0) / weeklyMoods.length
+      : null;
+
+    return res.status(200).json({ 
+      success: true, 
+      data: {
+        childId: childId,
+        childName: access.name || 'Child',
+        latestMood,
+        summary,
+        weeklyStats: {
+          totalCheckins: weeklyMoods.length,
+          avgMoodScore: avgMoodScore ? Math.round(avgMoodScore * 10) / 10 : null,
+          moods: weeklyMoods
+        },
+        weeklyAverage: avgMoodScore ? Math.round(avgMoodScore * 10) / 10 : null,
+        trustZone: latestMood?.trustZone || null,
+        totalCheckins: weeklyMoods.length
+      }
+    });
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
