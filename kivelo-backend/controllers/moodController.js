@@ -143,10 +143,19 @@ export const submitMoodCheckin = async (req, res) => {
       $inc: { points: 10 }
     });
 
-    // Analyze mood for parent notifications if needed
-    if (moodScore <= 4) {
-      await analyzeMoodForParent(userId, moodCheckin);
-    }
+    // Also update Child model's points and moodStats
+    await Child.findOneAndUpdate(
+      { user: userId },
+      {
+        $inc: { points: 10 },
+        $set: {
+          'moodStats.lastEntry': new Date(),
+        }
+      }
+    );
+
+    // Analyze mood and notify parent (always notify for mood check-ins)
+    await analyzeMoodForParent(userId, moodCheckin, true);
 
     res.status(201).json({
       success: true,

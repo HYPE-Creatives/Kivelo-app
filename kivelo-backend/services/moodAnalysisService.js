@@ -1,5 +1,6 @@
 import Mood from '../models/MoodCheckin.js';
 import User from '../models/User.js';
+import Child from '../models/Child.js';
 import Notification from '../models/Notification.js';
 import TrustZone from '../models/TrustZone.js';
 // import { OpenAI } from 'openai'; // Assuming you have this installed
@@ -9,30 +10,31 @@ import TrustZone from '../models/TrustZone.js';
 
 /**
  * ANALYZES A CHILD'S MOOD FOR PARENTAL INSIGHTS
- * Called when a child submits a mood check-in, especially with low scores.
- * @param {string} childId - The ID of the child who submitted the mood
+ * Called when a child submits a mood check-in.
+ * @param {string} childUserId - The User ID of the child who submitted the mood
  * @param {Object} moodCheckin - The newly created Mood document
+ * @param {boolean} alwaysNotify - If true, always notify parent (default: false)
  */
-export const analyzeMoodForParent = async (childId, moodCheckin) => {
+export const analyzeMoodForParent = async (childUserId, moodCheckin, alwaysNotify = false) => {
   try {
-    // 1. Get the child's parent
-    const childUser = await User.findById(childId).populate('child.parent', '_id email');
-    if (!childUser || !childUser.child?.parent) {
-      console.log(`No parent found for child ${childId}. Skipping analysis.`);
+    // 1. Get the child document to find parent
+    const childDoc = await Child.findOne({ user: childUserId });
+    if (!childDoc || !childDoc.parent) {
+      console.log(`No parent found for child user ${childUserId}. Skipping analysis.`);
       return;
     }
-    const parentId = childUser.child.parent._id;
+    const parentId = childDoc.parent;
 
     // 2. Get TrustZone settings for this parent-child pair
-    const trustZone = await TrustZone.findOne({ parentId, childId });
+    const trustZone = await TrustZone.findOne({ parentId, childId: childUserId });
     const settings = trustZone?.settings || getDefaultTrustZoneSettings();
 
     // 3. Calculate the current trust zone for this single entry
     const currentZone = calculateTrustZone(moodCheckin.moodScore, settings);
-    let shouldAlertParent = false;
+    let shouldAlertParent = alwaysNotify; // Always notify if flag is set
 
     // 4. Analyze for concerning patterns with recent history
-    const patternAnalysis = await checkForConcerningPatterns(childId, moodCheckin, settings);
+    const patternAnalysis = await checkForConcerningPatterns(childUserId, moodCheckin, settings);
 
     // 5. Perform AI Analysis on the mood content if needed (text, label, notes)
     let aiAnalysis = null;
@@ -55,8 +57,8 @@ export const analyzeMoodForParent = async (childId, moodCheckin) => {
     }
 
     // 7. Create and save a notification for the parent if needed
-    if (shouldAlertParent && settings.notificationsEnabled) {
-      await createParentNotification(parentId, childId, moodCheckin, {
+    if (shouldAlertParent) {
+      await createParentNotification(parentId, childUserId, moodCheckin, {
         currentZone,
         patternAnalysis,
         aiAnalysis
@@ -68,7 +70,7 @@ export const analyzeMoodForParent = async (childId, moodCheckin) => {
       await Mood.findByIdAndUpdate(moodCheckin._id, { aiAnalysis });
     }
 
-    console.log(`Mood analysis completed for child ${childId}. Alert sent: ${shouldAlertParent}`);
+    console.log(`Mood analysis completed for child ${childUserId}. Alert sent: ${shouldAlertParent}`);
 
   } catch (error) {
     console.error('Error in analyzeMoodForParent:', error);
@@ -306,46 +308,52 @@ const createParentNotification = async (parentId, childId, moodCheckin, analysis
   const childAvatar = child?.avatar?.url || null;
 
   let title, message;
+  let notificationType = 'mood_alert';
+  let priority = 3;
 
   if (currentZone === 'red') {
     title = `🚨 High Concern: ${childName} is having a very difficult time`;
     message = `${childName}'s recent mood check-in shows they are in the RED trust zone (score: ${moodCheckin.moodScore}/10). Your attention and comfort are recommended.`;
-  } else if (patternAnalysis.hasConsecutiveLowMood) {
+    priority = 5;
+  } else if (currentZone === 'orange') {
+    title = `⚠️ Attention: ${childName} might need support`;
+    message = `${childName} reported a mood score of ${moodCheckin.moodScore}/10 (ORANGE zone). Consider checking in with them.`;
+    priority = 4;
+  } else if (patternAnalysis?.hasConsecutiveLowMood) {
     title = `📉 Pattern Alert: ${childName} has had several low mood days`;
     message = `${childName} has been in a low mood for ${patternAnalysis.consecutiveLowDays} consecutive days. They might need extra support or a check-in.`;
+    priority = 4;
   } else {
-    title = `ℹ️ Mood Update: ${childName} checked in`;
-    message = `${childName} reported a mood score of ${moodCheckin.moodScore}/10 (${currentZone.toUpperCase()} zone).`;
+    title = `😊 Mood Update: ${childName} checked in`;
+    message = `${childName} reported a mood score of ${moodCheckin.moodScore}/10 (${currentZone?.toUpperCase() || 'GREEN'} zone).${moodCheckin.emoji ? ` Feeling: ${moodCheckin.emoji}` : ''}`;
+    priority = 2;
   }
 
-  // Add a snippet from AI analysis if available
-  if (aiAnalysis?.keywords?.length > 0) {
-    message += ` They mentioned themes like: ${aiAnalysis.keywords.join(', ')}.`;
+  // Add note if present
+  if (moodCheckin.textNote) {
+    message += ` Note: "${moodCheckin.textNote.substring(0, 50)}${moodCheckin.textNote.length > 50 ? '...' : ''}"`;
   }
 
   const notification = await Notification.create({
-    user: parentId,
-    child: childId,
-    type: 'parent_alert',
+    userId: parentId,
+    type: notificationType,
     title,
     message,
-    priority: currentZone === 'red' ? 'high' : 'medium',
+    priority,
     data: {
       moodCheckinId: moodCheckin._id,
       childId,
       childName,
       childAvatar,
+      emoji: moodCheckin.emoji,
       moodScore: moodCheckin.moodScore,
       trustZone: currentZone,
-      patternAnalysis,
-      aiAnalysis
+      textNote: moodCheckin.textNote
     },
     isRead: false
   });
 
-  // Here you could also trigger a push notification or email via your notificationService.js
-  // e.g., require('./notificationService').sendPushNotification(parentId, title, message);
-
+  console.log(`Created mood notification for parent ${parentId}: ${title}`);
   return notification;
 };
 

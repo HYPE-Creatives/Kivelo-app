@@ -1,4 +1,5 @@
 import User from '../models/User.js';
+import Child from '../models/Child.js';
 import Mood from '../models/MoodCheckin.js';
 
 export const updateStreak = async (userId) => {
@@ -64,6 +65,15 @@ export const updateStreak = async (userId) => {
     }
     
     await user.save();
+    
+    // Also update Child model with streak data
+    await Child.findOneAndUpdate(
+      { user: userId },
+      {
+        streakCount: user.streakCount,
+        'moodStats.currentStreak': user.streakCount
+      }
+    );
     
     return user.streakCount;
   } catch (error) {
