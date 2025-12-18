@@ -108,7 +108,7 @@ export default function ChildHome() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      {/* Animated Header with stats */
+      {/* Animated Header with stats */}
       <Animated.View 
         style={[
           styles.header,
