@@ -88,8 +88,9 @@ export async function createJournal(req, res, next) {
     // Notify parent unless private / no parent set
     if (!journal.isPrivate && childDoc?.parent) {
       try {
-        const childUser = await User.findById(targetChildUserId).select('name');
+        const childUser = await User.findById(targetChildUserId).select('name avatar');
         const childName = childUser?.name || 'Your child';
+        const childAvatar = childUser?.avatar?.url || null;
 
         await Notification.create({
           userId: childDoc.parent, // parent user id
@@ -99,7 +100,8 @@ export async function createJournal(req, res, next) {
           data: {
             journalId: journal._id,
             childId: childDoc.user,
-            childName
+            childName,
+            childAvatar
           }
         });
       } catch (notifErr) {

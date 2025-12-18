@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Dimensions,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -134,6 +135,8 @@ export default function NotificationsScreen() {
   const renderNotificationItem = (notification: Notification) => {
     const config = NOTIFICATION_TYPE_CONFIG[notification.type] || NOTIFICATION_TYPE_CONFIG.system;
     const priorityColor = notification.priority >= 4 ? "#EF4444" : notification.priority >= 3 ? "#F59E0B" : "#6B7280";
+    const childName = notification.data?.childName;
+    const childAvatar = notification.data?.childAvatar;
 
     return (
       <TouchableOpacity
@@ -145,9 +148,20 @@ export default function NotificationsScreen() {
         onPress={() => handleNotificationTap(notification)}
         activeOpacity={0.7}
       >
-        {/* Icon */}
+        {/* Icon or Child Avatar */}
         <View style={[styles.iconContainer, { backgroundColor: config.bg }]}>
-          <Ionicons name={config.icon as any} size={22} color={config.color} />
+          {childAvatar ? (
+            <Image 
+              source={{ uri: childAvatar }} 
+              style={styles.childAvatarImage}
+            />
+          ) : childName ? (
+            <Text style={[styles.avatarInitial, { color: config.color }]}>
+              {childName.charAt(0).toUpperCase()}
+            </Text>
+          ) : (
+            <Ionicons name={config.icon as any} size={22} color={config.color} />
+          )}
         </View>
 
         {/* Content */}
@@ -167,6 +181,12 @@ export default function NotificationsScreen() {
             {notification.message}
           </Text>
           <View style={styles.notificationFooter}>
+            {childName && (
+              <View style={styles.childTag}>
+                <Ionicons name="person" size={10} color="#6B7280" />
+                <Text style={styles.childTagText}>{childName}</Text>
+              </View>
+            )}
             <View style={[styles.typeTag, { backgroundColor: config.bg }]}>
               <Text style={[styles.typeTagText, { color: config.color }]}>
                 {config.label}
@@ -454,6 +474,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
+    overflow: "hidden",
+  },
+  childAvatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  avatarInitial: {
+    fontSize: 20,
+    fontWeight: "700",
   },
   notificationContent: {
     flex: 1,
@@ -497,6 +527,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    flexWrap: "wrap",
+  },
+  childTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#F3F4F6",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  childTagText: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: "#6B7280",
   },
   typeTag: {
     paddingHorizontal: 8,

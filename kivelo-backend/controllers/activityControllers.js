@@ -514,6 +514,9 @@ export const submitActivityAnswer = async (req, res) => {
 
     await activity.save();
 
+    // Get child's user info for notification
+    const childUser = await User.findById(userId).select('name avatar');
+
     // Notify parent of submission
     const parent = await User.findById(activity.createdBy);
     if (parent) {
@@ -521,10 +524,12 @@ export const submitActivityAnswer = async (req, res) => {
         userId: parent._id,
         type: "activity_submission",
         title: "New Activity Submission",
-        message: `${child.name || 'Your child'} has submitted "${activity.title}"`,
+        message: `${childUser?.name || child.name || 'Your child'} has submitted "${activity.title}"`,
         data: {
           activityId: activity._id,
           childId: child._id,
+          childName: childUser?.name || child.name,
+          childAvatar: childUser?.avatar?.url || null,
           submittedAt: new Date()
         }
       });

@@ -75,6 +75,8 @@ export default function ParentHome() {
   const [refreshing, setRefreshing] = useState(false);
   const [childMoods, setChildMoods] = useState<Record<string, ChildMoodSummary>>({});
   const [loadingData, setLoadingData] = useState(false);
+  const [activityLimit, setActivityLimit] = useState(5);
+  const ACTIVITY_PAGE_SIZE = 5;
 
   // Get current time greeting
   const getGreeting = () => {
@@ -510,15 +512,16 @@ export default function ParentHome() {
               </View>
             ) : (
               <View style={[styles.activityList, { backgroundColor: colors.card }]}>
-                {familyActivityFeed.slice(0, 5).map((activity, index) => {
+                {familyActivityFeed.slice(0, activityLimit).map((activity, index) => {
                   const config = ACTIVITY_TYPE_CONFIG[activity.type] || ACTIVITY_TYPE_CONFIG.mood_checkin;
+                  const isLastItem = index === Math.min(activityLimit, familyActivityFeed.length) - 1;
                   
                   return (
                     <View 
                       key={activity._id || index} 
                       style={[
                         styles.activityItem,
-                        index === familyActivityFeed.slice(0, 5).length - 1 && { borderBottomWidth: 0 }
+                        isLastItem && familyActivityFeed.length <= activityLimit && { borderBottomWidth: 0 }
                       ]}
                     >
                       <View style={[styles.activityIcon, { backgroundColor: config.bg }]}>
@@ -536,6 +539,33 @@ export default function ParentHome() {
                     </View>
                   );
                 })}
+                
+                {/* Pagination Controls */}
+                {familyActivityFeed.length > ACTIVITY_PAGE_SIZE && (
+                  <View style={styles.paginationContainer}>
+                    {activityLimit < familyActivityFeed.length ? (
+                      <TouchableOpacity 
+                        style={[styles.paginationButton, { backgroundColor: themeColors.primary + '15' }]}
+                        onPress={() => setActivityLimit(prev => Math.min(prev + ACTIVITY_PAGE_SIZE, familyActivityFeed.length))}
+                      >
+                        <Ionicons name="chevron-down" size={16} color={themeColors.primary} />
+                        <Text style={[styles.paginationText, { color: themeColors.primary }]}>
+                          View More ({familyActivityFeed.length - activityLimit} remaining)
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity 
+                        style={[styles.paginationButton, { backgroundColor: colors.border + '30' }]}
+                        onPress={() => setActivityLimit(ACTIVITY_PAGE_SIZE)}
+                      >
+                        <Ionicons name="chevron-up" size={16} color={colors.textSecondary} />
+                        <Text style={[styles.paginationText, { color: colors.textSecondary }]}>
+                          Show Less
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
               </View>
             )}
           </View>
@@ -1042,6 +1072,25 @@ const styles = StyleSheet.create({
   activityTime: {
     fontSize: 12,
     color: "#9CA3AF",
+  },
+  paginationContainer: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#F3F4F6",
+  },
+  paginationButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    gap: 6,
+  },
+  paginationText: {
+    fontSize: 13,
+    fontWeight: "600",
   },
   tipCard: {
     flexDirection: "row",

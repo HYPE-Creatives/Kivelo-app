@@ -301,8 +301,9 @@ const getDefaultTrustZoneSettings = () => ({
 const createParentNotification = async (parentId, childId, moodCheckin, analysisResults) => {
   const { currentZone, patternAnalysis, aiAnalysis } = analysisResults;
 
-  const child = await User.findById(childId).select('name');
+  const child = await User.findById(childId).select('name avatar');
   const childName = child?.name || 'Your child';
+  const childAvatar = child?.avatar?.url || null;
 
   let title, message;
 
@@ -332,6 +333,8 @@ const createParentNotification = async (parentId, childId, moodCheckin, analysis
     data: {
       moodCheckinId: moodCheckin._id,
       childId,
+      childName,
+      childAvatar,
       moodScore: moodCheckin.moodScore,
       trustZone: currentZone,
       patternAnalysis,
