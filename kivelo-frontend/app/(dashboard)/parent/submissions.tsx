@@ -305,17 +305,17 @@ export default function ParentSubmissions() {
       <Modal
         visible={modalVisible}
         animationType="slide"
-        presentationStyle="pageSheet"
+        presentationStyle="fullScreen"
         onRequestClose={() => setModalVisible(false)}
       >
         <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
           {/* Modal Header */}
           <View style={[styles.modalHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={() => setModalVisible(false)}>
+            <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeButton}>
               <Ionicons name="close" size={28} color={colors.text} />
             </TouchableOpacity>
             <Text style={[styles.modalTitle, { color: colors.text }]}>Review Submission</Text>
-            <View style={{ width: 28 }} />
+            <View style={{ width: 44 }} />
           </View>
 
           <ScrollView style={styles.modalContent}>
@@ -556,8 +556,9 @@ const styles = StyleSheet.create({
   
   // Modal styles
   modalContainer: { flex: 1 },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1 },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
   modalTitle: { fontSize: 18, fontWeight: '600' },
+  closeButton: { padding: 8 },
   modalContent: { flex: 1, padding: 16 },
   activityInfo: { padding: 16, borderRadius: 12, marginBottom: 16 },
   modalActivityTitle: { fontSize: 20, fontWeight: '600', marginBottom: 12 },
