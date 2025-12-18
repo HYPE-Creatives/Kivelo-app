@@ -10,6 +10,8 @@ import {
   Dimensions,
   Image,
   ActivityIndicator,
+  Modal,
+  Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -68,7 +70,7 @@ export default function ParentHome() {
     familyActivityFeed,
     loading 
   } = useParent();
-  const { unreadCount, refreshNotifications } = useNotifications();
+  const { notifications, unreadCount, refreshNotifications, markAsRead } = useNotifications();
   const { colors, themeColors, isDark } = useTheme();
   const router = useRouter();
   
@@ -76,6 +78,7 @@ export default function ParentHome() {
   const [childMoods, setChildMoods] = useState<Record<string, ChildMoodSummary>>({});
   const [loadingData, setLoadingData] = useState(false);
   const [activityLimit, setActivityLimit] = useState(5);
+  const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
   const ACTIVITY_PAGE_SIZE = 5;
 
   // Get current time greeting
@@ -235,7 +238,7 @@ export default function ParentHome() {
               {/* Notification Bell */}
               <TouchableOpacity 
                 style={styles.notificationBtn}
-                onPress={() => router.push("/(dashboard)/parent/notifications")}
+                onPress={() => setShowNotificationDropdown(true)}
               >
                 <Ionicons name="notifications-outline" size={24} color="#FFFFFF" />
                 {unreadCount > 0 && (
@@ -596,6 +599,100 @@ export default function ParentHome() {
           <View style={{ height: 40 }} />
         </View>
       </ScrollView>
+
+      {/* Notification Dropdown Modal */}
+      <Modal
+        visible={showNotificationDropdown}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowNotificationDropdown(false)}
+      >
+        <Pressable 
+          style={styles.dropdownOverlay}
+          onPress={() => setShowNotificationDropdown(false)}
+        >
+          <View style={styles.dropdownContainer}>
+            <View style={[styles.dropdownContent, { backgroundColor: colors.card }]}>
+              {/* Header */}
+              <View style={styles.dropdownHeader}>
+                <Text style={[styles.dropdownTitle, { color: colors.text }]}>Notifications</Text>
+                {unreadCount > 0 && (
+                  <View style={styles.dropdownBadge}>
+                    <Text style={styles.dropdownBadgeText}>{unreadCount} new</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Notification List */}
+              <ScrollView style={styles.dropdownList} showsVerticalScrollIndicator={false}>
+                {notifications.length === 0 ? (
+                  <View style={styles.dropdownEmpty}>
+                    <Ionicons name="notifications-off-outline" size={32} color={colors.textSecondary} />
+                    <Text style={[styles.dropdownEmptyText, { color: colors.textSecondary }]}>
+                      No notifications yet
+                    </Text>
+                  </View>
+                ) : (
+                  notifications.slice(0, 5).map((notif) => (
+                    <TouchableOpacity
+                      key={notif._id}
+                      style={[
+                        styles.dropdownItem,
+                        !notif.isRead && styles.dropdownItemUnread,
+                        { borderBottomColor: colors.border }
+                      ]}
+                      onPress={async () => {
+                        if (!notif.isRead) {
+                          await markAsRead(notif._id);
+                        }
+                        setShowNotificationDropdown(false);
+                        router.push("/(dashboard)/parent/notifications");
+                      }}
+                    >
+                      <View style={[styles.dropdownItemIcon, { backgroundColor: !notif.isRead ? themeColors.primary + '20' : colors.border }]}>
+                        <Ionicons 
+                          name={
+                            notif.type === 'mood_alert' ? 'heart' :
+                            notif.type === 'new_journal' ? 'book' :
+                            notif.type === 'activity_submission' ? 'clipboard' :
+                            notif.type === 'activity_completed' ? 'checkmark-circle' :
+                            'notifications'
+                          } 
+                          size={16} 
+                          color={!notif.isRead ? themeColors.primary : colors.textSecondary} 
+                        />
+                      </View>
+                      <View style={styles.dropdownItemContent}>
+                        <Text style={[styles.dropdownItemTitle, { color: colors.text }]} numberOfLines={1}>
+                          {notif.title}
+                        </Text>
+                        <Text style={[styles.dropdownItemMessage, { color: colors.textSecondary }]} numberOfLines={1}>
+                          {notif.message}
+                        </Text>
+                      </View>
+                      {!notif.isRead && <View style={styles.unreadIndicator} />}
+                    </TouchableOpacity>
+                  ))
+                )}
+              </ScrollView>
+
+              {/* Footer */}
+              <TouchableOpacity
+                style={[styles.dropdownFooter, { borderTopColor: colors.border }]}
+                onPress={() => {
+                  setShowNotificationDropdown(false);
+                  router.push("/(dashboard)/parent/notifications");
+                }}
+              >
+                <Text style={[styles.dropdownFooterText, { color: themeColors.primary }]}>
+                  View All Notifications
+                </Text>
+                <Ionicons name="arrow-forward" size={16} color={themeColors.primary} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1121,5 +1218,108 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#15803D",
     lineHeight: 19,
+  },
+  // Notification Dropdown Styles
+  dropdownOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+  dropdownContainer: {
+    position: "absolute",
+    top: 100,
+    right: 16,
+    width: SCREEN_WIDTH - 32,
+    maxWidth: 360,
+  },
+  dropdownContent: {
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    overflow: "hidden",
+  },
+  dropdownHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  dropdownTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  dropdownBadge: {
+    backgroundColor: "#EF4444",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  dropdownBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  dropdownList: {
+    maxHeight: 300,
+  },
+  dropdownEmpty: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 32,
+  },
+  dropdownEmptyText: {
+    fontSize: 14,
+    marginTop: 8,
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderBottomWidth: 1,
+  },
+  dropdownItemUnread: {
+    backgroundColor: "#F0FDF4",
+  },
+  dropdownItemIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  dropdownItemContent: {
+    flex: 1,
+  },
+  dropdownItemTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  dropdownItemMessage: {
+    fontSize: 13,
+  },
+  unreadIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#16A34A",
+    marginLeft: 8,
+  },
+  dropdownFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 14,
+    borderTopWidth: 1,
+    gap: 6,
+  },
+  dropdownFooterText: {
+    fontSize: 14,
+    fontWeight: "600",
   },
 });

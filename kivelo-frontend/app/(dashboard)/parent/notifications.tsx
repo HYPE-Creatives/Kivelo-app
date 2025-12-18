@@ -26,6 +26,8 @@ const NOTIFICATION_TYPE_CONFIG: Record<string, { icon: string; color: string; bg
   new_journal: { icon: "book", color: "#8B5CF6", bg: "#EDE9FE", label: "Journal" },
   new_activity: { icon: "clipboard", color: "#3B82F6", bg: "#DBEAFE", label: "Activity" },
   activity_completed: { icon: "checkmark-circle", color: "#16A34A", bg: "#DCFCE7", label: "Completed" },
+  activity_submission: { icon: "document-text", color: "#3B82F6", bg: "#DBEAFE", label: "Submission" },
+  submission_reviewed: { icon: "checkmark-done", color: "#16A34A", bg: "#DCFCE7", label: "Reviewed" },
   points_earned: { icon: "star", color: "#EC4899", bg: "#FCE7F3", label: "Points" },
   badge_earned: { icon: "trophy", color: "#F59E0B", bg: "#FEF3C7", label: "Badge" },
   system: { icon: "information-circle", color: "#6B7280", bg: "#F3F4F6", label: "System" },

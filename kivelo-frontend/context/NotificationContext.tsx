@@ -12,7 +12,7 @@ export interface Notification {
   userId: string;
   title: string;
   message: string;
-  type: "mood_alert" | "streak_milestone" | "new_journal" | "new_activity" | "activity_completed" | "points_earned" | "badge_earned" | "system" | "reminder" | "parent_alert" | "ai_suggestion";
+  type: "mood_alert" | "streak_milestone" | "new_journal" | "new_activity" | "activity_completed" | "activity_submission" | "submission_reviewed" | "points_earned" | "badge_earned" | "system" | "reminder" | "parent_alert" | "ai_suggestion";
   priority: number; // 1-5
   isRead: boolean;
   data?: Record<string, any>;
