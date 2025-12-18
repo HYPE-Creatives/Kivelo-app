@@ -308,7 +308,7 @@ export default function ParentSubmissions() {
         presentationStyle="pageSheet"
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+        <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
           {/* Modal Header */}
           <View style={[styles.modalHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
             <TouchableOpacity onPress={() => setModalVisible(false)}>
@@ -508,7 +508,7 @@ export default function ParentSubmissions() {
               </View>
             </View>
           )}
-        </View>
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
