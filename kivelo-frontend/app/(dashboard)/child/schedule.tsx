@@ -1,10 +1,11 @@
 // app/(dashboard)/child/schedule.tsx
 import { View, Text, StyleSheet } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function ScheduleScreen() {
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.content}>
         <Ionicons name="calendar-outline" size={80} color="#4CAF50" />
         <Text style={styles.title}>My Schedule</Text>
@@ -15,7 +16,7 @@ export default function ScheduleScreen() {
           Soon you will be able to view your daily activities, events, and reminders all in one place.
         </Text>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 

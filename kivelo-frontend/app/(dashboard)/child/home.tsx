@@ -1,5 +1,6 @@
 // app/(dashboard)/child/home.tsx
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Animated } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../../context/AuthContext";
 import { useGamification } from "../../../context/GamificationContext";
 import { useActivity } from "../../../context/ActivityContext";
@@ -98,16 +99,16 @@ export default function ChildHome() {
   // Show loading state during initial data fetch
   if (initialLoad) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }]}>
+      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }]} edges={['top']}>
         <ActivityIndicator size="large" color={themeColors.primary} />
         <Text style={{ marginTop: 12, color: colors.textSecondary }}>Loading your dashboard...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Animated Header with stats */}
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      {/* Animated Header with stats */
       <Animated.View 
         style={[
           styles.header,
@@ -219,7 +220,7 @@ export default function ChildHome() {
           </Animated.View>
         ))}
       </Animated.ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 

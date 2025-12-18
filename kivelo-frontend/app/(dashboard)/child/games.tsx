@@ -1,5 +1,6 @@
 // app/(dashboard)/child/games.tsx
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { showAlert } from '@/utils/showAlert';
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -171,7 +172,7 @@ export default function Games() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>🎮 Fun Zone</Text>
@@ -233,7 +234,7 @@ export default function Games() {
           </TouchableOpacity>
         ))}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 

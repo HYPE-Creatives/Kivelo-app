@@ -16,6 +16,7 @@ import {
   Modal,
   Alert,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Slider from '@react-native-community/slider';
 import { showAlert } from '@/utils/showAlert';
 import { useMood, MoodCheckin } from "@/context/MoodContext";
@@ -311,16 +312,17 @@ export default function MoodCheck() {
 
   if (isLoading) {
     return (
-      <View style={styles.loaderContainer}>
+      <SafeAreaView style={styles.loaderContainer} edges={['top']}>
         <ActivityIndicator size="large" color="#16A34A" />
         <Text style={styles.loadingText}>Loading mood data...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
+    <SafeAreaView style={styles.container} edges={['top']}>
     <KeyboardAvoidingView 
-      style={styles.container}
+      style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
@@ -752,6 +754,7 @@ export default function MoodCheck() {
         onSave={handleDrawingSave}
       />
     </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 

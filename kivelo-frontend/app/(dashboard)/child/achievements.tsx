@@ -1,5 +1,6 @@
 // app/(dashboard)/child/achievements.tsx
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useGamification } from "../../../context/GamificationContext";
 import { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,15 +21,15 @@ export default function AchievementsScreen() {
 
   if (loading && !stats) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]} edges={['top']}>
         <ActivityIndicator size="large" color="#4CAF50" />
         <Text style={{ marginTop: 12, color: '#666' }}>Loading achievements...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header with level info */}
       <View style={styles.header}>
         <View style={styles.levelCircle}>
@@ -203,7 +204,7 @@ export default function AchievementsScreen() {
           </>
         )}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
