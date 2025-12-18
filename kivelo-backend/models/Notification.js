@@ -15,6 +15,7 @@ const notificationSchema = new mongoose.Schema({
       'new_activity',
       'activity_completed',
       'activity_submission',
+      'submission_reviewed',
       'points_earned',
       'badge_earned',
       'system',
