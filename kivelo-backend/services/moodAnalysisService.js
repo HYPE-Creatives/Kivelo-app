@@ -23,10 +23,12 @@ export const analyzeMoodForParent = async (childUserId, moodCheckin, alwaysNotif
       console.log(`No parent found for child user ${childUserId}. Skipping analysis.`);
       return;
     }
-    const parentId = childDoc.parent;
+    const parentUserId = childDoc.parent; // This is the parent's User ID
+    
+    console.log(`[MoodAnalysis] Child: ${childUserId}, Parent User ID: ${parentUserId}`);
 
     // 2. Get TrustZone settings for this parent-child pair
-    const trustZone = await TrustZone.findOne({ parentId, childId: childUserId });
+    const trustZone = await TrustZone.findOne({ parentId: parentUserId, childId: childUserId });
     const settings = trustZone?.settings || getDefaultTrustZoneSettings();
 
     // 3. Calculate the current trust zone for this single entry
@@ -58,7 +60,8 @@ export const analyzeMoodForParent = async (childUserId, moodCheckin, alwaysNotif
 
     // 7. Create and save a notification for the parent if needed
     if (shouldAlertParent) {
-      await createParentNotification(parentId, childUserId, moodCheckin, {
+      console.log(`[MoodAnalysis] Creating notification for parent User ID: ${parentUserId}`);
+      await createParentNotification(parentUserId, childUserId, moodCheckin, {
         currentZone,
         patternAnalysis,
         aiAnalysis

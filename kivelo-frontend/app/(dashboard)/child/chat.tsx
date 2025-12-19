@@ -1,45 +1,74 @@
 // app/(dashboard)/child/chat.tsx
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useConversation } from "../../../context/ConversationContext";
+import { useAuth } from "../../../context/AuthContext";
 
 export default function ChatScreen() {
   const [selectedTab, setSelectedTab] = useState<'ai' | 'family'>('ai');
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const { 
+    familyConversations, 
+    familyLoading, 
+    getFamilyChats,
+    aiConversation,
+    getOrCreateAIChat
+  } = useConversation();
 
-  const chatContacts = [
+  // Load family conversations on mount
+  useEffect(() => {
+    getFamilyChats();
+    getOrCreateAIChat();
+  }, []);
+
+  // Transform family conversations into display format
+  const chatContacts = familyConversations.map((conv) => {
+    const otherParticipant = conv.participants?.find(
+      (p) => p.user._id !== user?._id
+    );
+    const isParent = otherParticipant?.role === 'parent';
+    
+    return {
+      id: conv._id,
+      name: otherParticipant?.user?.name || 'Family Member',
+      type: isParent ? 'parent' : 'sibling',
+      icon: isParent ? 'heart' : 'people',
+      lastMessage: conv.lastMessage?.content || 'Start chatting!',
+      online: false, // Would need real-time status
+      color: isParent ? '#FF6B9D' : '#9C27B0',
+      conversationType: conv.type
+    };
+  });
+
+  // Fallback contacts if no family conversations exist yet
+  const fallbackContacts = [
     {
-      id: '2',
+      id: 'placeholder-1',
       name: 'Mom',
       type: 'parent',
       icon: 'heart',
-      lastMessage: "How was school today?",
-      online: true,
+      lastMessage: "Ask your parent to start a chat!",
+      online: false,
       color: '#FF6B9D'
     },
     {
-      id: '3',
+      id: 'placeholder-2',
       name: 'Dad',
       type: 'parent',
       icon: 'shield',
-      lastMessage: "Great job on your homework!",
+      lastMessage: "Family chat coming soon!",
       online: false,
       color: '#2196F3'
     },
-    {
-      id: '4',
-      name: 'Sister Emma',
-      type: 'sibling',
-      icon: 'people',
-      lastMessage: "Want to play a game?",
-      online: true,
-      color: '#9C27B0'
-    },
   ];
+
+  const displayContacts = chatContacts.length > 0 ? chatContacts : fallbackContacts;
 
   const aiFeatures = [
     {
@@ -205,7 +234,13 @@ export default function ChatScreen() {
         {selectedTab === 'family' && (
           <>
             <Text style={styles.sectionTitle}>👨‍👩‍👧‍👦 Your Family</Text>
-            {chatContacts.length === 0 ? (
+            
+            {familyLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#667EEA" />
+                <Text style={styles.loadingText}>Loading family chats...</Text>
+              </View>
+            ) : displayContacts.length === 0 ? (
               <View style={styles.emptyState}>
                 <View style={styles.emptyIconContainer}>
                   <Ionicons name="people-outline" size={48} color="#9CA3AF" />
@@ -216,11 +251,17 @@ export default function ChatScreen() {
                 </Text>
               </View>
             ) : (
-              chatContacts.map(contact => (
+              displayContacts.map(contact => (
                 <TouchableOpacity
                   key={contact.id}
                   style={styles.contactCard}
-                  onPress={() => console.log('Open chat with', contact.name)}
+                  onPress={() => {
+                    // Only navigate if it's a real conversation (not placeholder)
+                    if (!contact.id.startsWith('placeholder')) {
+                      console.log('Open chat with', contact.name, contact.id);
+                      // TODO: Navigate to family chat screen with conversationId
+                    }
+                  }}
                   activeOpacity={0.8}
                 >
                   <View style={[styles.contactAvatar, { backgroundColor: contact.color + '15' }]}>
@@ -576,6 +617,17 @@ const styles = StyleSheet.create({
     textAlign: 'center', 
     paddingHorizontal: 32,
     lineHeight: 20,
+  },
+
+  // Loading State
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#6B7280',
   },
 
   // Coming Soon

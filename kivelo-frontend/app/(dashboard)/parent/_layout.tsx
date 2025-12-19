@@ -6,6 +6,7 @@ import { ParentProvider } from "../../../context/ParentContext";
 import { ActivityProvider } from "../../../context/ActivityContext";
 import { NotificationProvider } from "../../../context/NotificationContext";
 import { ThemeProvider, useTheme } from "../../../context/ThemeContext";
+import { ConversationProvider } from "../../../context/ConversationContext";
 import { useEffect } from "react";
 import { BackHandler, Platform, StatusBar } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -149,6 +150,20 @@ function ThemedTabs() {
             title: "Theme Settings",
           }}
         />
+        <Tabs.Screen
+          name="chat"
+          options={{
+            href: null,
+            title: "Child Chat",
+          }}
+        />
+        <Tabs.Screen
+          name="family-chat"
+          options={{
+            href: null,
+            title: "Family Group Chat",
+          }}
+        />
       </Tabs>
     </>
   );
@@ -177,7 +192,9 @@ export default function ParentLayout() {
       <ParentProvider>
         <ActivityProvider>
           <NotificationProvider>
-            <ThemedTabs />
+            <ConversationProvider>
+              <ThemedTabs />
+            </ConversationProvider>
           </NotificationProvider>
         </ActivityProvider>
       </ParentProvider>

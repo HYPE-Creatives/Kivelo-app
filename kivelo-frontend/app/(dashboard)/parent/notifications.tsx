@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useNotifications, Notification } from "../../../context/NotificationContext";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -60,9 +61,13 @@ export default function NotificationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState("all");
 
-  useEffect(() => {
-    refreshNotifications();
-  }, []);
+  // Refresh notifications when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('Notifications screen focused - refreshing...');
+      refreshNotifications();
+    }, [refreshNotifications])
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

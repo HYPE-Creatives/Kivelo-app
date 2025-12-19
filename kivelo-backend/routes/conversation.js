@@ -14,7 +14,9 @@ import {
   getFlaggedConversations,
   reviewConversation,
   getChildAIInsights,
-  archiveOldMessages
+  archiveOldMessages,
+  editMessage,
+  deleteMessage
 } from '../controllers/conversationController.js';
 
 const router = express.Router();
@@ -517,5 +519,81 @@ router.post('/parent/review/:conversationId', auth, isParent, reviewConversation
  *                       type: array
  */
 router.get('/parent/child/:childId/insights', auth, isParent, getChildAIInsights);
+
+// ==============================================
+// MESSAGE EDIT & DELETE ROUTES
+// ==============================================
+
+/**
+ * @swagger
+ * /api/v1/conversations/{conversationId}/messages/{messageId}:
+ *   put:
+ *     summary: Edit a message
+ *     description: Edit the content of a message (sender only)
+ *     tags: [Family Chat]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: conversationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: messageId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - content
+ *             properties:
+ *               content:
+ *                 type: string
+ *                 description: New message content
+ *     responses:
+ *       200:
+ *         description: Message updated
+ *       403:
+ *         description: Can only edit own messages
+ *       404:
+ *         description: Message not found
+ */
+router.put('/:conversationId/messages/:messageId', auth, editMessage);
+
+/**
+ * @swagger
+ * /api/v1/conversations/{conversationId}/messages/{messageId}:
+ *   delete:
+ *     summary: Delete a message
+ *     description: Delete a message (sender or parent can delete)
+ *     tags: [Family Chat]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: conversationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: messageId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Message deleted
+ *       403:
+ *         description: Can only delete own messages
+ *       404:
+ *         description: Message not found
+ */
+router.delete('/:conversationId/messages/:messageId', auth, deleteMessage);
 
 export default router;

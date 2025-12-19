@@ -329,13 +329,13 @@ export async function getFamilyConversations(req, res) {
         { 'participants.user': userId }
       ]
     })
-      .populate('participants.user', 'name avatar')
+      .populate('participants.user', 'name email avatar role')
       .sort({ updatedAt: -1 });
 
     // Add unread count and last message
     const conversationsWithMeta = conversations.map(conv => {
       const lastMessage = conv.messages[conv.messages.length - 1];
-      const participant = conv.participants.find(p => p.user._id.toString() === userId);
+      const participant = conv.participants.find(p => p.user?._id?.toString() === userId);
       const unreadCount = participant?.lastReadAt
         ? conv.messages.filter(m => m.createdAt > participant.lastReadAt).length
         : conv.messages.length;
@@ -409,9 +409,13 @@ export async function createFamilyConversation(req, res) {
     });
 
     if (existingConv) {
+      // Populate user data for the response
+      const populatedConv = await Conversation.findById(existingConv._id)
+        .populate('participants.user', 'name email avatar role');
+      
       return res.json({
         success: true,
-        data: existingConv,
+        data: populatedConv,
         message: 'Conversation already exists'
       });
     }
@@ -424,9 +428,13 @@ export async function createFamilyConversation(req, res) {
 
     await conversation.save();
 
+    // Populate user data for the response
+    const populatedConversation = await Conversation.findById(conversation._id)
+      .populate('participants.user', 'name email avatar role');
+
     return res.status(201).json({
       success: true,
-      data: conversation,
+      data: populatedConversation,
       message: 'Conversation created'
     });
   } catch (error) {
@@ -743,6 +751,104 @@ async function isParentOfChild(parentUserId, childUserId) {
     c.user.toString() === childUserId?.toString() || 
     c._id.toString() === childUserId?.toString()
   );
+}
+
+/* ============================================================
+   13. EDIT MESSAGE
+=============================================================== */
+export async function editMessage(req, res) {
+  try {
+    const { conversationId, messageId } = req.params;
+    const { content } = req.body;
+    const userId = req.user.id;
+
+    if (!content || !content.trim()) {
+      return res.status(400).json({ success: false, message: 'Content is required' });
+    }
+
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      return res.status(404).json({ success: false, message: 'Conversation not found' });
+    }
+
+    // Find the message
+    const message = conversation.messages.id(messageId);
+    if (!message) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    // Only message sender can edit (or parent can edit their own messages)
+    if (message.sender?.toString() !== userId) {
+      return res.status(403).json({ success: false, message: 'You can only edit your own messages' });
+    }
+
+    // Can't edit AI messages
+    if (message.role === 'assistant') {
+      return res.status(403).json({ success: false, message: 'Cannot edit AI messages' });
+    }
+
+    // Update message
+    message.content = content.trim();
+    message.edited = true;
+    message.editedAt = new Date();
+
+    await conversation.save();
+
+    return res.json({
+      success: true,
+      message: 'Message updated',
+      data: message
+    });
+  } catch (error) {
+    console.error('Error in editMessage:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+/* ============================================================
+   14. DELETE MESSAGE
+=============================================================== */
+export async function deleteMessage(req, res) {
+  try {
+    const { conversationId, messageId } = req.params;
+    const userId = req.user.id;
+
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      return res.status(404).json({ success: false, message: 'Conversation not found' });
+    }
+
+    // Find the message
+    const message = conversation.messages.id(messageId);
+    if (!message) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    // Only message sender can delete (or parent has extra privileges)
+    const isOwner = message.sender?.toString() === userId;
+    const isParentUser = req.user.role === 'parent';
+    
+    if (!isOwner && !isParentUser) {
+      return res.status(403).json({ success: false, message: 'You can only delete your own messages' });
+    }
+
+    // Can't delete AI messages
+    if (message.role === 'assistant') {
+      return res.status(403).json({ success: false, message: 'Cannot delete AI messages' });
+    }
+
+    // Remove message from array
+    conversation.messages.pull(messageId);
+    await conversation.save();
+
+    return res.json({
+      success: true,
+      message: 'Message deleted'
+    });
+  } catch (error) {
+    console.error('Error in deleteMessage:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
 }
 
 /* ============================================================

@@ -20,6 +20,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
 import { useParent, Child, JournalEntry, MoodEntry } from "../../../context/ParentContext";
 import { useAuth } from "../../../context/AuthContext";
 
@@ -80,6 +81,7 @@ export default function FamilyManagement() {
     getChildMoodHistory,
     getChildJournals,
   } = useParent();
+  const router = useRouter();
 
   const [refreshing, setRefreshing] = useState(false);
   const [childrenDetails, setChildrenDetails] = useState<ChildWithFullDetails[]>([]);
@@ -547,6 +549,35 @@ export default function FamilyManagement() {
           </TouchableOpacity>
         )}
 
+        {/* Family Group Chat Card */}
+        <TouchableOpacity
+          style={styles.familyGroupChatCard}
+          onPress={() => {
+            router.push({
+              pathname: "/(dashboard)/parent/family-chat",
+            });
+          }}
+          activeOpacity={0.8}
+        >
+          <LinearGradient
+            colors={['#10B981', '#059669']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.familyGroupChatGradient}
+          >
+            <View style={styles.familyGroupChatIcon}>
+              <Ionicons name="chatbubbles" size={28} color="white" />
+            </View>
+            <View style={styles.familyGroupChatInfo}>
+              <Text style={styles.familyGroupChatTitle}>Family Group Chat</Text>
+              <Text style={styles.familyGroupChatSubtitle}>
+                Message everyone in the family at once
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="rgba(255,255,255,0.8)" />
+          </LinearGradient>
+        </TouchableOpacity>
+
         {loadingDetails ? (
           <View style={styles.loadingWrap}>
             <ChildCardSkeleton />
@@ -840,6 +871,24 @@ export default function FamilyManagement() {
 
                       {/* Actions */}
                       <View style={styles.actionRow}>
+                        <TouchableOpacity
+                          style={[styles.actionBtn, styles.chatBtn]}
+                          onPress={() => {
+                            const childUserId = child.user?._id || child.user;
+                            const childAvatar = child.user?.avatar?.url || '';
+                            router.push({
+                              pathname: "/(dashboard)/parent/chat",
+                              params: {
+                                childId: childUserId,
+                                childName: name,
+                                childAvatar: childAvatar,
+                              }
+                            });
+                          }}
+                        >
+                          <Ionicons name="chatbubble-outline" size={18} color="#16A34A" />
+                          <Text style={[styles.actionBtnText, { color: "#16A34A" }]}>Chat</Text>
+                        </TouchableOpacity>
                         {!child.hasSetPassword && (
                           <TouchableOpacity
                             style={styles.actionBtn}
@@ -1145,6 +1194,44 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "rgba(255,255,255,0.85)",
     marginTop: 2,
+  },
+  familyGroupChatCard: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  familyGroupChatGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  familyGroupChatIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  familyGroupChatInfo: {
+    flex: 1,
+  },
+  familyGroupChatTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: 'white',
+    marginBottom: 4,
+  },
+  familyGroupChatSubtitle: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.85)',
   },
   container: {
     flex: 1,
@@ -1507,6 +1594,9 @@ const styles = StyleSheet.create({
   },
   dangerBtn: {
     backgroundColor: "#FEE2E2",
+  },
+  chatBtn: {
+    backgroundColor: "#DCFCE7",
   },
   expandHint: {
     alignItems: "center",

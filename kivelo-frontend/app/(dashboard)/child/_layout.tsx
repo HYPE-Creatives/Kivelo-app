@@ -9,6 +9,7 @@ import { AIProvider } from "../../../context/AIContext";
 import { NotificationProvider } from "../../../context/NotificationContext";
 import { JournalProvider } from "../../../context/JournalContext";
 import { ThemeProvider, useTheme } from "../../../context/ThemeContext";
+import { ConversationProvider } from "../../../context/ConversationContext";
 import { useEffect } from "react";
 import { BackHandler, View, Image, Text, TouchableOpacity, StyleSheet, StatusBar } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -284,7 +285,9 @@ export default function ChildLayout() {
             <MoodProvider>
               <JournalProvider>
                 <AIProvider>
-                  <ThemedTabs />
+                  <ConversationProvider>
+                    <ThemedTabs />
+                  </ConversationProvider>
                 </AIProvider>
               </JournalProvider>
             </MoodProvider>

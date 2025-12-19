@@ -21,6 +21,7 @@ import Animated, { FadeIn, FadeInDown, FadeInUp } from "react-native-reanimated"
 import { useMood } from "../../../context/MoodContext";
 import { useAI } from "../../../context/AIContext";
 import { useAuth } from "../../../context/AuthContext";
+import { useConversation } from "../../../context/ConversationContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -51,6 +52,13 @@ export default function AIHelper() {
   const { getTodayMood } = useMood();
   const { sendMessage: sendAIMessage, getChatHistory } = useAI();
   const { user } = useAuth();
+  const { 
+    aiConversation, 
+    aiLoading, 
+    getOrCreateAIChat, 
+    sendAIMessage: sendConversationMessage,
+    addAIResponse 
+  } = useConversation();
   const insets = useSafeAreaInsets();
 
   const [message, setMessage] = useState("");
@@ -85,12 +93,28 @@ export default function AIHelper() {
 
   const loadChatHistory = async () => {
     try {
-      // First try to load from local storage
+      // First try to load from server via ConversationContext
+      const conversation = await getOrCreateAIChat();
+      
+      if (conversation && conversation.messages.length > 0) {
+        // Transform backend messages to local format
+        const formatted: ChatMessage[] = conversation.messages.map((msg, idx) => ({
+          id: msg._id || `server-${idx}-${Date.now()}`,
+          role: msg.role === 'assistant' ? 'ai' : 'user' as 'user' | 'ai',
+          text: msg.content,
+          timestamp: new Date(msg.createdAt).getTime(),
+        }));
+        setConversation(formatted);
+        setShowQuickActions(formatted.length <= 2);
+        await saveChatHistory(formatted);
+        return;
+      }
+      
+      // Try local storage as fallback
       const localHistory = await AsyncStorage.getItem(CHAT_STORAGE_KEY);
       if (localHistory) {
         const parsed = JSON.parse(localHistory);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Update the first AI greeting message with current user's name
           const updatedMessages = updateGreetingWithCurrentUser(parsed);
           setConversation(updatedMessages);
           setShowQuickActions(updatedMessages.length <= 2);
@@ -98,30 +122,16 @@ export default function AIHelper() {
         }
       }
 
-      // If no local history, try to get from server
-      try {
-        const serverHistory = await getChatHistory();
-        if (serverHistory && serverHistory.length > 0) {
-          const formatted: ChatMessage[] = serverHistory.map((msg, idx) => ({
-            id: `server-${idx}-${Date.now()}`,
-            role: msg.role as "user" | "ai",
-            text: msg.text,
-            timestamp: msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now(),
-          }));
-          // Update greeting with current user's name
-          const updatedFormatted = updateGreetingWithCurrentUser(formatted);
-          setConversation(updatedFormatted);
-          await saveChatHistory(updatedFormatted);
-          return;
-        }
-      } catch (error) {
-        console.log("Server history unavailable, starting fresh");
-        setIsOnline(false);
-      }
-
-      // If no history anywhere, create welcome message
+      // If no history anywhere, create welcome message with mood context
       const mood = await getTodayMood().catch(() => null);
-      const greeting = getMoodBasedGreeting(mood?.moodScore, user?.name);
+      const moodContext = aiConversation?.context;
+      
+      // Use mood context from conversation if available
+      const greeting = getMoodBasedGreeting(
+        moodContext?.currentMood?.moodScore || mood?.moodScore, 
+        user?.name
+      );
+      
       const welcomeMessage: ChatMessage = {
         id: `welcome-${Date.now()}`,
         role: "ai",
@@ -202,7 +212,7 @@ export default function AIHelper() {
     setMessage("");
     setShowQuickActions(false);
 
-    // Add user message
+    // Add user message to local UI
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       role: "user",
@@ -217,8 +227,19 @@ export default function AIHelper() {
     scrollToEnd();
 
     try {
+      // Send message to conversation API (persists to MongoDB)
+      if (aiConversation?.conversationId) {
+        await sendConversationMessage(text);
+      }
+      
+      // Get AI response (still uses existing AI service)
       const reply = await sendAIMessage(text);
       setIsOnline(true);
+      
+      // Save AI response to conversation API
+      if (aiConversation?.conversationId) {
+        await addAIResponse(reply);
+      }
       
       const aiMessage: ChatMessage = {
         id: `ai-${Date.now()}`,
