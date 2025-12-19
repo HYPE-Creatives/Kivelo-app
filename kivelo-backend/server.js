@@ -281,9 +281,19 @@ const getAllRoutes = (app) => {
     if (layer.route && layer.route.path) routes.push(layer.route.path);
 
     if (layer.name === "router" && layer.handle.stack) {
+      // Get the mount path for this router (e.g., '/api/v1/conversations')
+      const mountPath = layer.regexp.source
+        .replace(/\\\//g, '/')
+        .replace(/\^\//g, '/')
+        .replace(/\/\?\(\?=\/\|\$\)/g, '')
+        .replace(/\(\?:\(\[\^\/\]\+\?\)\)/g, ':param')
+        .replace(/\/$/g, '');
+      
       layer.handle.stack.forEach((nested) => {
         if (nested.route && nested.route.path) {
-          routes.push(nested.route.path);
+          // Build full path: mountPath + routePath
+          const fullPath = mountPath + nested.route.path;
+          routes.push(fullPath);
         }
       });
     }
@@ -311,11 +321,37 @@ const PUBLIC_ROUTES = [
   "/api-analytics/v1"
 ];
 
+// API route prefixes that have dynamic parameters and should pass through to router
+const API_ROUTE_PREFIXES = [
+  "/api/v1/conversations",
+  "/api/v1/activities",
+  "/api/v1/mood",
+  "/api/v1/children",
+  "/api/v1/parents",
+  "/api/v1/users",
+  "/api/v1/families",
+  "/api/v1/gamification",
+  "/api/v1/learning",
+  "/api/v1/journals",
+  "/api/v1/notifications",
+  "/api/v1/settings",
+  "/api/v1/ai",
+  "/api/v1/audit",
+  "/api/v1/admin",
+  "/api/v1/analytics",
+  "/api/v1/auth"
+];
+
 app.use((req, res, next) => {
   const p = req.path || "";
 
   if (PUBLIC_ROUTES.some((r) => p.startsWith(r))) {
     return next();
+  }
+
+  // Allow all known API route prefixes to pass through - let the actual router handle 404s
+  if (API_ROUTE_PREFIXES.some((prefix) => p.startsWith(prefix))) {
+    return apiKeyMiddleware(req, res, next);
   }
 
   const all = getAllRoutes(app);

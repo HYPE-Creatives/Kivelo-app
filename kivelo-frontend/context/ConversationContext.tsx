@@ -153,6 +153,7 @@ export const ConversationProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const urls = [LOCAL_API_URL, API_URL];
+    let lastError: Error | null = null;
     
     for (const baseUrl of urls) {
       try {
@@ -173,22 +174,46 @@ export const ConversationProvider = ({ children }: { children: ReactNode }) => {
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || `Request failed with status ${response.status}`);
+          const errorMessage = errorData.message || `Request failed with status ${response.status}`;
+          
+          // For client errors (4xx except 404), throw immediately - don't try other servers
+          // 404 might mean route doesn't exist on this server, try next
+          // 5xx means server error, try next server
+          if (response.status >= 400 && response.status < 500 && response.status !== 404) {
+            throw new Error(errorMessage);
+          }
+          
+          // For 404 or 5xx, store error and try next server
+          lastError = new Error(errorMessage);
+          console.log(`Request to ${baseUrl} failed with ${response.status}:`, errorMessage);
+          continue;
         }
 
         return await response.json();
       } catch (err: any) {
+        // If it's our thrown error (client error like 401, 403), re-throw immediately
+        if (err.message && !err.message.includes('Network') && !err.message.includes('fetch') && err.name !== 'AbortError') {
+          // Check if it's a known HTTP error we want to propagate
+          if (err.message.includes('status') || err.message.includes('Unauthorized') || 
+              err.message.includes('Forbidden') || err.message.includes('not found')) {
+            throw err;
+          }
+        }
+        
         if (err.name === 'AbortError') {
           console.log(`Request to ${baseUrl} timed out`);
+          lastError = new Error(`Request to ${baseUrl} timed out`);
         } else {
           console.log(`Request to ${baseUrl} failed:`, err.message);
+          lastError = err;
         }
-        // Try next URL
+        // Try next URL for network errors
         continue;
       }
     }
 
-    throw new Error('All API servers unavailable');
+    // If we have a specific error message, use it instead of generic message
+    throw lastError || new Error('All API servers unavailable');
   };
 
   // ============================================================

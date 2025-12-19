@@ -13,8 +13,10 @@ import { AlertProvider } from "../components/AlertProvider";
 const RNView = View as unknown as React.ComponentType<any>;
 const RNActivityIndicator = ActivityIndicator as unknown as React.ComponentType<any>;
 
-// Keep splash screen visible until app is ready
-SplashScreen.preventAutoHideAsync();
+// Keep splash screen visible until app is ready (only on native platforms)
+if (Platform.OS !== 'web') {
+  SplashScreen.preventAutoHideAsync();
+}
 
 // Handle GitHub Pages SPA redirect (web only)
 if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -41,7 +43,9 @@ function RootContent() {
     // Simulate loading resources
     const timer = setTimeout(() => {
       setAppReady(true);
-      SplashScreen.hideAsync();
+      if (Platform.OS !== 'web') {
+        SplashScreen.hideAsync();
+      }
     }, 1500);
 
     return () => clearTimeout(timer);
