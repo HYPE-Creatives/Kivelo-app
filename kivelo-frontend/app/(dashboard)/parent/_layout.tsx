@@ -151,6 +151,13 @@ function ThemedTabs() {
           }}
         />
         <Tabs.Screen
+          name="settings/change-password"
+          options={{
+            href: null,
+            title: "Change Password",
+          }}
+        />
+        <Tabs.Screen
           name="chat"
           options={{
             href: null,

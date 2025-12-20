@@ -323,36 +323,51 @@ export async function getFamilyConversations(req, res) {
       return res.status(404).json({ success: false, message: 'Family not found' });
     }
 
+    // Query for family conversations where current user is a participant
+    // This ensures we only get conversations the user is actually part of
     const conversations = await Conversation.find({
-      $or: [
-        { familyId, type: { $in: ['family_chat', 'parent_child', 'sibling'] } },
-        { 'participants.user': userId }
-      ]
+      type: { $in: ['family_chat', 'parent_child', 'sibling'] },
+      'participants.user': userId
     })
       .populate('participants.user', 'name email avatar role')
       .sort({ updatedAt: -1 });
 
-    // Add unread count and last message
-    const conversationsWithMeta = conversations.map(conv => {
-      const lastMessage = conv.messages[conv.messages.length - 1];
-      const participant = conv.participants.find(p => p.user?._id?.toString() === userId);
-      const unreadCount = participant?.lastReadAt
-        ? conv.messages.filter(m => m.createdAt > participant.lastReadAt).length
-        : conv.messages.length;
+    // Deduplicate by conversation ID and filter out self-referential conversations
+    const seenIds = new Set();
+    const conversationsWithMeta = conversations
+      .filter(conv => {
+        // Deduplicate
+        if (seenIds.has(conv._id.toString())) return false;
+        seenIds.add(conv._id.toString());
+        
+        // Filter out conversations where user is the only participant or 
+        // where all "other" participants are also the same user (self-chat)
+        const otherParticipants = conv.participants.filter(
+          p => p.user?._id?.toString() !== userId
+        );
+        // Must have at least one other participant
+        return otherParticipants.length > 0;
+      })
+      .map(conv => {
+        const lastMessage = conv.messages[conv.messages.length - 1];
+        const participant = conv.participants.find(p => p.user?._id?.toString() === userId);
+        const unreadCount = participant?.lastReadAt
+          ? conv.messages.filter(m => m.createdAt > participant.lastReadAt).length
+          : conv.messages.length;
 
-      return {
-        _id: conv._id,
-        type: conv.type,
-        participants: conv.participants,
-        lastMessage: lastMessage ? {
-          content: lastMessage.content.substring(0, 50),
-          createdAt: lastMessage.createdAt,
-          senderRole: lastMessage.role
-        } : null,
-        unreadCount,
-        updatedAt: conv.updatedAt
-      };
-    });
+        return {
+          _id: conv._id,
+          type: conv.type,
+          participants: conv.participants,
+          lastMessage: lastMessage ? {
+            content: lastMessage.content.substring(0, 50),
+            createdAt: lastMessage.createdAt,
+            senderRole: lastMessage.role
+          } : null,
+          unreadCount,
+          updatedAt: conv.updatedAt
+        };
+      });
 
     return res.json({
       success: true,

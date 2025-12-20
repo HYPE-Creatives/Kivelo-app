@@ -1,109 +1,193 @@
-// app/(dashboard)/child/chat.tsx
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from "react-native";
+// app/(dashboard)/child/chat.tsx - Redesigned Chat & Connect Hub
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+  ActivityIndicator,
+  RefreshControl,
+  Animated,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useState, useEffect } from "react";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useConversation } from "../../../context/ConversationContext";
 import { useAuth } from "../../../context/AuthContext";
+import { useMood } from "../../../context/MoodContext";
+
+interface FamilyContact {
+  id: string;  // Conversation ID
+  participantId?: string;  // Other user's ID
+  name: string;
+  type: 'parent' | 'sibling';
+  icon: string;
+  color: string;
+  lastMessage?: string;
+  lastMessageTime?: string;
+  unreadCount?: number;
+  isOnline?: boolean;
+}
+
+interface TodayMoodData {
+  moodScore?: number;
+  emoji?: string;
+}
 
 export default function ChatScreen() {
-  const [selectedTab, setSelectedTab] = useState<'ai' | 'family'>('ai');
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { getTodayMood } = useMood();
   const { 
     familyConversations, 
     familyLoading, 
     getFamilyChats,
     aiConversation,
-    getOrCreateAIChat
+    getOrCreateAIChat,
   } = useConversation();
 
-  // Load family conversations on mount
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedSection, setSelectedSection] = useState<'all' | 'family' | 'ai'>('all');
+  const [todayMoodData, setTodayMoodData] = useState<TodayMoodData | null>(null);
+  const fadeAnim = useState(new Animated.Value(0))[0];
+
+  // Load data on mount
   useEffect(() => {
-    getFamilyChats();
-    getOrCreateAIChat();
+    loadData();
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
   }, []);
 
-  // Transform family conversations into display format
-  const chatContacts = familyConversations.map((conv) => {
+  const loadData = async () => {
+    const [_, __, moodResult] = await Promise.all([
+      getFamilyChats(), 
+      getOrCreateAIChat(),
+      getTodayMood()
+    ]);
+    if (moodResult?.success && moodResult.data) {
+      setTodayMoodData(moodResult.data);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    const moodResult = await getTodayMood();
+    if (moodResult?.success && moodResult.data) {
+      setTodayMoodData(moodResult.data);
+    }
+    await loadData();
+    setRefreshing(false);
+  };
+
+  // Transform family conversations into contacts (with deduplication and filter self)
+  const seenIds = new Set<string>();
+  const familyContacts: FamilyContact[] = familyConversations
+    .filter((conv) => {
+      // Deduplicate by conversation ID
+      if (seenIds.has(conv._id)) return false;
+      seenIds.add(conv._id);
+      // Filter out conversations where the "other" participant is the current user (self)
+      const otherParticipant = conv.participants?.find(
+        (p) => p.user._id !== user?._id
+      );
+      // If no other participant or the other participant is also the current user, skip
+      if (!otherParticipant || otherParticipant.user._id === user?._id) return false;
+      return true;
+    })
+    .map((conv) => {
     const otherParticipant = conv.participants?.find(
       (p) => p.user._id !== user?._id
     );
     const isParent = otherParticipant?.role === 'parent';
+    const name = otherParticipant?.user?.name || 'Family Member';
+    const participantUserId = otherParticipant?.user._id || '';
     
     return {
-      id: conv._id,
-      name: otherParticipant?.user?.name || 'Family Member',
+      id: conv._id,  // This is the conversation ID
+      participantId: participantUserId,  // This is the other user's ID
+      name,
       type: isParent ? 'parent' : 'sibling',
-      icon: isParent ? 'heart' : 'people',
-      lastMessage: conv.lastMessage?.content || 'Start chatting!',
-      online: false, // Would need real-time status
-      color: isParent ? '#FF6B9D' : '#9C27B0',
-      conversationType: conv.type
+      icon: isParent 
+        ? (name.toLowerCase().includes('mom') ? 'heart' : 'shield')
+        : 'people',
+      color: isParent
+        ? (name.toLowerCase().includes('mom') ? '#FF6B9D' : '#2196F3')
+        : '#9C27B0',
+      lastMessage: conv.lastMessage?.content || 'Tap to start chatting!',
+      lastMessageTime: conv.lastMessage?.createdAt 
+        ? formatTimeAgo(conv.lastMessage.createdAt)
+        : undefined,
+      unreadCount: conv.unreadCount || 0,
+      isOnline: false,
     };
   });
 
-  // Fallback contacts if no family conversations exist yet
-  const fallbackContacts = [
-    {
-      id: 'placeholder-1',
-      name: 'Mom',
-      type: 'parent',
-      icon: 'heart',
-      lastMessage: "Ask your parent to start a chat!",
-      online: false,
-      color: '#FF6B9D'
-    },
-    {
-      id: 'placeholder-2',
-      name: 'Dad',
-      type: 'parent',
-      icon: 'shield',
-      lastMessage: "Family chat coming soon!",
-      online: false,
-      color: '#2196F3'
-    },
-  ];
+  // Add placeholder parents if no conversations exist
+  const displayContacts: FamilyContact[] = familyContacts.length > 0 
+    ? familyContacts 
+    : [
+        {
+          id: 'placeholder-mom',
+          name: 'Mom',
+          type: 'parent',
+          icon: 'heart',
+          color: '#FF6B9D',
+          lastMessage: 'Ask your parent to connect! 💕',
+        },
+        {
+          id: 'placeholder-dad',
+          name: 'Dad',
+          type: 'parent',
+          icon: 'shield',
+          color: '#2196F3',
+          lastMessage: 'Family chat coming soon! 💪',
+        },
+      ];
 
-  const displayContacts = chatContacts.length > 0 ? chatContacts : fallbackContacts;
-
-  const aiFeatures = [
-    {
-      icon: 'happy-outline',
-      title: 'Mood Support',
-      description: 'Talk about your feelings',
-      gradient: ['#FF6B9D', '#FF8A65'] as [string, string],
-      message: "I'm feeling a bit down today"
-    },
-    {
-      icon: 'book-outline',
-      title: 'Homework Help',
-      description: 'Get help with school work',
-      gradient: ['#667EEA', '#764BA2'] as [string, string],
-      message: "Can you help me with my homework?"
-    },
-    {
-      icon: 'chatbubble-ellipses-outline',
-      title: 'Just Chat',
-      description: 'Have a friendly conversation',
-      gradient: ['#10B981', '#34D399'] as [string, string],
-      message: "Hi! Can we just chat for a bit?"
-    },
-    {
-      icon: 'bulb-outline',
-      title: 'Ask Questions',
-      description: 'Learn something new',
-      gradient: ['#F59E0B', '#FCD34D'] as [string, string],
-      message: "I have a question about something"
-    },
-  ];
-
-  const handleOpenAIHelper = () => {
+  const handleOpenAIChat = () => {
     router.push("/(dashboard)/child/ai-helper");
   };
+
+  const handleOpenFamilyChat = (contact: FamilyContact) => {
+    if (contact.id.startsWith('placeholder')) {
+      // Show info for placeholder contacts
+      return;
+    }
+    router.push({
+      pathname: "/(dashboard)/child/family-chat",
+      params: {
+        conversationId: contact.id,  // Pass the existing conversation ID
+        participantId: contact.participantId || '',  // Pass the other user's ID
+        contactName: contact.name,
+        contactType: contact.type,
+      }
+    });
+  };
+
+  // Get mood-based greeting
+  const getMoodGreeting = () => {
+    if (!todayMoodData?.moodScore) {
+      return { text: "How are you today? 😊", subtext: "Chat with your AI friend or family!" };
+    }
+    const score = todayMoodData.moodScore;
+    if (score >= 8) {
+      return { text: "You're feeling great! 🌟", subtext: "Share your happiness with family!" };
+    } else if (score >= 6) {
+      return { text: "Having a good day! 😊", subtext: "Stay connected with loved ones!" };
+    } else if (score >= 4) {
+      return { text: "It's okay to feel meh 💙", subtext: "Talk to someone who cares!" };
+    } else {
+      return { text: "We're here for you 💜", subtext: "Chat with AI Friend or family anytime!" };
+    }
+  };
+
+  const greeting = getMoodGreeting();
 
   return (
     <View style={styles.container}>
@@ -112,477 +196,478 @@ export default function ChatScreen() {
         colors={["#667EEA", "#764BA2"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
-        style={styles.header}
+        style={[styles.header, { paddingTop: insets.top + 8 }]}
       >
-        <Text style={styles.title}>Chat & Connect</Text>
-        <Text style={styles.subtitle}>Stay in touch safely 💬</Text>
+        <View style={styles.headerContent}>
+          <Text style={styles.title}>💬 Chat & Connect</Text>
+          <Text style={styles.subtitle}>{greeting.text}</Text>
+          <Text style={styles.headerHint}>{greeting.subtext}</Text>
+        </View>
       </LinearGradient>
 
-      {/* Tab switcher */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, selectedTab === 'ai' && styles.tabActive]}
-          onPress={() => setSelectedTab('ai')}
-        >
-          <Ionicons 
-            name="sparkles" 
-            size={20} 
-            color={selectedTab === 'ai' ? 'white' : '#666'} 
-          />
-          <Text style={[styles.tabText, selectedTab === 'ai' && styles.tabTextActive]}>
-            AI Friend
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, selectedTab === 'family' && styles.tabActive]}
-          onPress={() => setSelectedTab('family')}
-        >
-          <Ionicons 
-            name="people" 
-            size={20} 
-            color={selectedTab === 'family' ? 'white' : '#666'} 
-          />
-          <Text style={[styles.tabText, selectedTab === 'family' && styles.tabTextActive]}>
-            Family
-          </Text>
-        </TouchableOpacity>
+      {/* Filter Pills */}
+      <View style={styles.filterContainer}>
+        {(['all', 'ai', 'family'] as const).map((section) => (
+          <TouchableOpacity
+            key={section}
+            style={[
+              styles.filterPill,
+              selectedSection === section && styles.filterPillActive
+            ]}
+            onPress={() => setSelectedSection(section)}
+          >
+            <Ionicons
+              name={
+                section === 'all' ? 'apps' :
+                section === 'ai' ? 'sparkles' : 'people'
+              }
+              size={16}
+              color={selectedSection === section ? 'white' : '#6B7280'}
+            />
+            <Text style={[
+              styles.filterText,
+              selectedSection === section && styles.filterTextActive
+            ]}>
+              {section === 'all' ? 'All' : section === 'ai' ? 'AI Friend' : 'Family'}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
-      <ScrollView 
-        style={styles.content} 
-        contentContainerStyle={{ paddingBottom: insets.bottom + 90 }}
+      <Animated.ScrollView
+        style={[styles.content, { opacity: fadeAnim }]}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={['#667EEA']}
+            tintColor="#667EEA"
+          />
+        }
       >
-        {selectedTab === 'ai' && (
+        {/* AI Friend Card - Always show unless filtered out */}
+        {(selectedSection === 'all' || selectedSection === 'ai') && (
           <>
-            {/* Main AI Chat Card */}
-            <TouchableOpacity 
-              style={styles.mainAICard}
-              onPress={handleOpenAIHelper}
+            <Text style={styles.sectionTitle}>🤖 Your AI Friend</Text>
+            <TouchableOpacity
+              style={styles.aiCard}
+              onPress={handleOpenAIChat}
               activeOpacity={0.9}
             >
               <LinearGradient
                 colors={["#667EEA", "#764BA2"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.mainAIGradient}
+                style={styles.aiCardGradient}
               >
-                <View style={styles.mainAIContent}>
-                  <View style={styles.mainAIAvatar}>
-                    <Ionicons name="sparkles" size={32} color="#667EEA" />
+                <View style={styles.aiCardContent}>
+                  <View style={styles.aiAvatar}>
+                    <Ionicons name="sparkles" size={28} color="#667EEA" />
                   </View>
-                  <View style={styles.mainAIInfo}>
-                    <View style={styles.mainAIHeader}>
-                      <Text style={styles.mainAIName}>AI Friend</Text>
-                      <View style={styles.onlineDot} />
+                  <View style={styles.aiInfo}>
+                    <View style={styles.aiHeader}>
+                      <Text style={styles.aiName}>AI Friend</Text>
+                      <View style={styles.onlineBadge}>
+                        <View style={styles.onlineDot} />
+                        <Text style={styles.onlineText}>Always Online</Text>
+                      </View>
                     </View>
-                    <Text style={styles.mainAIDesc}>
-                      Your 24/7 friend - always here to chat, help, and listen! 💜
+                    <Text style={styles.aiDescription}>
+                      Your 24/7 buddy for chatting, homework help, or when you need someone to listen! 💜
                     </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={24} color="rgba(255,255,255,0.8)" />
                 </View>
-                <View style={styles.startChatButton}>
-                  <Ionicons name="chatbubble" size={16} color="#667EEA" />
+
+                {/* Quick Action Buttons */}
+                <View style={styles.quickActions}>
+                  <TouchableOpacity style={styles.quickAction} onPress={handleOpenAIChat}>
+                    <Ionicons name="happy-outline" size={18} color="white" />
+                    <Text style={styles.quickActionText}>Mood</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.quickAction} onPress={handleOpenAIChat}>
+                    <Ionicons name="book-outline" size={18} color="white" />
+                    <Text style={styles.quickActionText}>Help</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.quickAction} onPress={handleOpenAIChat}>
+                    <Ionicons name="chatbubble-outline" size={18} color="white" />
+                    <Text style={styles.quickActionText}>Chat</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.quickAction} onPress={handleOpenAIChat}>
+                    <Ionicons name="bulb-outline" size={18} color="white" />
+                    <Text style={styles.quickActionText}>Ideas</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Start Chat Button */}
+                <TouchableOpacity style={styles.startChatBtn} onPress={handleOpenAIChat}>
+                  <Ionicons name="chatbubble" size={18} color="#667EEA" />
                   <Text style={styles.startChatText}>Start Chatting</Text>
-                </View>
+                  <Ionicons name="arrow-forward" size={18} color="#667EEA" />
+                </TouchableOpacity>
               </LinearGradient>
             </TouchableOpacity>
-
-            {/* AI Features grid */}
-            <Text style={styles.sectionTitle}>✨ What can I help you with?</Text>
-            <View style={styles.featuresGrid}>
-              {aiFeatures.map((feature, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.featureCard}
-                  onPress={handleOpenAIHelper}
-                  activeOpacity={0.8}
-                >
-                  <LinearGradient
-                    colors={feature.gradient}
-                    style={styles.featureIcon}
-                  >
-                    <Ionicons name={feature.icon as any} size={24} color="white" />
-                  </LinearGradient>
-                  <Text style={styles.featureTitle}>{feature.title}</Text>
-                  <Text style={styles.featureDescription}>{feature.description}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* AI Info card */}
-            <View style={styles.infoCard}>
-              <LinearGradient
-                colors={["#E0E7FF", "#EDE9FE"]}
-                style={styles.infoGradient}
-              >
-                <View style={styles.infoIconContainer}>
-                  <Ionicons name="shield-checkmark" size={24} color="#667EEA" />
-                </View>
-                <View style={styles.infoContent}>
-                  <Text style={styles.infoTitle}>Safe & Private</Text>
-                  <Text style={styles.infoText}>
-                    All your chats are private and secure. I'm here to help, not judge! 💚
-                  </Text>
-                </View>
-              </LinearGradient>
-            </View>
           </>
         )}
 
-        {selectedTab === 'family' && (
+        {/* Family Section */}
+        {(selectedSection === 'all' || selectedSection === 'family') && (
           <>
-            <Text style={styles.sectionTitle}>👨‍👩‍👧‍👦 Your Family</Text>
+            <Text style={styles.sectionTitle}>👨‍👩‍👧‍👦 Family Members</Text>
             
             {familyLoading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#667EEA" />
-                <Text style={styles.loadingText}>Loading family chats...</Text>
-              </View>
-            ) : displayContacts.length === 0 ? (
-              <View style={styles.emptyState}>
-                <View style={styles.emptyIconContainer}>
-                  <Ionicons name="people-outline" size={48} color="#9CA3AF" />
-                </View>
-                <Text style={styles.emptyText}>No family members yet</Text>
-                <Text style={styles.emptySubtext}>
-                  Ask your parent to add family members to the app
-                </Text>
+                <Text style={styles.loadingText}>Finding your family...</Text>
               </View>
             ) : (
-              displayContacts.map(contact => (
-                <TouchableOpacity
-                  key={contact.id}
-                  style={styles.contactCard}
-                  onPress={() => {
-                    // Only navigate if it's a real conversation (not placeholder)
-                    if (!contact.id.startsWith('placeholder')) {
-                      console.log('Open chat with', contact.name, contact.id);
-                      // TODO: Navigate to family chat screen with conversationId
-                    }
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <View style={[styles.contactAvatar, { backgroundColor: contact.color + '15' }]}>
-                    <Ionicons name={contact.icon as any} size={26} color={contact.color} />
-                    {contact.online && <View style={styles.onlineBadge} />}
-                  </View>
-                  <View style={styles.contactInfo}>
-                    <View style={styles.contactHeader}>
-                      <Text style={styles.contactName}>{contact.name}</Text>
-                      {contact.online && (
-                        <View style={[styles.onlineIndicator, { backgroundColor: '#DCFCE7' }]}>
-                          <Text style={styles.onlineText}>Online</Text>
-                        </View>
-                      )}
+              <View style={styles.contactsList}>
+                {displayContacts.map((contact) => (
+                  <TouchableOpacity
+                    key={contact.id}
+                    style={styles.contactCard}
+                    onPress={() => handleOpenFamilyChat(contact)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[styles.contactAvatar, { backgroundColor: contact.color + '15' }]}>
+                      <Ionicons name={contact.icon as any} size={24} color={contact.color} />
+                      {contact.isOnline && <View style={styles.contactOnline} />}
                     </View>
-                    <Text style={styles.contactMessage} numberOfLines={1}>
-                      {contact.lastMessage}
-                    </Text>
-                  </View>
-                  <View style={styles.contactArrow}>
-                    <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
-                  </View>
-                </TouchableOpacity>
-              ))
+                    
+                    <View style={styles.contactInfo}>
+                      <View style={styles.contactHeader}>
+                        <Text style={styles.contactName}>{contact.name}</Text>
+                        {contact.lastMessageTime && (
+                          <Text style={styles.contactTime}>{contact.lastMessageTime}</Text>
+                        )}
+                      </View>
+                      <Text style={styles.contactMessage} numberOfLines={1}>
+                        {contact.lastMessage}
+                      </Text>
+                    </View>
+
+                    {contact.unreadCount ? (
+                      <View style={[styles.unreadBadge, { backgroundColor: contact.color }]}>
+                        <Text style={styles.unreadText}>{contact.unreadCount}</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.arrowContainer}>
+                        <Ionicons name="chevron-forward" size={20} color="#D1D5DB" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
             )}
 
-            {/* Coming Soon Banner */}
-            <View style={styles.comingSoonCard}>
-              <LinearGradient
-                colors={["#FEF3C7", "#FDE68A"]}
-                style={styles.comingSoonGradient}
-              >
-                <Ionicons name="construct-outline" size={24} color="#D97706" />
-                <View style={styles.comingSoonContent}>
-                  <Text style={styles.comingSoonTitle}>Family Chat Coming Soon!</Text>
-                  <Text style={styles.comingSoonText}>
-                    Soon you'll be able to chat with your family members here
-                  </Text>
-                </View>
-              </LinearGradient>
-            </View>
+            {/* Add Family Info Card */}
+            {familyContacts.length === 0 && (
+              <View style={styles.infoCard}>
+                <LinearGradient
+                  colors={["#FEF3C7", "#FDE68A"]}
+                  style={styles.infoGradient}
+                >
+                  <Ionicons name="information-circle" size={24} color="#D97706" />
+                  <View style={styles.infoContent}>
+                    <Text style={styles.infoTitle}>Connect with Family!</Text>
+                    <Text style={styles.infoText}>
+                      Ask your parent to set up family chat so you can message each other safely! 💕
+                    </Text>
+                  </View>
+                </LinearGradient>
+              </View>
+            )}
           </>
         )}
-      </ScrollView>
+
+        {/* Safety Card */}
+        <View style={styles.safetyCard}>
+          <LinearGradient
+            colors={["#DCFCE7", "#BBF7D0"]}
+            style={styles.safetyGradient}
+          >
+            <Ionicons name="shield-checkmark" size={24} color="#16A34A" />
+            <View style={styles.safetyContent}>
+              <Text style={styles.safetyTitle}>Safe & Secure 🔒</Text>
+              <Text style={styles.safetyText}>
+                All your chats are private and monitored by your parents to keep you safe!
+              </Text>
+            </View>
+          </LinearGradient>
+        </View>
+      </Animated.ScrollView>
     </View>
   );
 }
 
+// Helper function to format time ago
+function formatTimeAgo(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'now';
+  if (diffMins < 60) return `${diffMins}m`;
+  if (diffHours < 24) return `${diffHours}h`;
+  if (diffDays < 7) return `${diffDays}d`;
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#F3F4F6' 
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
   },
-  header: { 
-    paddingTop: 12,
-    paddingBottom: 16, 
+  
+  // Header
+  header: {
+    paddingBottom: 20,
     paddingHorizontal: 20,
   },
-  title: { 
-    fontSize: 24, 
-    fontWeight: 'bold', 
-    color: 'white', 
-    marginBottom: 4 
+  headerContent: {},
+  title: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 4,
   },
-  subtitle: { 
-    fontSize: 14, 
-    color: 'rgba(255,255,255,0.85)' 
+  subtitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.95)',
   },
-  tabContainer: { 
-    flexDirection: 'row', 
-    padding: 16, 
-    paddingBottom: 8,
-    gap: 10 
+  headerHint: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
   },
-  tab: { 
-    flex: 1, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    paddingVertical: 12, 
-    borderRadius: 12, 
-    backgroundColor: 'white', 
+
+  // Filter Pills
+  filterContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     gap: 8,
+  },
+  filterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'white',
+    gap: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 1,
   },
-  tabActive: { 
-    backgroundColor: '#667EEA' 
+  filterPillActive: {
+    backgroundColor: '#667EEA',
   },
-  tabText: { 
-    fontSize: 14, 
-    fontWeight: '600', 
-    color: '#666' 
+  filterText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
   },
-  tabTextActive: { 
-    color: 'white' 
+  filterTextActive: {
+    color: 'white',
   },
-  content: { 
-    flex: 1, 
-    paddingHorizontal: 16 
+
+  // Content
+  content: {
+    flex: 1,
+    paddingHorizontal: 16,
   },
-  sectionTitle: { 
-    fontSize: 17, 
-    fontWeight: '700', 
-    color: '#374151', 
-    marginBottom: 14, 
-    marginTop: 8 
-  },
-  
-  // Main AI Card
-  mainAICard: {
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#374151',
     marginTop: 8,
+    marginBottom: 12,
+  },
+
+  // AI Card
+  aiCard: {
     marginBottom: 20,
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#667EEA',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  mainAIGradient: {
-    padding: 16,
+  aiCardGradient: {
+    padding: 18,
   },
-  mainAIContent: {
+  aiCardContent: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
-  mainAIAvatar: {
+  aiAvatar: {
     width: 56,
     height: 56,
-    borderRadius: 28,
+    borderRadius: 16,
     backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
-  mainAIInfo: {
+  aiInfo: {
     flex: 1,
   },
-  mainAIHeader: {
+  aiHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    justifyContent: 'space-between',
+    marginBottom: 6,
   },
-  mainAIName: {
-    fontSize: 18,
+  aiName: {
+    fontSize: 20,
     fontWeight: '700',
     color: 'white',
-    marginRight: 8,
+  },
+  onlineBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
   },
   onlineDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: '#22C55E',
+    marginRight: 4,
   },
-  mainAIDesc: {
+  onlineText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: 'white',
+  },
+  aiDescription: {
     fontSize: 13,
     color: 'rgba(255,255,255,0.9)',
-    lineHeight: 18,
+    lineHeight: 19,
   },
-  startChatButton: {
+
+  // Quick Actions
+  quickActions: {
+    flexDirection: 'row',
+    marginTop: 16,
+    gap: 8,
+  },
+  quickAction: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  quickActionText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'white',
+    marginTop: 4,
+  },
+
+  // Start Chat Button
+  startChatBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'white',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    marginTop: 14,
-    gap: 6,
+    marginTop: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
+    gap: 8,
   },
   startChatText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     color: '#667EEA',
   },
 
-  // Feature Cards
-  featuresGrid: { 
-    flexDirection: 'row', 
-    flexWrap: 'wrap', 
-    gap: 12, 
-    marginBottom: 20 
+  // Contact Cards
+  contactsList: {
+    gap: 10,
   },
-  featureCard: { 
-    width: '47%', 
-    backgroundColor: 'white', 
-    padding: 14, 
-    borderRadius: 14, 
-    alignItems: 'center',
-    shadowColor: '#000', 
-    shadowOffset: { width: 0, height: 2 }, 
-    shadowOpacity: 0.05, 
-    shadowRadius: 4, 
-    elevation: 2 
-  },
-  featureIcon: { 
-    width: 50, 
-    height: 50, 
-    borderRadius: 14, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginBottom: 10 
-  },
-  featureTitle: { 
-    fontSize: 14, 
-    fontWeight: '600', 
-    color: '#374151', 
-    marginBottom: 4, 
-    textAlign: 'center' 
-  },
-  featureDescription: { 
-    fontSize: 11, 
-    color: '#6B7280', 
-    textAlign: 'center', 
-    lineHeight: 15 
-  },
-
-  // Info Card
-  infoCard: { 
-    borderRadius: 14, 
-    overflow: 'hidden',
-    marginBottom: 20,
-  },
-  infoGradient: {
+  contactCard: {
     flexDirection: 'row',
-    padding: 16,
     alignItems: 'center',
-    gap: 12,
-  },
-  infoIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
     backgroundColor: 'white',
+    padding: 14,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  contactAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 14,
+    position: 'relative',
   },
-  infoContent: { 
-    flex: 1 
+  contactOnline: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#22C55E',
+    borderWidth: 2,
+    borderColor: 'white',
   },
-  infoTitle: { 
-    fontSize: 15, 
-    fontWeight: '600', 
-    color: '#4338CA', 
-    marginBottom: 2 
+  contactInfo: {
+    flex: 1,
   },
-  infoText: { 
-    fontSize: 13, 
-    color: '#6366F1', 
-    lineHeight: 18 
+  contactHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
   },
-
-  // Contact Cards
-  contactCard: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    backgroundColor: 'white', 
-    padding: 14, 
-    borderRadius: 14, 
-    marginBottom: 10, 
-    shadowColor: '#000', 
-    shadowOffset: { width: 0, height: 1 }, 
-    shadowOpacity: 0.05, 
-    shadowRadius: 3, 
-    elevation: 2 
+  contactName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
   },
-  contactAvatar: { 
-    width: 52, 
-    height: 52, 
-    borderRadius: 26, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginRight: 12, 
-    position: 'relative' 
+  contactTime: {
+    fontSize: 12,
+    color: '#9CA3AF',
   },
-  onlineBadge: { 
-    position: 'absolute', 
-    bottom: 0, 
-    right: 0, 
-    width: 14, 
-    height: 14, 
-    borderRadius: 7, 
-    backgroundColor: '#22C55E', 
-    borderWidth: 2, 
-    borderColor: 'white' 
+  contactMessage: {
+    fontSize: 14,
+    color: '#6B7280',
   },
-  contactInfo: { 
-    flex: 1 
+  unreadBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
   },
-  contactHeader: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    marginBottom: 4 
+  unreadText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: 'white',
   },
-  contactName: { 
-    fontSize: 15, 
-    fontWeight: '600', 
-    color: '#1F2937', 
-    marginRight: 8 
-  },
-  onlineIndicator: { 
-    paddingHorizontal: 8, 
-    paddingVertical: 2, 
-    borderRadius: 10 
-  },
-  onlineText: { 
-    fontSize: 10, 
-    fontWeight: '600', 
-    color: '#16A34A' 
-  },
-  contactMessage: { 
-    fontSize: 13, 
-    color: '#6B7280' 
-  },
-  contactArrow: {
+  arrowContainer: {
     width: 32,
     height: 32,
     borderRadius: 16,
@@ -591,35 +676,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // Empty State
-  emptyState: { 
-    alignItems: 'center', 
-    paddingVertical: 40 
-  },
-  emptyIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  emptyText: { 
-    fontSize: 17, 
-    fontWeight: '600', 
-    color: '#6B7280', 
-    marginBottom: 6 
-  },
-  emptySubtext: { 
-    fontSize: 14, 
-    color: '#9CA3AF', 
-    textAlign: 'center', 
-    paddingHorizontal: 32,
-    lineHeight: 20,
-  },
-
-  // Loading State
+  // Loading
   loadingContainer: {
     alignItems: 'center',
     paddingVertical: 40,
@@ -630,31 +687,59 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
 
-  // Coming Soon
-  comingSoonCard: {
-    borderRadius: 14,
+  // Info Card
+  infoCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  infoGradient: {
+    flexDirection: 'row',
+    padding: 16,
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  infoContent: {
+    flex: 1,
+  },
+  infoTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#D97706',
+    marginBottom: 4,
+  },
+  infoText: {
+    fontSize: 13,
+    color: '#B45309',
+    lineHeight: 18,
+  },
+
+  // Safety Card
+  safetyCard: {
+    borderRadius: 16,
     overflow: 'hidden',
     marginTop: 8,
     marginBottom: 20,
   },
-  comingSoonGradient: {
+  safetyGradient: {
     flexDirection: 'row',
     padding: 16,
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 12,
   },
-  comingSoonContent: {
+  safetyContent: {
     flex: 1,
   },
-  comingSoonTitle: {
-    fontSize: 14,
+  safetyTitle: {
+    fontSize: 15,
     fontWeight: '600',
-    color: '#D97706',
-    marginBottom: 2,
+    color: '#166534',
+    marginBottom: 4,
   },
-  comingSoonText: {
-    fontSize: 12,
-    color: '#B45309',
-    lineHeight: 16,
+  safetyText: {
+    fontSize: 13,
+    color: '#15803d',
+    lineHeight: 18,
   },
 });

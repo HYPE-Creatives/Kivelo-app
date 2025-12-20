@@ -199,6 +199,14 @@ function ThemedTabs() {
           }}
         />
         <Tabs.Screen
+          name="family-chat"
+          options={{
+            href: null,
+            title: "Family Chat",
+            headerShown: false,
+          }}
+        />
+        <Tabs.Screen
           name="notifications"
           options={{
             href: null,

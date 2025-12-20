@@ -181,7 +181,7 @@ export default function Settings() {
   // handleUpdateEmail removed; 'Edit Profile' uses dedicated screen
 
   const handleChangePassword = () => {
-    showAlert("Coming Soon", "Password change feature will be available soon.");
+    router.push("/(dashboard)/parent/settings/change-password");
   };
 
   const handleManageFamily = () => {
