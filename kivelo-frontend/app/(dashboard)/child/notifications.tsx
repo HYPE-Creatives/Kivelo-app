@@ -36,6 +36,9 @@ const getNotificationIcon = (type: string) => {
       return { name: "people", color: "#06B6D4" };
     case "ai_suggestion":
       return { name: "sparkles", color: "#A855F7" };
+    case "new_message":
+    case "chat_message":
+      return { name: "chatbubble-ellipses", color: "#10B981" };
     default:
       return { name: "notifications", color: "#64748b" };
   }
@@ -63,7 +66,8 @@ export default function NotificationsScreen() {
     markAsRead, 
     markAllAsRead, 
     refreshNotifications,
-    unreadCount 
+    unreadCount,
+    deleteNotification 
   } = useNotifications();
   
   const [refreshing, setRefreshing] = useState(false);
@@ -83,11 +87,31 @@ export default function NotificationsScreen() {
     if (!notification.isRead) {
       await markAsRead(notification._id);
     }
-    // Could navigate to relevant screen based on notification type/data
+    
+    // Navigate to relevant screen based on notification type
+    if (notification.type === 'new_message' || notification.type === 'chat_message') {
+      // Navigate to family chat with the conversation
+      if (notification.data?.conversationId) {
+        router.push({
+          pathname: '/(dashboard)/child/family-chat',
+          params: {
+            conversationId: notification.data.conversationId,
+            contactName: notification.data.senderName || 'Family',
+            contactRole: notification.data.senderRole || 'parent',
+          }
+        });
+      } else {
+        router.push('/(dashboard)/child/chat');
+      }
+    }
   };
 
   const handleMarkAllRead = async () => {
     await markAllAsRead();
+  };
+
+  const handleDelete = async (notificationId: string) => {
+    await deleteNotification(notificationId);
   };
 
   const filteredNotifications = filter === "unread" 
@@ -205,6 +229,15 @@ export default function NotificationsScreen() {
                         {formatTimeAgo(notification.createdAt)}
                       </Text>
                     </View>
+                    
+                    {/* Delete button */}
+                    <TouchableOpacity
+                      style={styles.deleteBtn}
+                      onPress={() => handleDelete(notification._id)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Ionicons name="trash-outline" size={18} color="#9CA3AF" />
+                    </TouchableOpacity>
                   </TouchableOpacity>
                 );
               })}
@@ -393,6 +426,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#94a3b8",
     marginTop: 6,
+  },
+  deleteBtn: {
+    padding: 8,
+    marginLeft: 4,
+    alignSelf: "center",
   },
   footerText: {
     textAlign: "center",

@@ -21,7 +21,9 @@ const notificationSchema = new mongoose.Schema({
       'system',
       'reminder',
       'parent_alert',
-      'ai_suggestion'
+      'ai_suggestion',
+      'new_message',
+      'chat_message'
     ],
     required: true
   },

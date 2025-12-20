@@ -9,6 +9,45 @@ import Notification from '../models/Notification.js';
 import { checkMessageSafety } from '../services/safetyMonitoringService.js';
 
 /* ============================================================
+   HELPER: Send chat notification to recipient
+=============================================================== */
+async function sendChatNotification(senderId, recipientId, senderName, messagePreview, conversationId) {
+  try {
+    // Don't notify the sender
+    if (senderId === recipientId) return;
+
+    // Get sender info for personalized notification
+    const sender = await User.findById(senderId).select('name role').lean();
+    const senderDisplayName = sender?.name || senderName || 'Someone';
+    const senderRole = sender?.role || 'family member';
+
+    // Create notification for recipient
+    await Notification.create({
+      userId: recipientId,
+      type: 'new_message',
+      title: `New message from ${senderDisplayName}`,
+      message: messagePreview.length > 50 
+        ? messagePreview.substring(0, 50) + '...' 
+        : messagePreview,
+      data: {
+        conversationId,
+        senderId,
+        senderName: senderDisplayName,
+        senderRole,
+        messagePreview
+      },
+      priority: 4, // High priority for chat messages
+      isRead: false
+    });
+
+    console.log(`[CHAT NOTIFICATION] Sent to ${recipientId} from ${senderDisplayName}`);
+  } catch (error) {
+    console.error('Error sending chat notification:', error);
+    // Don't throw - notifications are non-critical
+  }
+}
+
+/* ============================================================
    HELPER: Load mood context for AI conversations
 =============================================================== */
 async function loadMoodContext(childUserId) {
@@ -171,6 +210,31 @@ export async function sendMessage(req, res) {
     };
 
     await conversation.addMessage(messageData);
+
+    // Send notification to recipients (only for family chat, not AI chat)
+    if (conversation.type === 'family_chat' && conversation.participants?.length > 0) {
+      // Get sender info for notification
+      const sender = await User.findById(senderId).select('firstName lastName role');
+      const senderName = sender ? `${sender.firstName} ${sender.lastName}` : 'Someone';
+      
+      // Notify all participants except the sender
+      for (const participant of conversation.participants) {
+        if (participant.user.toString() !== senderId) {
+          try {
+            await sendChatNotification(
+              senderId,
+              participant.user.toString(),
+              senderName,
+              content,
+              conversationId
+            );
+          } catch (notifError) {
+            console.error('Failed to send chat notification:', notifError);
+            // Don't fail the message send if notification fails
+          }
+        }
+      }
+    }
 
     // If flagged, handle safety alert
     if (safetyCheck.flagged) {

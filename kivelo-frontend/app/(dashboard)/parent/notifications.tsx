@@ -35,6 +35,8 @@ const NOTIFICATION_TYPE_CONFIG: Record<string, { icon: string; color: string; bg
   reminder: { icon: "alarm", color: "#3B82F6", bg: "#DBEAFE", label: "Reminder" },
   parent_alert: { icon: "alert-circle", color: "#EF4444", bg: "#FEE2E2", label: "Alert" },
   ai_suggestion: { icon: "sparkles", color: "#8B5CF6", bg: "#EDE9FE", label: "AI Insight" },
+  new_message: { icon: "chatbubble-ellipses", color: "#10B981", bg: "#D1FAE5", label: "Message" },
+  chat_message: { icon: "chatbubble-ellipses", color: "#10B981", bg: "#D1FAE5", label: "Message" },
 };
 
 // Filter tabs
@@ -121,6 +123,22 @@ export default function NotificationsScreen() {
       case "new_activity":
       case "activity_completed":
         router.push("/(dashboard)/parent/activities");
+        break;
+      case "new_message":
+      case "chat_message":
+        // Navigate to chat with the conversation
+        if (data?.conversationId) {
+          router.push({
+            pathname: '/(dashboard)/parent/family-chat',
+            params: {
+              conversationId: data.conversationId,
+              contactName: data.senderName || 'Family',
+              contactRole: data.senderRole || 'child',
+            }
+          });
+        } else {
+          router.push('/(dashboard)/parent/chat');
+        }
         break;
       default:
         // Just mark as read, no navigation
