@@ -96,9 +96,62 @@ const io = new IOServer(httpServer, {
 // store io instance
 setIO(io);
 
-// optional: handle connections
+// Socket.io connection handler with room management
 io.on("connection", (socket) => {
   console.log("Socket connected:", socket.id);
+
+  // Join user's personal room (for direct notifications)
+  socket.on("join_user", (userId) => {
+    if (userId) {
+      socket.join(`user:${userId}`);
+      console.log(`Socket ${socket.id} joined user room: user:${userId}`);
+    }
+  });
+
+  // Join a conversation room (for chat messages)
+  socket.on("join_conversation", (conversationId) => {
+    if (conversationId) {
+      socket.join(`conversation:${conversationId}`);
+      console.log(`Socket ${socket.id} joined conversation: conversation:${conversationId}`);
+    }
+  });
+
+  // Leave a conversation room
+  socket.on("leave_conversation", (conversationId) => {
+    if (conversationId) {
+      socket.leave(`conversation:${conversationId}`);
+      console.log(`Socket ${socket.id} left conversation: conversation:${conversationId}`);
+    }
+  });
+
+  // Typing indicator
+  socket.on("typing_start", ({ conversationId, userId, userName }) => {
+    socket.to(`conversation:${conversationId}`).emit("user_typing", {
+      conversationId,
+      userId,
+      userName,
+      isTyping: true
+    });
+  });
+
+  socket.on("typing_stop", ({ conversationId, userId }) => {
+    socket.to(`conversation:${conversationId}`).emit("user_typing", {
+      conversationId,
+      userId,
+      isTyping: false
+    });
+  });
+
+  // Message read receipt
+  socket.on("message_read", ({ conversationId, userId, messageId }) => {
+    socket.to(`conversation:${conversationId}`).emit("message_read_receipt", {
+      conversationId,
+      userId,
+      messageId,
+      readAt: new Date()
+    });
+  });
+
   socket.on("disconnect", () => {
     console.log("Socket disconnected:", socket.id);
   });

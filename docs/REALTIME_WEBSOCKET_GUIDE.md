@@ -164,26 +164,33 @@ export const disconnectSocket = () => {
 
 ## Available Events
 
-### Currently Implemented Events
+### Server → Client Events (Emitted by Backend)
 
-| Event Name | Direction | Description | Payload |
-|------------|-----------|-------------|---------|
-| `analytics:update` | Server → Client | Real-time analytics data update | `{ route, method, clientType, statusCode, timestamp }` |
-| `connect` | Bidirectional | Socket connection established | `socket.id` |
-| `disconnect` | Bidirectional | Socket disconnected | `reason` |
+| Event Name | Description | Payload |
+|------------|-------------|---------|
+| `new_message` | New chat message in conversation | `{ conversationId, message, senderId, senderRole }` |
+| `ai_response` | AI assistant response in AI chat | `{ conversationId, message }` |
+| `user_typing` | User typing indicator | `{ conversationId, userId, userName, isTyping }` |
+| `message_read_receipt` | Message was read by user | `{ conversationId, userId, messageId, readAt }` |
+| `analytics:update` | Real-time analytics data update | `{ route, method, clientType, statusCode, timestamp }` |
 
-### Planned/Suggested Events
+### Client → Server Events (Emitted by Frontend)
 
-The following events are suggested for future implementation:
+| Event Name | Description | Payload |
+|------------|-------------|---------|
+| `join_user` | Join user's personal room for notifications | `userId` (string) |
+| `join_conversation` | Join a conversation room for messages | `conversationId` (string) |
+| `leave_conversation` | Leave a conversation room | `conversationId` (string) |
+| `typing_start` | User started typing | `{ conversationId, userId, userName }` |
+| `typing_stop` | User stopped typing | `{ conversationId, userId }` |
+| `message_read` | Mark message as read | `{ conversationId, userId, messageId }` |
 
-| Event Name | Direction | Description | Payload |
-|------------|-----------|-------------|---------|
-| `notification:new` | Server → Client | New notification created | `{ notification }` |
-| `mood:checkin` | Server → Client | Child completed mood check-in | `{ childId, moodScore, timestamp }` |
-| `activity:completed` | Server → Client | Activity marked complete | `{ activityId, childId, points }` |
-| `badge:earned` | Server → Client | New badge unlocked | `{ badge, userId }` |
-| `family:update` | Server → Client | Family data changed | `{ type, data }` |
-| `chat:message` | Bidirectional | Real-time chat messages | `{ message, sender, timestamp }` |
+### Connection Events
+
+| Event Name | Direction | Description |
+|------------|-----------|-------------|
+| `connect` | Bidirectional | Socket connection established |
+| `disconnect` | Bidirectional | Socket disconnected |
 
 ---
 
@@ -198,6 +205,21 @@ socket = io(SOCKET_URL, {
     token: accessToken
   }
 });
+```
+
+### Joining Rooms After Connection
+
+After connecting, the frontend must join the appropriate rooms to receive events:
+
+```typescript
+// Join user's personal room (do this immediately after connection)
+socket.emit('join_user', userId);
+
+// Join a specific conversation room when opening a chat
+socket.emit('join_conversation', conversationId);
+
+// Leave conversation room when closing chat
+socket.emit('leave_conversation', conversationId);
 ```
 
 ### Backend Authentication Middleware (Suggested)
@@ -369,6 +391,187 @@ const AnalyticsComponent: React.FC = () => {
           - Status: {analyticsData.statusCode}
         </Text>
       )}
+    </View>
+  );
+};
+```
+
+### Chat Implementation Example
+
+Complete example for real-time chat with typing indicators:
+
+```typescript
+// ChatScreen.tsx - Real-time chat with Socket.io
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, TextInput, FlatList, TouchableOpacity } from 'react-native';
+import { useSocket } from '../context/SocketContext';
+import { useAuth } from '../context/AuthContext';
+
+interface Message {
+  _id: string;
+  content: string;
+  sender: string;
+  role: string;
+  createdAt: string;
+}
+
+export const ChatScreen: React.FC<{ conversationId: string }> = ({ conversationId }) => {
+  const { socket, emit, on, off } = useSocket();
+  const { user } = useAuth();
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputText, setInputText] = useState('');
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (!socket || !conversationId) return;
+
+    // Join conversation room
+    emit('join_conversation', conversationId);
+
+    // Listen for new messages
+    const handleNewMessage = (data: { conversationId: string; message: Message }) => {
+      if (data.conversationId === conversationId) {
+        setMessages(prev => [...prev, data.message]);
+      }
+    };
+
+    // Listen for AI responses
+    const handleAIResponse = (data: { conversationId: string; message: Message }) => {
+      if (data.conversationId === conversationId) {
+        setMessages(prev => [...prev, data.message]);
+      }
+    };
+
+    // Listen for typing indicators
+    const handleTyping = (data: { conversationId: string; userId: string; userName: string; isTyping: boolean }) => {
+      if (data.conversationId === conversationId && data.userId !== user?.id) {
+        setTypingUsers(prev => {
+          if (data.isTyping) {
+            return prev.includes(data.userName) ? prev : [...prev, data.userName];
+          } else {
+            return prev.filter(name => name !== data.userName);
+          }
+        });
+      }
+    };
+
+    // Listen for read receipts
+    const handleReadReceipt = (data: { conversationId: string; userId: string; messageId: string }) => {
+      if (data.conversationId === conversationId) {
+        // Update message read status in UI
+        console.log(`Message ${data.messageId} read by ${data.userId}`);
+      }
+    };
+
+    on('new_message', handleNewMessage);
+    on('ai_response', handleAIResponse);
+    on('user_typing', handleTyping);
+    on('message_read_receipt', handleReadReceipt);
+
+    return () => {
+      // Leave conversation room and cleanup
+      emit('leave_conversation', conversationId);
+      off('new_message', handleNewMessage);
+      off('ai_response', handleAIResponse);
+      off('user_typing', handleTyping);
+      off('message_read_receipt', handleReadReceipt);
+    };
+  }, [socket, conversationId, user?.id]);
+
+  // Handle typing indicator
+  const handleTextChange = (text: string) => {
+    setInputText(text);
+
+    // Emit typing start
+    emit('typing_start', {
+      conversationId,
+      userId: user?.id,
+      userName: user?.name
+    });
+
+    // Clear previous timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Set timeout to stop typing indicator after 2 seconds of no input
+    typingTimeoutRef.current = setTimeout(() => {
+      emit('typing_stop', {
+        conversationId,
+        userId: user?.id
+      });
+    }, 2000);
+  };
+
+  // Send message via API (not socket - socket is for receiving only)
+  const sendMessage = async () => {
+    if (!inputText.trim()) return;
+
+    try {
+      // Call your API to send the message
+      // The backend will emit the socket event to all participants
+      const response = await fetch(`${API_URL}/conversations/message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          conversationId,
+          content: inputText.trim(),
+          type: 'text'
+        })
+      });
+
+      if (response.ok) {
+        setInputText('');
+        // Stop typing indicator
+        emit('typing_stop', { conversationId, userId: user?.id });
+      }
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    }
+  };
+
+  return (
+    <View style={{ flex: 1 }}>
+      <FlatList
+        data={messages}
+        keyExtractor={(item) => item._id}
+        renderItem={({ item }) => (
+          <View style={{
+            alignSelf: item.sender === user?.id ? 'flex-end' : 'flex-start',
+            backgroundColor: item.sender === user?.id ? '#007AFF' : '#E5E5EA',
+            padding: 10,
+            margin: 5,
+            borderRadius: 15,
+            maxWidth: '70%'
+          }}>
+            <Text style={{ color: item.sender === user?.id ? '#FFF' : '#000' }}>
+              {item.content}
+            </Text>
+          </View>
+        )}
+      />
+      
+      {typingUsers.length > 0 && (
+        <Text style={{ padding: 10, fontStyle: 'italic', color: '#666' }}>
+          {typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...
+        </Text>
+      )}
+
+      <View style={{ flexDirection: 'row', padding: 10 }}>
+        <TextInput
+          value={inputText}
+          onChangeText={handleTextChange}
+          placeholder="Type a message..."
+          style={{ flex: 1, borderWidth: 1, borderRadius: 20, paddingHorizontal: 15 }}
+        />
+        <TouchableOpacity onPress={sendMessage} style={{ marginLeft: 10, padding: 10 }}>
+          <Text>Send</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };

@@ -7,6 +7,7 @@ import Child from '../models/Child.js';
 import Parent from '../models/Parent.js';
 import Notification from '../models/Notification.js';
 import { checkMessageSafety } from '../services/safetyMonitoringService.js';
+import { getIO } from '../utils/socket.js';
 
 /* ============================================================
    HELPER: Send chat notification to recipient
@@ -246,10 +247,39 @@ export async function sendMessage(req, res) {
       }
     }
 
+    // Get the saved message
+    const savedMessage = conversation.messages[conversation.messages.length - 1];
+
+    // Emit socket event for real-time updates
+    const io = getIO();
+    if (io) {
+      // Emit to conversation room
+      io.to(`conversation:${conversationId}`).emit('new_message', {
+        conversationId,
+        message: savedMessage,
+        senderId,
+        senderRole: req.user.role
+      });
+
+      // Also emit to individual user rooms for participants not in conversation room
+      if (conversation.participants?.length > 0) {
+        for (const participant of conversation.participants) {
+          if (participant.user.toString() !== senderId) {
+            io.to(`user:${participant.user.toString()}`).emit('new_message', {
+              conversationId,
+              message: savedMessage,
+              senderId,
+              senderRole: req.user.role
+            });
+          }
+        }
+      }
+    }
+
     return res.json({
       success: true,
       data: {
-        message: conversation.messages[conversation.messages.length - 1],
+        message: savedMessage,
         safetyCheck: safetyCheck.flagged ? { flagged: true, category: safetyCheck.category } : null
       }
     });
@@ -302,10 +332,30 @@ export async function addAIResponse(req, res) {
       await conversation.save();
     }
 
+    // Get the saved message
+    const savedMessage = conversation.messages[conversation.messages.length - 1];
+
+    // Emit socket event for real-time AI response
+    const io = getIO();
+    if (io) {
+      io.to(`conversation:${conversationId}`).emit('ai_response', {
+        conversationId,
+        message: savedMessage
+      });
+
+      // Also emit to child's user room
+      if (conversation.childId) {
+        io.to(`user:${conversation.childId.toString()}`).emit('ai_response', {
+          conversationId,
+          message: savedMessage
+        });
+      }
+    }
+
     return res.json({
       success: true,
       data: {
-        message: conversation.messages[conversation.messages.length - 1]
+        message: savedMessage
       }
     });
   } catch (error) {
