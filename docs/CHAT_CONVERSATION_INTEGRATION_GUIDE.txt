@@ -1,0 +1,1183 @@
+================================================================================
+KIVELO APP - CHAT & CONVERSATION INTEGRATION GUIDE
+================================================================================
+
+This document provides frontend integration guidance for the Chat & Conversation
+features in the Kivelo Family Wellness app. It covers:
+- AI Chat (Child's AI Counselor)
+- Family Chat (Parent-Child, Sibling messaging)
+- Safety Monitoring & Parent Oversight
+- Message Management
+
+================================================================================
+                        📋 FEATURE OVERVIEW
+================================================================================
+
+The conversation system supports THREE types of chats:
+
+1. AI CHAT (ai_chat)
+   - Child-only feature
+   - AI counselor with mood-aware responses
+   - Loads mood context, journal themes, activity engagement
+   - Session-based with stats tracking
+
+2. FAMILY CHAT (family_chat)
+   - Multi-participant (parents + children)
+   - General family discussions
+
+3. DIRECT CHATS (parent_child, sibling)
+   - 1-on-1 conversations
+   - parent_child: Between a parent and their child
+   - sibling: Between siblings
+
+SAFETY FEATURES:
+- All messages are checked for safety concerns
+- Flagged messages trigger parent notifications
+- Parents can review flagged conversations
+
+================================================================================
+                        🔗 API BASE URL
+================================================================================
+
+All conversation endpoints: /api/v1/conversations/...
+
+Headers Required:
+- Content-Type: application/json
+- Authorization: Bearer <jwt_token>
+
+================================================================================
+                        📝 TYPESCRIPT TYPES
+================================================================================
+
+```typescript
+// Message types
+interface Message {
+  _id: string;
+  sender?: string;                    // User ID (null for AI messages)
+  role: 'user' | 'assistant' | 'system' | 'parent' | 'child';
+  content: string;
+  type: 'text' | 'suggestion' | 'prompt' | 'activity' | 'mood_insight' | 'safety_alert' | 'image' | 'voice';
+  metadata?: {
+    moodScore?: number;
+    trustZone?: string;
+    aiConfidence?: number;
+    suggestedActivity?: string;
+    readBy?: { user: string; readAt: string }[];
+  };
+  flagged?: boolean;
+  flagReason?: string;
+  createdAt: string;
+  edited?: boolean;
+  editedAt?: string;
+}
+
+// Conversation types
+interface Conversation {
+  _id: string;
+  type: 'ai_chat' | 'family_chat' | 'parent_child' | 'sibling';
+  childId?: string;                   // For AI chats
+  participants?: Participant[];        // For family chats
+  familyId?: string;
+  context?: MoodContext;              // AI chat mood context
+  messages: Message[];
+  moodAtStart?: {
+    emoji: string;
+    moodScore: number;
+    trustZone: string;
+  };
+  isActive: boolean;
+  safetyFlags?: SafetyFlags;
+  stats?: ConversationStats;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface Participant {
+  user: {
+    _id: string;
+    name: string;
+    email?: string;
+    avatar?: { url: string };
+    role: 'parent' | 'child';
+  };
+  role: 'parent' | 'child';
+  joinedAt: string;
+  lastReadAt?: string;
+}
+
+interface MoodContext {
+  currentMood?: {
+    emoji: string;
+    moodScore: number;
+    trustZone: 'green' | 'yellow' | 'orange' | 'red';
+    lastCheckinAt: string;
+  };
+  moodTrend?: {
+    weeklyAverage: number | null;
+    trend: 'improving' | 'stable' | 'declining';
+    daysTracked: number;
+  };
+  recentJournalThemes?: string[];
+  interests?: string[];
+  activityEngagement?: {
+    completedThisWeek: number;
+    favoriteCategory: string | null;
+  };
+}
+
+interface SafetyFlags {
+  hasConcerningContent: boolean;
+  flagCount: number;
+  lastFlaggedAt?: string;
+  parentNotified: boolean;
+  requiresReview: boolean;
+}
+
+interface ConversationStats {
+  totalMessages: number;
+  userMessages: number;
+  aiMessages: number;
+  averageResponseTime?: number;
+  sessionDuration?: number;           // In seconds
+}
+
+// Family conversation list item
+interface ConversationListItem {
+  _id: string;
+  type: 'family_chat' | 'parent_child' | 'sibling';
+  participants: Participant[];
+  lastMessage?: {
+    content: string;                  // First 50 chars
+    createdAt: string;
+    senderRole: string;
+  };
+  unreadCount: number;
+  updatedAt: string;
+}
+```
+
+================================================================================
+                        🤖 AI CHAT ENDPOINTS (Child Only)
+================================================================================
+
+1. GET OR CREATE AI CONVERSATION
+--------------------------------------------------------------------------------
+Endpoint: GET /api/v1/conversations/ai
+Protected: Yes (Child role required)
+Headers: Authorization: Bearer <child_token>
+
+Description: Gets the active AI conversation or creates a new one.
+Automatically loads the child's mood context for personalized responses.
+
+Success Response (200):
+{
+  "success": true,
+  "data": {
+    "conversationId": "conv_id",
+    "type": "ai_chat",
+    "context": {
+      "currentMood": {
+        "emoji": "😊",
+        "moodScore": 8,
+        "trustZone": "green",
+        "lastCheckinAt": "2024-01-01T10:00:00.000Z"
+      },
+      "moodTrend": {
+        "weeklyAverage": 7.5,
+        "trend": "improving",
+        "daysTracked": 5
+      },
+      "recentJournalThemes": ["school", "friends"],
+      "interests": ["gaming", "reading"],
+      "activityEngagement": {
+        "completedThisWeek": 3,
+        "favoriteCategory": "education"
+      }
+    },
+    "messages": [ /* last 20 messages */ ],
+    "moodAtStart": {
+      "emoji": "😊",
+      "moodScore": 8,
+      "trustZone": "green"
+    },
+    "stats": {
+      "totalMessages": 15,
+      "userMessages": 8,
+      "aiMessages": 7
+    }
+  }
+}
+
+Frontend Implementation:
+```typescript
+const getOrCreateAIConversation = async () => {
+  try {
+    const token = await AsyncStorage.getItem('kivelo_access_token');
+    if (!token) throw new Error('Not authenticated');
+
+    const response = await fetch(`${API_BASE_URL}/conversations/ai`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const data = await response.json();
+    
+    if (data.success) {
+      return {
+        conversationId: data.data.conversationId,
+        messages: data.data.messages,
+        context: data.data.context,
+        moodAtStart: data.data.moodAtStart
+      };
+    }
+    throw new Error(data.message);
+  } catch (error) {
+    console.error('Error getting AI conversation:', error);
+    throw error;
+  }
+};
+```
+
+--------------------------------------------------------------------------------
+2. SEND MESSAGE (to AI)
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/conversations/message
+Protected: Yes
+Headers: Authorization: Bearer <child_token>
+
+Request Body:
+{
+  "conversationId": "conv_id",
+  "content": "I'm feeling a bit stressed about school today",
+  "type": "text"
+}
+
+Success Response (200):
+{
+  "success": true,
+  "data": {
+    "message": {
+      "_id": "msg_id",
+      "sender": "child_user_id",
+      "role": "child",
+      "content": "I'm feeling a bit stressed about school today",
+      "type": "text",
+      "metadata": {
+        "moodScore": 8,
+        "trustZone": "green"
+      },
+      "flagged": false,
+      "createdAt": "2024-01-01T10:05:00.000Z"
+    },
+    "safetyCheck": null  // or { flagged: true, category: "..." }
+  }
+}
+
+Frontend Implementation:
+```typescript
+const sendMessage = async (conversationId: string, content: string, type: string = 'text') => {
+  try {
+    const token = await AsyncStorage.getItem('kivelo_access_token');
+    if (!token) throw new Error('Not authenticated');
+
+    const response = await fetch(`${API_BASE_URL}/conversations/message`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ conversationId, content, type })
+    });
+
+    const data = await response.json();
+    
+    if (data.success) {
+      return {
+        message: data.data.message,
+        safetyCheck: data.data.safetyCheck
+      };
+    }
+    throw new Error(data.message);
+  } catch (error) {
+    console.error('Error sending message:', error);
+    throw error;
+  }
+};
+```
+
+--------------------------------------------------------------------------------
+3. ADD AI RESPONSE
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/conversations/ai/response
+Protected: Yes
+Headers: Authorization: Bearer <child_token>
+
+Description: After receiving AI response from external AI service, save it here.
+
+Request Body:
+{
+  "conversationId": "conv_id",
+  "content": "I understand you're feeling stressed. Would you like to try a breathing exercise?",
+  "type": "suggestion",
+  "metadata": {
+    "confidence": 0.95,
+    "suggestionType": "breathing_exercise",
+    "suggestionContent": "4-7-8 breathing technique"
+  }
+}
+
+Success Response (200):
+{
+  "success": true,
+  "data": {
+    "message": {
+      "_id": "msg_id",
+      "role": "assistant",
+      "content": "I understand you're feeling stressed...",
+      "type": "suggestion",
+      "metadata": {
+        "aiConfidence": 0.95,
+        "suggestedActivity": null
+      },
+      "createdAt": "2024-01-01T10:05:30.000Z"
+    }
+  }
+}
+
+--------------------------------------------------------------------------------
+4. END AI CONVERSATION
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/conversations/ai/:conversationId/end
+Protected: Yes (Child role required)
+Headers: Authorization: Bearer <child_token>
+
+Description: Ends the current AI conversation. Next call to GET /ai creates new one.
+
+Success Response (200):
+{
+  "success": true,
+  "message": "Conversation ended",
+  "data": {
+    "sessionDuration": 300,           // seconds
+    "totalMessages": 15
+  }
+}
+
+Frontend Implementation:
+```typescript
+const endAIConversation = async (conversationId: string) => {
+  try {
+    const token = await AsyncStorage.getItem('kivelo_access_token');
+    
+    const response = await fetch(`${API_BASE_URL}/conversations/ai/${conversationId}/end`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const data = await response.json();
+    return { success: data.success, sessionStats: data.data };
+  } catch (error) {
+    console.error('Error ending conversation:', error);
+    throw error;
+  }
+};
+```
+
+================================================================================
+                        👨‍👩‍👧 FAMILY CHAT ENDPOINTS
+================================================================================
+
+1. GET FAMILY CONVERSATIONS
+--------------------------------------------------------------------------------
+Endpoint: GET /api/v1/conversations/family
+Protected: Yes (Parent or Child)
+Headers: Authorization: Bearer <token>
+
+Description: Gets all family chat conversations for the current user.
+
+Success Response (200):
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "conv_id",
+      "type": "parent_child",
+      "participants": [
+        {
+          "user": {
+            "_id": "parent_id",
+            "name": "Mom",
+            "avatar": { "url": "https://..." },
+            "role": "parent"
+          },
+          "role": "parent",
+          "joinedAt": "2024-01-01T00:00:00.000Z"
+        },
+        {
+          "user": {
+            "_id": "child_id",
+            "name": "Alice",
+            "avatar": { "url": "https://..." },
+            "role": "child"
+          },
+          "role": "child",
+          "joinedAt": "2024-01-01T00:00:00.000Z"
+        }
+      ],
+      "lastMessage": {
+        "content": "Don't forget to do your homework...",
+        "createdAt": "2024-01-01T15:00:00.000Z",
+        "senderRole": "parent"
+      },
+      "unreadCount": 2,
+      "updatedAt": "2024-01-01T15:00:00.000Z"
+    }
+  ]
+}
+
+Frontend Implementation:
+```typescript
+const getFamilyConversations = async () => {
+  try {
+    const token = await AsyncStorage.getItem('kivelo_access_token');
+    if (!token) throw new Error('Not authenticated');
+
+    const response = await fetch(`${API_BASE_URL}/conversations/family`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const data = await response.json();
+    
+    if (data.success) {
+      return data.data;  // Array of conversations
+    }
+    throw new Error(data.message);
+  } catch (error) {
+    console.error('Error getting family conversations:', error);
+    throw error;
+  }
+};
+```
+
+--------------------------------------------------------------------------------
+2. CREATE FAMILY CONVERSATION
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/conversations/family
+Protected: Yes
+Headers: Authorization: Bearer <token>
+
+Request Body:
+{
+  "participantIds": ["user_id_1", "user_id_2"],
+  "type": "parent_child"  // or "family_chat", "sibling"
+}
+
+Success Response (201 - New) or (200 - Existing):
+{
+  "success": true,
+  "data": {
+    "_id": "conv_id",
+    "type": "parent_child",
+    "participants": [
+      {
+        "user": {
+          "_id": "parent_id",
+          "name": "Mom",
+          "email": "mom@example.com",
+          "avatar": { "url": "https://..." },
+          "role": "parent"
+        },
+        "role": "parent",
+        "joinedAt": "2024-01-01T12:00:00.000Z"
+      },
+      {
+        "user": {
+          "_id": "child_id",
+          "name": "Alice",
+          "email": "alice@example.com",
+          "avatar": { "url": "https://..." },
+          "role": "child"
+        },
+        "role": "child",
+        "joinedAt": "2024-01-01T12:00:00.000Z"
+      }
+    ],
+    "messages": [],
+    "familyId": "family_id"
+  },
+  "message": "Conversation created"  // or "Conversation already exists"
+}
+
+Frontend Implementation:
+```typescript
+const createOrGetConversation = async (participantIds: string[], type: string = 'family_chat') => {
+  try {
+    const token = await AsyncStorage.getItem('kivelo_access_token');
+    
+    const response = await fetch(`${API_BASE_URL}/conversations/family`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ participantIds, type })
+    });
+
+    const data = await response.json();
+    
+    if (data.success) {
+      return data.data;
+    }
+    throw new Error(data.message);
+  } catch (error) {
+    console.error('Error creating conversation:', error);
+    throw error;
+  }
+};
+```
+
+--------------------------------------------------------------------------------
+3. GET CONVERSATION HISTORY
+--------------------------------------------------------------------------------
+Endpoint: GET /api/v1/conversations/:conversationId
+Protected: Yes
+Headers: Authorization: Bearer <token>
+
+Query Parameters:
+- limit: number (default: 50) - Number of messages to return
+- before: ISO date string - Get messages before this timestamp (for pagination)
+
+Success Response (200):
+{
+  "success": true,
+  "data": {
+    "conversationId": "conv_id",
+    "type": "parent_child",
+    "messages": [
+      {
+        "_id": "msg_id",
+        "sender": {
+          "_id": "user_id",
+          "name": "Mom",
+          "avatar": { "url": "https://..." }
+        },
+        "role": "parent",
+        "content": "How was school today?",
+        "type": "text",
+        "createdAt": "2024-01-01T15:00:00.000Z"
+      }
+    ],
+    "hasMore": true,
+    "stats": {
+      "totalMessages": 150,
+      "userMessages": 75,
+      "aiMessages": 0
+    }
+  }
+}
+
+Frontend Implementation:
+```typescript
+const getConversationHistory = async (
+  conversationId: string, 
+  limit: number = 50, 
+  before?: string
+) => {
+  try {
+    const token = await AsyncStorage.getItem('kivelo_access_token');
+    
+    let url = `${API_BASE_URL}/conversations/${conversationId}?limit=${limit}`;
+    if (before) {
+      url += `&before=${encodeURIComponent(before)}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const data = await response.json();
+    
+    if (data.success) {
+      return {
+        messages: data.data.messages,
+        hasMore: data.data.hasMore,
+        stats: data.data.stats
+      };
+    }
+    throw new Error(data.message);
+  } catch (error) {
+    console.error('Error getting conversation history:', error);
+    throw error;
+  }
+};
+```
+
+--------------------------------------------------------------------------------
+4. SEND MESSAGE (Family Chat)
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/conversations/message
+Protected: Yes
+Headers: Authorization: Bearer <token>
+
+(Same as AI chat - use the same endpoint)
+
+Request Body:
+{
+  "conversationId": "conv_id",
+  "content": "Hi! How's your day going?",
+  "type": "text"
+}
+
+Success Response (200):
+{
+  "success": true,
+  "data": {
+    "message": {
+      "_id": "msg_id",
+      "sender": "user_id",
+      "role": "parent",
+      "content": "Hi! How's your day going?",
+      "type": "text",
+      "flagged": false,
+      "createdAt": "2024-01-01T15:00:00.000Z"
+    },
+    "safetyCheck": null
+  }
+}
+
+NOTE: Family chat messages automatically trigger notifications to other participants!
+
+--------------------------------------------------------------------------------
+5. MARK MESSAGES AS READ
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/conversations/:conversationId/read
+Protected: Yes
+Headers: Authorization: Bearer <token>
+
+Description: Marks all messages in the conversation as read by current user.
+
+Success Response (200):
+{
+  "success": true,
+  "message": "Messages marked as read"
+}
+
+Frontend Implementation:
+```typescript
+const markAsRead = async (conversationId: string) => {
+  try {
+    const token = await AsyncStorage.getItem('kivelo_access_token');
+    
+    const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/read`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const data = await response.json();
+    return { success: data.success };
+  } catch (error) {
+    console.error('Error marking as read:', error);
+    throw error;
+  }
+};
+```
+
+================================================================================
+                        ✏️ MESSAGE MANAGEMENT
+================================================================================
+
+1. EDIT MESSAGE
+--------------------------------------------------------------------------------
+Endpoint: PUT /api/v1/conversations/:conversationId/messages/:messageId
+Protected: Yes
+Headers: Authorization: Bearer <token>
+
+Restrictions:
+- Only the message sender can edit
+- Cannot edit AI assistant messages
+
+Request Body:
+{
+  "content": "Updated message content"
+}
+
+Success Response (200):
+{
+  "success": true,
+  "message": "Message updated",
+  "data": {
+    "_id": "msg_id",
+    "content": "Updated message content",
+    "edited": true,
+    "editedAt": "2024-01-01T15:30:00.000Z"
+  }
+}
+
+Error Responses:
+- 403: "You can only edit your own messages"
+- 403: "Cannot edit AI messages"
+- 404: "Message not found"
+
+--------------------------------------------------------------------------------
+2. DELETE MESSAGE
+--------------------------------------------------------------------------------
+Endpoint: DELETE /api/v1/conversations/:conversationId/messages/:messageId
+Protected: Yes
+Headers: Authorization: Bearer <token>
+
+Restrictions:
+- Message sender can delete their own messages
+- Parents can delete any message (moderation power)
+- Cannot delete AI assistant messages
+
+Success Response (200):
+{
+  "success": true,
+  "message": "Message deleted"
+}
+
+Error Responses:
+- 403: "You can only delete your own messages"
+- 403: "Cannot delete AI messages"
+- 404: "Message not found"
+
+================================================================================
+                        🛡️ PARENT OVERSIGHT ENDPOINTS
+================================================================================
+
+1. GET FLAGGED CONVERSATIONS
+--------------------------------------------------------------------------------
+Endpoint: GET /api/v1/conversations/parent/flagged
+Protected: Yes (Parent role required)
+Headers: Authorization: Bearer <parent_token>
+
+Description: Gets conversations with flagged content that need parent review.
+
+Success Response (200):
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "conv_id",
+      "childName": "Alice",
+      "childAvatar": { "url": "https://..." },
+      "flagCount": 2,
+      "lastFlaggedAt": "2024-01-01T14:00:00.000Z",
+      "flaggedMessages": [
+        {
+          "content": "flagged message content...",
+          "flagReason": "potential_concern",
+          "createdAt": "2024-01-01T14:00:00.000Z"
+        }
+      ],
+      "requiresReview": true
+    }
+  ],
+  "totalFlagged": 1
+}
+
+Frontend Implementation:
+```typescript
+const getFlaggedConversations = async () => {
+  try {
+    const token = await AsyncStorage.getItem('kivelo_access_token');
+    
+    const response = await fetch(`${API_BASE_URL}/conversations/parent/flagged`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const data = await response.json();
+    
+    if (data.success) {
+      return {
+        flaggedConversations: data.data,
+        total: data.totalFlagged
+      };
+    }
+    throw new Error(data.message);
+  } catch (error) {
+    console.error('Error getting flagged conversations:', error);
+    throw error;
+  }
+};
+```
+
+--------------------------------------------------------------------------------
+2. REVIEW FLAGGED CONVERSATION
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/conversations/parent/review/:conversationId
+Protected: Yes (Parent role required)
+Headers: Authorization: Bearer <parent_token>
+
+Request Body:
+{
+  "notes": "Talked to child about this. Everything is okay.",
+  "acknowledged": true    // Set to true to clear the review flag
+}
+
+Success Response (200):
+{
+  "success": true,
+  "message": "Conversation reviewed",
+  "data": {
+    "reviewedAt": "2024-01-01T15:00:00.000Z"
+  }
+}
+
+--------------------------------------------------------------------------------
+3. GET CHILD AI INSIGHTS
+--------------------------------------------------------------------------------
+Endpoint: GET /api/v1/conversations/parent/child/:childId/insights
+Protected: Yes (Parent role required)
+Headers: Authorization: Bearer <parent_token>
+
+Description: Analytics about child's AI conversations.
+
+Success Response (200):
+{
+  "success": true,
+  "data": {
+    "totalConversations": 25,
+    "totalMessages": 150,
+    "avgSessionDuration": 300,         // seconds (5 minutes)
+    "commonMoodAtStart": "😊",
+    "suggestionBreakdown": {
+      "breathing_exercise": 5,
+      "activity": 8,
+      "coping_strategy": 3,
+      "talk_to_parent": 2
+    },
+    "flaggedCount": 1,
+    "recentTopics": ["school", "friends", "homework"]
+  }
+}
+
+Frontend Implementation:
+```typescript
+const getChildAIInsights = async (childId: string) => {
+  try {
+    const token = await AsyncStorage.getItem('kivelo_access_token');
+    
+    const response = await fetch(`${API_BASE_URL}/conversations/parent/child/${childId}/insights`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const data = await response.json();
+    
+    if (data.success) {
+      return data.data;
+    }
+    throw new Error(data.message);
+  } catch (error) {
+    console.error('Error getting child insights:', error);
+    throw error;
+  }
+};
+```
+
+================================================================================
+                        📦 MESSAGE ARCHIVING (Hybrid Storage)
+================================================================================
+
+Endpoint: POST /api/v1/conversations/:conversationId/archive
+Protected: Yes
+Headers: Authorization: Bearer <token>
+
+Description: Archives old messages from server and returns them for local storage.
+Keeps recent messages in database for quick access.
+
+Request Body:
+{
+  "keepCount": 50    // Number of recent messages to keep in DB
+}
+
+Success Response (200):
+{
+  "success": true,
+  "data": {
+    "archivedCount": 100,
+    "archivedMessages": [ /* array of archived messages to store locally */ ],
+    "remainingInDB": 50
+  }
+}
+
+Frontend Pattern (Hybrid Storage):
+```typescript
+const archiveMessages = async (conversationId: string, keepCount: number = 50) => {
+  try {
+    const token = await AsyncStorage.getItem('kivelo_access_token');
+    
+    const response = await fetch(`${API_BASE_URL}/conversations/${conversationId}/archive`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ keepCount })
+    });
+
+    const data = await response.json();
+    
+    if (data.success && data.data.archivedMessages.length > 0) {
+      // Store archived messages locally
+      const localKey = `archived_messages_${conversationId}`;
+      const existingArchive = await AsyncStorage.getItem(localKey);
+      const existing = existingArchive ? JSON.parse(existingArchive) : [];
+      
+      // Append new archived messages
+      const updated = [...existing, ...data.data.archivedMessages];
+      await AsyncStorage.setItem(localKey, JSON.stringify(updated));
+      
+      return {
+        archivedCount: data.data.archivedCount,
+        totalLocal: updated.length
+      };
+    }
+    return { archivedCount: 0, totalLocal: 0 };
+  } catch (error) {
+    console.error('Error archiving messages:', error);
+    throw error;
+  }
+};
+```
+
+================================================================================
+                        🔄 SUGGESTED UI FLOW
+================================================================================
+
+AI CHAT FLOW (Child):
+--------------------------------------------------------------------------------
+1. Child opens AI Helper screen
+2. Call GET /conversations/ai to get/create conversation
+3. Display mood context in UI (show child's current mood)
+4. Show existing messages (from response)
+5. Child sends message → POST /conversations/message
+6. Get AI response from your AI service
+7. Save AI response → POST /conversations/ai/response
+8. Display AI message in chat
+9. (Optional) Child ends conversation → POST /conversations/ai/{id}/end
+
+FAMILY CHAT FLOW:
+--------------------------------------------------------------------------------
+1. User opens Chat screen
+2. Call GET /conversations/family to list conversations
+3. Display conversation list with unread counts
+4. User taps conversation → GET /conversations/{id} for history
+5. Call POST /conversations/{id}/read to mark read
+6. User sends message → POST /conversations/message
+7. Display message (optimistic UI)
+8. (If new chat) → POST /conversations/family with participantIds
+
+PARENT OVERSIGHT FLOW:
+--------------------------------------------------------------------------------
+1. Parent sees notification badge for flagged content
+2. Parent opens oversight screen
+3. Call GET /conversations/parent/flagged
+4. Display flagged conversations with excerpts
+5. Parent reviews conversation
+6. Call POST /conversations/parent/review/{id} with notes
+7. (Optional) View insights → GET /conversations/parent/child/{childId}/insights
+
+================================================================================
+                        ⚠️ SAFETY MONITORING
+================================================================================
+
+All messages are automatically checked for safety concerns.
+The system checks for:
+- Concerning language or topics
+- Potential signs of distress
+- Inappropriate content
+
+When a message is flagged:
+1. Message is saved with flagged: true
+2. Conversation's safetyFlags are updated
+3. High severity triggers IMMEDIATE parent notification
+4. Conversation marked as requiresReview: true
+
+Safety Check Response in Send Message:
+```typescript
+{
+  "safetyCheck": {
+    "flagged": true,
+    "category": "potential_concern"  // or other category
+  }
+}
+```
+
+Frontend Handling:
+```typescript
+const result = await sendMessage(conversationId, content);
+
+if (result.safetyCheck?.flagged) {
+  // Message was flagged but sent
+  // Optionally show gentle reminder to child
+  console.log('Message flagged:', result.safetyCheck.category);
+}
+```
+
+================================================================================
+                        📋 CONTEXT PROVIDER EXAMPLE
+================================================================================
+
+```typescript
+// context/ConversationContext.tsx
+import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const API_BASE_URL = 'https://family-wellness.onrender.com/api/v1';
+const ACCESS_TOKEN_KEY = 'kivelo_access_token';
+
+interface ConversationContextType {
+  // AI Chat
+  aiConversation: Conversation | null;
+  getAIConversation: () => Promise<void>;
+  sendAIMessage: (content: string) => Promise<Message>;
+  addAIResponse: (content: string, metadata?: any) => Promise<Message>;
+  endAIConversation: () => Promise<void>;
+  
+  // Family Chat
+  familyConversations: ConversationListItem[];
+  getFamilyConversations: () => Promise<void>;
+  createConversation: (participantIds: string[], type?: string) => Promise<Conversation>;
+  getConversationHistory: (conversationId: string, limit?: number) => Promise<Message[]>;
+  sendMessage: (conversationId: string, content: string) => Promise<Message>;
+  markAsRead: (conversationId: string) => Promise<void>;
+  
+  // Message management
+  editMessage: (conversationId: string, messageId: string, content: string) => Promise<void>;
+  deleteMessage: (conversationId: string, messageId: string) => Promise<void>;
+  
+  // Parent oversight
+  flaggedConversations: FlaggedConversation[];
+  getFlaggedConversations: () => Promise<void>;
+  reviewConversation: (conversationId: string, notes: string, acknowledged: boolean) => Promise<void>;
+  getChildInsights: (childId: string) => Promise<ChildInsights>;
+  
+  loading: boolean;
+  error: string | null;
+}
+
+export const ConversationProvider = ({ children }: { children: ReactNode }) => {
+  const [aiConversation, setAIConversation] = useState(null);
+  const [familyConversations, setFamilyConversations] = useState([]);
+  const [flaggedConversations, setFlaggedConversations] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Helper for authenticated requests
+  const authFetch = async (endpoint: string, options: RequestInit = {}) => {
+    const token = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+    if (!token) throw new Error('Not authenticated');
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Request failed');
+    return data;
+  };
+
+  const getAIConversation = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await authFetch('/conversations/ai');
+      setAIConversation(data.data);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const sendMessage = useCallback(async (conversationId: string, content: string) => {
+    const data = await authFetch('/conversations/message', {
+      method: 'POST',
+      body: JSON.stringify({ conversationId, content, type: 'text' }),
+    });
+    return data.data.message;
+  }, []);
+
+  // ... implement other methods similarly
+
+  return (
+    <ConversationContext.Provider value={{
+      aiConversation,
+      getAIConversation,
+      // ... other values
+      loading,
+      error,
+    }}>
+      {children}
+    </ConversationContext.Provider>
+  );
+};
+```
+
+================================================================================
+                        🧪 TESTING CHECKLIST
+================================================================================
+
+AI Chat Tests:
+[ ] Child can get/create AI conversation
+[ ] Child can send message to AI
+[ ] AI responses are saved correctly
+[ ] Mood context is loaded properly
+[ ] Child can end AI conversation
+[ ] New conversation is created after ending
+
+Family Chat Tests:
+[ ] User can list family conversations
+[ ] Conversation is created with correct participants
+[ ] Messages are sent and received
+[ ] Unread count is accurate
+[ ] Mark as read updates correctly
+[ ] Chat notifications are received
+
+Message Management Tests:
+[ ] User can edit own message
+[ ] User cannot edit others' messages
+[ ] User cannot edit AI messages
+[ ] Parent can delete any message
+[ ] Child can only delete own messages
+
+Safety & Oversight Tests:
+[ ] Messages are checked for safety
+[ ] Flagged messages appear in parent oversight
+[ ] Parent can review flagged conversations
+[ ] Parent receives notifications for high severity
+
+================================================================================
+Document Version: 1.0
+Last Updated: December 2024
+================================================================================

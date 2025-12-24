@@ -1,0 +1,1481 @@
+================================================================================
+KIVELO APP - FRONTEND MOBILE INTEGRATION GUIDE
+================================================================================
+
+This document provides step-by-step guidance for frontend mobile developers
+to integrate with the Kivelo Family Wellness backend API. It includes:
+- API configuration & authentication
+- Code examples with TypeScript types
+- All available endpoints organized by feature
+- Error handling patterns
+
+================================================================================
+                        📋 QUICK START CHECKLIST
+================================================================================
+
+1. Set up API URL configuration (fallback pattern)
+2. Implement token storage with AsyncStorage
+3. Create authenticated API helper function
+4. Implement auth flows (login, register, logout)
+5. Build feature contexts as needed
+
+================================================================================
+                        🔗 API CONFIGURATION
+================================================================================
+
+Base URLs (with automatic fallback):
+- Development: http://localhost:5000/api/v1
+- Production:  https://family-wellness.onrender.com/api/v1
+
+Content-Type: application/json
+Authentication: Bearer Token (JWT)
+
+RECOMMENDED PATTERN - API URLs with Fallback:
+--------------------------------------------------------------------------------
+
+```typescript
+// In development, try local first then remote
+// In production, only use remote
+
+const isProduction = Platform.OS === 'web' && 
+  typeof window !== 'undefined' && 
+  !window.location.hostname.includes('localhost');
+
+const API_URLS = isProduction
+  ? ["https://family-wellness.onrender.com/api/v1"]
+  : [
+      "http://localhost:5000/api/v1",
+      "https://family-wellness.onrender.com/api/v1",
+    ];
+```
+
+================================================================================
+                        🔐 STORAGE KEYS
+================================================================================
+
+AsyncStorage Keys (consistent across all contexts):
+
+USER_STORAGE_KEY    = "kivelo_user"           // User object (JSON string)
+ACCESS_TOKEN_KEY    = "kivelo_access_token"   // JWT access token
+REFRESH_TOKEN_KEY   = "kivelo_refresh_token"  // Refresh token (if available)
+
+================================================================================
+                        📡 API HELPER FUNCTION
+================================================================================
+
+Use this pattern in all contexts for API calls with automatic fallback:
+
+```typescript
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const ACCESS_TOKEN_KEY = "kivelo_access_token";
+
+const apiCallWithFallback = async (
+  endpoint: string, 
+  options: RequestInit = {}
+): Promise<{ response: Response; data: any }> => {
+  let lastError = null;
+  
+  for (const baseUrl of API_URLS) {
+    try {
+      console.log(`🔄 Trying: ${baseUrl}${endpoint}`);
+      
+      const response = await fetch(`${baseUrl}${endpoint}`, options);
+      
+      if (!response.ok) {
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch {
+          errorMessage = response.statusText || errorMessage;
+        }
+        
+        // For 404 or 5xx errors, try next URL
+        if (response.status === 404 || response.status >= 500) {
+          lastError = { success: false, message: errorMessage };
+          console.warn(`⚠️ Route not found or server error at ${baseUrl}:`, errorMessage);
+          continue;
+        }
+        
+        // For 4xx errors (auth/validation), throw immediately
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      console.log(`✅ Success with: ${baseUrl}`);
+      return { response, data };
+      
+    } catch (error: any) {
+      // If it's our thrown error (client error), re-throw it immediately
+      if (!error.message?.includes('Network') && !error.message?.includes('fetch')) {
+        throw error;
+      }
+      
+      lastError = {
+        success: false,
+        message: `Network error: ${error.message}`
+      };
+      console.warn(`🌐 Network error with ${baseUrl}:`, error.message);
+    }
+  }
+
+  throw new Error(lastError?.message || "Unable to connect to server");
+};
+```
+
+--------------------------------------------------------------------------------
+AUTHENTICATED REQUEST HELPER (for protected endpoints):
+--------------------------------------------------------------------------------
+
+```typescript
+const makeAuthenticatedRequest = async (
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<{ response: Response; data: any }> => {
+  const token = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+  
+  if (!token) {
+    throw new Error("Not authenticated. Please log in again.");
+  }
+
+  return apiCallWithFallback(endpoint, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+      ...options.headers,
+    },
+  });
+};
+```
+
+================================================================================
+                        👤 USER TYPES
+================================================================================
+
+```typescript
+type Role = "parent" | "child" | null;
+
+interface ChildDetails {
+  dob?: string;
+  gender?: string;
+  interests?: string[];
+  gradeLevel?: string;
+}
+
+interface User {
+  id: string;
+  _id?: string;
+  role: Role;
+  email: string;
+  name: string;
+  phone?: string;
+  dob?: string;
+  children?: string[];
+  hasSetPassword?: boolean;
+  childDetails?: ChildDetails;
+  avatar?: {
+    url?: string;
+    publicId?: string;
+  };
+  parent?: {
+    familyCode: string;
+    subscription: string;
+  };
+}
+
+interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn?: number;
+}
+```
+
+================================================================================
+                    🔐 AUTHENTICATION ENDPOINTS
+================================================================================
+
+1. PARENT REGISTRATION
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/auth/register-parent
+Protected: No
+
+Request Body:
+{
+  "email": "parent@example.com",
+  "password": "password123",
+  "name": "John Parent",
+  "phone": "+1234567890",
+  "dob": "1980-01-01",
+  "termsAccepted": true
+}
+
+Success Response (201):
+{
+  "success": true,
+  "token": "jwt_token_here",
+  "accessToken": "jwt_access_token",
+  "user": {
+    "id": "user_id",
+    "email": "parent@example.com",
+    "name": "John Parent",
+    "role": "parent"
+  },
+  "parent": {
+    "familyCode": "A1B2C3D4E5F6",
+    "subscription": "free"
+  },
+  "message": "Registration successful!"
+}
+
+Frontend Implementation:
+```typescript
+const registerParent = async (
+  email: string,
+  password: string,
+  name: string,
+  phone: string,
+  dob: string,
+  termsAccepted: boolean
+) => {
+  try {
+    const { data } = await apiCallWithFallback("/auth/register-parent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password,
+        phone: phone.trim(),
+        dob,
+        termsAccepted,
+      }),
+    });
+
+    if (data.success) {
+      const userData = data.data?.user || data.user;
+      const tokens = {
+        accessToken: data.accessToken || data.token,
+        refreshToken: data.refreshToken || "",
+      };
+      
+      // Store auth data
+      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData));
+      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
+      
+      return { success: true, message: "Registration successful!" };
+    }
+    return { success: false, message: data.message };
+  } catch (error: any) {
+    return { success: false, message: error.message || "Registration failed" };
+  }
+};
+```
+
+--------------------------------------------------------------------------------
+2. PARENT LOGIN
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/auth/parent-login
+Protected: No
+
+Request Body:
+{
+  "email": "parent@example.com",
+  "password": "password123"
+}
+
+Success Response (200):
+{
+  "success": true,
+  "message": "Login successful",
+  "token": "jwt_token_here",
+  "accessToken": "jwt_access_token",
+  "data": {
+    "user": {
+      "id": "user_id",
+      "name": "John Parent",
+      "email": "parent@example.com",
+      "role": "parent"
+    },
+    "familyCode": "A1B2C3D4E5F6",
+    "subscription": "free"
+  }
+}
+
+Frontend Implementation:
+```typescript
+const loginParent = async (email: string, password: string) => {
+  try {
+    const { data } = await apiCallWithFallback("/auth/parent-login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        email: email.trim().toLowerCase(), 
+        password 
+      }),
+    });
+
+    if (data.success) {
+      const userData = data.data?.user || data.user;
+      
+      // Build user object with parent-specific data
+      const finalUser = {
+        id: userData._id || userData.id,
+        role: "parent",
+        email: userData.email,
+        name: userData.name,
+        parent: {
+          familyCode: data.data?.familyCode || "",
+          subscription: data.data?.subscription || "free",
+        },
+      };
+
+      const tokens = {
+        accessToken: data.accessToken || data.token,
+        refreshToken: data.refreshToken || "",
+      };
+
+      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(finalUser));
+      await AsyncStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
+
+      return { success: true, message: "Login successful!" };
+    }
+    return { success: false, message: data.message };
+  } catch (error: any) {
+    return { success: false, message: error.message };
+  }
+};
+```
+
+--------------------------------------------------------------------------------
+3. CHILD LOGIN (with password)
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/auth/child-login-password
+Protected: No
+
+Request Body:
+{
+  "email": "child@example.com",
+  "password": "childpassword123"
+}
+
+Success Response (200):
+{
+  "success": true,
+  "message": "Login successful",
+  "token": "jwt_token_here",
+  "accessToken": "jwt_access_token",
+  "data": {
+    "user": {
+      "id": "child_user_id",
+      "name": "Alice Child",
+      "email": "child@example.com",
+      "role": "child"
+    },
+    "hasSetPassword": true,
+    "parentId": "parent_user_id"
+  }
+}
+
+--------------------------------------------------------------------------------
+4. CHILD LOGIN (with one-time code - first time)
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/auth/child-login
+Protected: No
+Description: Used when parent generates a one-time code for child registration
+
+Request Body:
+{
+  "email": "child@example.com",
+  "code": "A1B2C3D4"
+}
+
+Success Response (200):
+{
+  "success": true,
+  "token": "jwt_token_here",
+  "user": {
+    "id": "child_user_id",
+    "email": "child@example.com",
+    "name": "Alice Child",
+    "role": "child",
+    "hasSetPassword": false
+  },
+  "message": "Login successful. Please set your password."
+}
+
+IMPORTANT: If hasSetPassword is false, redirect child to password setup screen!
+
+--------------------------------------------------------------------------------
+5. SET CHILD PASSWORD (after one-time code login)
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/auth/set-child-password
+Protected: Yes (Child role required)
+Headers: Authorization: Bearer <child_token>
+
+Request Body:
+{
+  "password": "newpassword123"
+}
+
+Success Response (200):
+{
+  "success": true,
+  "token": "new_jwt_token_here",
+  "message": "Password set successfully."
+}
+
+Frontend Implementation:
+```typescript
+const setChildPassword = async (password: string) => {
+  try {
+    const token = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+    
+    const { data } = await apiCallWithFallback("/auth/set-child-password", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({ password }),
+    });
+
+    if (data.success) {
+      // Update stored token if new one provided
+      if (data.token) {
+        await AsyncStorage.setItem(ACCESS_TOKEN_KEY, data.token);
+      }
+      
+      // Update user to mark hasSetPassword = true
+      const storedUser = await AsyncStorage.getItem(USER_STORAGE_KEY);
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        user.hasSetPassword = true;
+        await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+      }
+
+      return { success: true, message: "Password set successfully!" };
+    }
+    return { success: false, message: data.message };
+  } catch (error: any) {
+    return { success: false, message: error.message };
+  }
+};
+```
+
+--------------------------------------------------------------------------------
+6. GENERATE ONE-TIME CODE (Parent only)
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/auth/generate-code
+Protected: Yes (Parent role required)
+Headers: Authorization: Bearer <parent_token>
+
+Request Body:
+{
+  "childName": "Alice Child",
+  "childEmail": "alice@example.com",
+  "childDOB": "2015-06-15",
+  "childGender": "female"
+}
+
+Success Response (201):
+{
+  "success": true,
+  "code": "A1B2C3D4",
+  "expiresAt": "2024-01-01T13:00:00.000Z",
+  "childId": "child_user_id",
+  "message": "One-time code generated for Alice Child"
+}
+
+NOTE: One-time codes expire in 1 hour and are single-use only!
+
+--------------------------------------------------------------------------------
+7. VERIFY TOKEN
+--------------------------------------------------------------------------------
+Endpoint: GET /api/v1/auth/verify
+Protected: Yes
+Headers: Authorization: Bearer <token>
+
+Success Response (200):
+{
+  "success": true,
+  "user": {
+    "id": "user_id",
+    "email": "user@example.com",
+    "name": "User Name",
+    "role": "parent|child"
+  },
+  "message": "Token is valid"
+}
+
+--------------------------------------------------------------------------------
+8. LOGOUT
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/auth/logout
+Protected: Yes
+Headers: Authorization: Bearer <token>
+
+Success Response (200):
+{
+  "success": true,
+  "message": "Logged out successfully."
+}
+
+Frontend Implementation:
+```typescript
+const logout = async () => {
+  try {
+    // Clear all stored auth data
+    await Promise.all([
+      AsyncStorage.removeItem(USER_STORAGE_KEY),
+      AsyncStorage.removeItem(ACCESS_TOKEN_KEY),
+      AsyncStorage.removeItem(REFRESH_TOKEN_KEY),
+    ]);
+    
+    // Navigate to login screen
+    router.replace('/(auth)/login');
+  } catch (error) {
+    console.error("Logout error:", error);
+  }
+};
+```
+
+================================================================================
+                    👤 USER MANAGEMENT ENDPOINTS
+================================================================================
+
+1. GET USER PROFILE
+--------------------------------------------------------------------------------
+Endpoint: GET /api/v1/users/profile
+Protected: Yes
+Headers: Authorization: Bearer <token>
+
+Success Response (200):
+{
+  "success": true,
+  "user": {
+    "id": "user_id",
+    "email": "user@example.com",
+    "name": "User Name",
+    "role": "parent|child",
+    "phone": "+1234567890",
+    "dob": "1980-01-01",
+    "avatar": {
+      "url": "https://cloudinary.com/...",
+      "publicId": "avatar_id"
+    },
+    "isActive": true,
+    "lastLogin": "2024-01-01T12:00:00.000Z"
+  }
+}
+
+Frontend Implementation (refreshProfile):
+```typescript
+const refreshProfile = async () => {
+  try {
+    const accessToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+    if (!accessToken) return { success: false, message: 'No access token' };
+
+    const { data } = await apiCallWithFallback('/users/profile', {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (data.success) {
+      const userData = data.data?.user || data.user;
+      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData));
+      return { success: true };
+    }
+    return { success: false, message: data.message };
+  } catch (error: any) {
+    return { success: false, message: error.message };
+  }
+};
+```
+
+--------------------------------------------------------------------------------
+2. UPDATE PROFILE
+--------------------------------------------------------------------------------
+Endpoint: PUT /api/v1/users/profile
+Protected: Yes
+Headers: Authorization: Bearer <token>
+
+Request Body:
+{
+  "name": "Updated Name",
+  "phone": "+0987654321",
+  "dob": "1980-01-01"
+}
+
+Success Response (200):
+{
+  "success": true,
+  "message": "Profile updated successfully",
+  "user": { /* updated user object */ }
+}
+
+--------------------------------------------------------------------------------
+3. UPDATE PASSWORD
+--------------------------------------------------------------------------------
+Endpoint: PUT /api/v1/users/update-password
+Protected: Yes
+Headers: Authorization: Bearer <token>
+
+Request Body:
+{
+  "currentPassword": "oldpassword123",
+  "newPassword": "newpassword123"
+}
+
+Success Response (200):
+{
+  "success": true,
+  "message": "Password updated successfully"
+}
+
+Error Responses:
+- 400: "Current password and new password are required"
+- 400: "Current password is incorrect"
+- 400: "New password must be different from current password"
+
+Frontend Implementation:
+```typescript
+const changePassword = async (currentPassword: string, newPassword: string) => {
+  try {
+    const token = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+    
+    const { data } = await apiCallWithFallback("/users/update-password", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+
+    return { success: data.success, message: data.message };
+  } catch (error: any) {
+    return { success: false, message: error.message };
+  }
+};
+```
+
+================================================================================
+                    😊 MOOD TRACKING ENDPOINTS (Child Only)
+================================================================================
+
+Types:
+```typescript
+interface MoodCheckin {
+  _id: string;
+  child: string;
+  type: "emoji" | "text" | "voice" | "drawing" | "numeric" | "combined";
+  emoji?: string;
+  textNote?: string;
+  moodScore: number;  // 1-10
+  trustZone: "green" | "yellow" | "orange" | "red";
+  tags?: string[];
+  context?: {
+    location?: string;
+    activity?: string;
+    people?: string[];
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface MoodStats {
+  averageScore: number;
+  totalEntries: number;
+  trustZoneDistribution: {
+    green?: number;
+    yellow?: number;
+    orange?: number;
+    red?: number;
+  };
+  frequentEmojis: Record<string, number>;
+  currentTrustZone: string;
+}
+```
+
+Trust Zones (auto-calculated from moodScore):
+- Green (8-10): Happy/Great
+- Yellow (6-7): Okay/Good
+- Orange (4-5): Down
+- Red (1-3): Sad/Distressed
+
+--------------------------------------------------------------------------------
+1. SUBMIT MOOD CHECK-IN
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/mood/checkin
+Protected: Yes (Child role required)
+Headers: Authorization: Bearer <child_token>
+
+Request Body:
+{
+  "emoji": "😊",
+  "textNote": "Had a great day at school!",
+  "moodScore": 9,
+  "tags": ["school", "friends"]
+}
+
+Success Response (201):
+{
+  "success": true,
+  "message": "Mood recorded successfully! You earned 10 points!",
+  "data": {
+    "_id": "mood_id",
+    "child": "child_id",
+    "emoji": "😊",
+    "textNote": "Had a great day!",
+    "moodScore": 9,
+    "trustZone": "green",
+    "createdAt": "2024-01-01T10:00:00.000Z"
+  }
+}
+
+Frontend Implementation:
+```typescript
+const submitMood = async (moodData: {
+  emoji?: string;
+  textNote?: string;
+  moodScore?: number;
+  tags?: string[];
+}) => {
+  try {
+    const accessToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+    if (!accessToken) {
+      return { success: false, message: "Not authenticated." };
+    }
+
+    const { data } = await apiCallWithFallback("/mood/checkin", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${accessToken}`
+      },
+      body: JSON.stringify(moodData),
+    });
+
+    return {
+      success: data.success,
+      message: data.message,
+      data: data.data
+    };
+  } catch (error: any) {
+    return { success: false, message: error.message };
+  }
+};
+```
+
+--------------------------------------------------------------------------------
+2. GET MOOD HISTORY
+--------------------------------------------------------------------------------
+Endpoint: GET /api/v1/mood/history?period=week&limit=50
+Protected: Yes (Child role required)
+Headers: Authorization: Bearer <child_token>
+
+Query Parameters:
+- period: "day" | "week" | "month" | "all" (default: "week")
+- limit: number (default: 50)
+
+Success Response (200):
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "mood_id",
+      "emoji": "😊",
+      "moodScore": 9,
+      "trustZone": "green",
+      "createdAt": "2024-01-01T10:00:00.000Z"
+    }
+  ],
+  "stats": {
+    "averageScore": 7.5,
+    "totalEntries": 10,
+    "trustZoneDistribution": {
+      "green": 5,
+      "yellow": 3,
+      "orange": 2
+    }
+  }
+}
+
+--------------------------------------------------------------------------------
+3. GET TODAY'S MOOD
+--------------------------------------------------------------------------------
+Endpoint: GET /api/v1/mood/today
+Protected: Yes (Child role required)
+Headers: Authorization: Bearer <child_token>
+
+Success Response (200):
+{
+  "success": true,
+  "hasCheckedInToday": true,
+  "data": {
+    "_id": "mood_id",
+    "emoji": "😊",
+    "moodScore": 9,
+    "trustZone": "green",
+    "createdAt": "2024-01-01T10:00:00.000Z"
+  }
+}
+
+--------------------------------------------------------------------------------
+4. GET MOOD STATS
+--------------------------------------------------------------------------------
+Endpoint: GET /api/v1/mood/stats
+Protected: Yes (Child role required)
+Headers: Authorization: Bearer <child_token>
+
+Success Response (200):
+{
+  "success": true,
+  "data": {
+    "averageScore": 7.5,
+    "totalEntries": 25,
+    "trustZoneDistribution": {
+      "green": 12,
+      "yellow": 8,
+      "orange": 4,
+      "red": 1
+    },
+    "frequentEmojis": {
+      "😊": 10,
+      "😐": 5,
+      "😢": 2
+    },
+    "currentTrustZone": "green"
+  }
+}
+
+--------------------------------------------------------------------------------
+5. UPDATE MOOD ENTRY
+--------------------------------------------------------------------------------
+Endpoint: PUT /api/v1/mood/:moodId
+Protected: Yes (Child role required)
+Headers: Authorization: Bearer <child_token>
+
+Request Body:
+{
+  "textNote": "Updated note",
+  "moodScore": 8
+}
+
+Success Response (200):
+{
+  "success": true,
+  "message": "Mood entry updated",
+  "data": { /* updated mood object */ }
+}
+
+--------------------------------------------------------------------------------
+6. DELETE MOOD ENTRY
+--------------------------------------------------------------------------------
+Endpoint: DELETE /api/v1/mood/:moodId
+Protected: Yes (Child role required)
+Headers: Authorization: Bearer <child_token>
+
+Success Response (200):
+{
+  "success": true,
+  "message": "Mood entry deleted"
+}
+
+================================================================================
+                    🏆 GAMIFICATION ENDPOINTS
+================================================================================
+
+Types:
+```typescript
+interface Badge {
+  _id: string;
+  badgeId?: {
+    _id: string;
+    name: string;
+    iconUrl: string;
+    description: string;
+  };
+  earnedAt?: string;
+  name?: string;
+  iconUrl?: string;
+  description?: string;
+  pointsRequired?: number;
+}
+
+interface GamificationStats {
+  points: number;
+  streakCount: number;
+  badges: Badge[];
+  level: number;
+  nextLevelPoints: number;
+}
+```
+
+Points System:
+- Mood check-in: 10 points
+- Activity completion: Points vary by activity
+- Level calculation: Math.floor(points / 100) + 1
+
+--------------------------------------------------------------------------------
+1. GET GAMIFICATION STATS
+--------------------------------------------------------------------------------
+Endpoint: GET /api/v1/gamification/stats
+Protected: Yes (Child role required)
+Headers: Authorization: Bearer <child_token>
+
+Success Response (200):
+{
+  "success": true,
+  "data": {
+    "points": 250,
+    "streakCount": 5,
+    "badges": [
+      {
+        "_id": "badge_id",
+        "name": "First Check-in",
+        "iconUrl": "https://...",
+        "description": "Completed your first mood check-in",
+        "earnedAt": "2024-01-01T10:00:00.000Z"
+      }
+    ],
+    "level": 3,
+    "nextLevelPoints": 300
+  }
+}
+
+Frontend Implementation:
+```typescript
+const getStats = async () => {
+  try {
+    const token = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+    if (!token) return null;
+
+    const { data } = await apiCallWithFallback('/gamification/stats', {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (data.success) {
+      return data.data;
+    }
+    return null;
+  } catch (error) {
+    console.error("Get stats error:", error);
+    return null;
+  }
+};
+```
+
+--------------------------------------------------------------------------------
+2. GET AVAILABLE BADGES
+--------------------------------------------------------------------------------
+Endpoint: GET /api/v1/gamification/badges
+Protected: Yes
+Headers: Authorization: Bearer <token>
+
+Success Response (200):
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "badge_id",
+      "name": "Mood Master",
+      "iconUrl": "https://...",
+      "description": "Check in your mood for 7 consecutive days",
+      "pointsRequired": 70
+    }
+  ]
+}
+
+--------------------------------------------------------------------------------
+3. REDEEM REWARD (Child Only)
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/gamification/rewards/redeem
+Protected: Yes (Child role required)
+Headers: Authorization: Bearer <child_token>
+
+Request Body:
+{
+  "rewardId": "reward_id"
+}
+
+Success Response (200):
+{
+  "success": true,
+  "data": {
+    "rewardId": "reward_id",
+    "pointsSpent": 100,
+    "remainingPoints": 150
+  }
+}
+
+--------------------------------------------------------------------------------
+4. AWARD POINTS (Parent Only)
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/gamification/award-points
+Protected: Yes (Parent role required)
+Headers: Authorization: Bearer <parent_token>
+
+Request Body:
+{
+  "childId": "child_id",
+  "points": 50,
+  "reason": "Helped with chores"
+}
+
+Success Response (200):
+{
+  "success": true,
+  "message": "Points awarded successfully"
+}
+
+================================================================================
+                    📋 ACTIVITY ENDPOINTS
+================================================================================
+
+Types:
+```typescript
+interface Activity {
+  _id: string;
+  title: string;
+  description: string;
+  category: 'education' | 'physical' | 'creative' | 'chores' | 'social' | 'mindfulness';
+  points: number;
+  duration: number;
+  assignedTo: { _id: string; name?: string }[] | string[];
+  createdBy: { _id: string; name?: string } | string;
+  dueDate?: string;
+  completed: boolean;
+  completedAt?: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  tags: string[];
+  questions: Question[];
+  submissions: Submission[];
+  requiresSubmission: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+--------------------------------------------------------------------------------
+1. GET ACTIVITIES
+--------------------------------------------------------------------------------
+Endpoint: GET /api/v1/activity
+Protected: Yes
+Headers: Authorization: Bearer <token>
+
+Note: Returns different results based on role:
+- Parent: Returns activities they created
+- Child: Returns activities assigned to them
+
+Success Response (200):
+{
+  "success": true,
+  "activities": [
+    {
+      "_id": "activity_id",
+      "title": "Read a Book",
+      "description": "Read for 30 minutes",
+      "category": "education",
+      "points": 50,
+      "duration": 30,
+      "completed": false,
+      "difficulty": "easy"
+    }
+  ]
+}
+
+--------------------------------------------------------------------------------
+2. CREATE ACTIVITY (Parent Only)
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/activity
+Protected: Yes (Parent role required)
+Headers: Authorization: Bearer <parent_token>
+
+Request Body:
+{
+  "title": "Read a Book",
+  "description": "Read for 30 minutes",
+  "category": "education",
+  "points": 50,
+  "duration": 30,
+  "assignedTo": ["child_id_1", "child_id_2"],
+  "dueDate": "2024-01-02T00:00:00.000Z",
+  "difficulty": "easy",
+  "tags": ["reading", "education"]
+}
+
+Success Response (201):
+{
+  "success": true,
+  "message": "Activity created successfully",
+  "activity": { /* activity object */ }
+}
+
+--------------------------------------------------------------------------------
+3. COMPLETE ACTIVITY (Child Only)
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/activity/:activityId/complete
+Protected: Yes (Child role required)
+Headers: Authorization: Bearer <child_token>
+
+Success Response (200):
+{
+  "success": true,
+  "message": "Activity completed successfully!",
+  "pointsEarned": 50,
+  "newTotalPoints": 200
+}
+
+Frontend Implementation:
+```typescript
+const completeActivity = async (activityId: string) => {
+  try {
+    const token = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+    if (!token) throw new Error("Not authenticated");
+
+    const { data } = await apiCallWithFallback(`/activity/${activityId}/complete`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (data.success) {
+      // Refresh gamification stats after completing
+      await refreshStats();
+      return { success: true };
+    }
+    throw new Error(data.message);
+  } catch (error: any) {
+    return { success: false, message: error.message };
+  }
+};
+```
+
+--------------------------------------------------------------------------------
+4. UPDATE ACTIVITY (Parent Only)
+--------------------------------------------------------------------------------
+Endpoint: PUT /api/v1/activity/:activityId
+Protected: Yes (Parent role required)
+Headers: Authorization: Bearer <parent_token>
+
+Request Body: (all fields optional)
+{
+  "title": "Updated Title",
+  "points": 75,
+  "dueDate": "2024-01-05T00:00:00.000Z"
+}
+
+Success Response (200):
+{
+  "success": true,
+  "message": "Activity updated successfully",
+  "activity": { /* updated activity object */ }
+}
+
+--------------------------------------------------------------------------------
+5. DELETE ACTIVITY (Parent Only)
+--------------------------------------------------------------------------------
+Endpoint: DELETE /api/v1/activity/:activityId
+Protected: Yes (Parent role required)
+Headers: Authorization: Bearer <parent_token>
+
+Success Response (200):
+{
+  "success": true,
+  "message": "Activity deleted successfully"
+}
+
+================================================================================
+                    👨‍👩‍👧 PARENT-SPECIFIC ENDPOINTS
+================================================================================
+
+1. GET PARENT'S CHILDREN
+--------------------------------------------------------------------------------
+Endpoint: GET /api/v1/parents/children
+Protected: Yes (Parent role required)
+Headers: Authorization: Bearer <parent_token>
+
+Success Response (200):
+{
+  "success": true,
+  "children": [
+    {
+      "id": "child_id",
+      "name": "Alice Child",
+      "email": "alice@example.com",
+      "hasSetPassword": true,
+      "lastLogin": "2024-01-01T12:00:00.000Z",
+      "points": 150,
+      "completedActivities": 5
+    }
+  ]
+}
+
+--------------------------------------------------------------------------------
+2. GET CHILD DETAILS
+--------------------------------------------------------------------------------
+Endpoint: GET /api/v1/parents/child/:childId
+Protected: Yes (Parent role required)
+Headers: Authorization: Bearer <parent_token>
+
+Success Response (200):
+{
+  "success": true,
+  "child": {
+    "id": "child_id",
+    "name": "Alice Child",
+    "email": "alice@example.com",
+    "points": 150,
+    "completedActivities": 5,
+    "currentStreak": 3,
+    "limits": {
+      "dailyScreenTime": 120,
+      "maxActivitiesPerDay": 5
+    },
+    "recentActivities": [
+      {
+        "activityName": "Read a Book",
+        "completedAt": "2024-01-01T10:00:00.000Z",
+        "pointsEarned": 50
+      }
+    ]
+  }
+}
+
+--------------------------------------------------------------------------------
+3. UPDATE CHILD LIMITS
+--------------------------------------------------------------------------------
+Endpoint: PUT /api/v1/parents/child/:childId/limits
+Protected: Yes (Parent role required)
+Headers: Authorization: Bearer <parent_token>
+
+Request Body:
+{
+  "dailyScreenTime": 90,
+  "maxActivitiesPerDay": 3
+}
+
+Success Response (200):
+{
+  "success": true,
+  "message": "Child limits updated successfully"
+}
+
+================================================================================
+                    📚 LEARNING ENDPOINTS
+================================================================================
+
+Types:
+```typescript
+interface Article {
+  _id: string;
+  title: string;
+  content: string;
+  category: 'parenting' | 'child_development' | 'education' | 'health' | 'behavior';
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  readTime: number;
+  tags: string[];
+  quiz?: QuizQuestion[];
+}
+```
+
+--------------------------------------------------------------------------------
+1. GET ARTICLES
+--------------------------------------------------------------------------------
+Endpoint: GET /api/v1/learning/articles?category=X&difficulty=Y&page=1&limit=10
+Protected: Yes
+Headers: Authorization: Bearer <token>
+
+Query Parameters:
+- category: string (optional)
+- difficulty: string (optional)
+- page: number (default: 1)
+- limit: number (default: 10)
+
+Success Response (200):
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "article_id",
+      "title": "Understanding Child Development",
+      "category": "child_development",
+      "difficulty": "beginner",
+      "readTime": 5,
+      "tags": ["development", "parenting"]
+    }
+  ],
+  "pagination": {
+    "total": 50,
+    "page": 1,
+    "pages": 5
+  }
+}
+
+--------------------------------------------------------------------------------
+2. GET ARTICLE BY ID
+--------------------------------------------------------------------------------
+Endpoint: GET /api/v1/learning/articles/:articleId
+Protected: Yes
+Headers: Authorization: Bearer <token>
+
+Success Response (200):
+{
+  "success": true,
+  "data": {
+    "_id": "article_id",
+    "title": "Understanding Child Development",
+    "content": "Full article content here...",
+    "category": "child_development",
+    "difficulty": "beginner",
+    "readTime": 5,
+    "quiz": [
+      {
+        "question": "What age range...",
+        "options": ["A", "B", "C", "D"],
+        "correctAnswer": "B"
+      }
+    ]
+  }
+}
+
+--------------------------------------------------------------------------------
+3. MARK ARTICLE COMPLETE
+--------------------------------------------------------------------------------
+Endpoint: POST /api/v1/learning/articles/:articleId/complete
+Protected: Yes
+Headers: Authorization: Bearer <token>
+
+Success Response (200):
+{
+  "success": true,
+  "message": "Article marked as complete"
+}
+
+================================================================================
+                    ⚠️ ERROR HANDLING PATTERNS
+================================================================================
+
+Standard Error Response Format:
+{
+  "success": false,
+  "message": "Error description"
+}
+
+HTTP Status Codes:
+- 400: Bad Request (validation errors)
+- 401: Unauthorized (no token or invalid token)
+- 403: Forbidden (role mismatch)
+- 404: Not Found (resource doesn't exist)
+- 409: Conflict (duplicate resource)
+- 500: Internal Server Error
+
+Frontend Error Handling Pattern:
+```typescript
+const handleApiCall = async () => {
+  try {
+    const result = await someApiCall();
+    
+    if (!result.success) {
+      // Show error toast/alert
+      Alert.alert("Error", result.message || "Something went wrong");
+      return;
+    }
+    
+    // Handle success
+  } catch (error: any) {
+    // Network or unexpected errors
+    Alert.alert("Error", error.message || "Network error. Please try again.");
+  }
+};
+```
+
+================================================================================
+                    🔄 RECOMMENDED CONTEXT STRUCTURE
+================================================================================
+
+For React Native/Expo apps, organize API calls into Context Providers:
+
+1. AuthContext.tsx
+   - login, logout, register
+   - changePassword, setChildPassword
+   - refreshProfile, clearAuthState
+
+2. MoodContext.tsx (Child features)
+   - submitMood, getMoodHistory
+   - getTodayMood, getMoodStats
+   - updateMood, deleteMood
+
+3. GamificationContext.tsx (Child features)
+   - getStats, getBadges
+   - redeemReward, refreshStats
+
+4. ActivityContext.tsx
+   - getActivities, createActivity (parent)
+   - completeActivity (child)
+   - updateActivity, deleteActivity (parent)
+
+5. LearningContext.tsx
+   - getArticles, getArticle
+   - markComplete
+
+Example Provider Wrapper (in _layout.tsx):
+```typescript
+<AuthProvider>
+  <MoodProvider>
+    <GamificationProvider>
+      <ActivityProvider>
+        <LearningProvider>
+          {children}
+        </LearningProvider>
+      </ActivityProvider>
+    </GamificationProvider>
+  </MoodProvider>
+</AuthProvider>
+```
+
+================================================================================
+                    🧪 TESTING CHECKLIST
+================================================================================
+
+Authentication Tests:
+[ ] Parent registration creates account and returns token
+[ ] Parent login returns correct user data and token
+[ ] Child login with code works for first-time access
+[ ] Child password setup updates hasSetPassword flag
+[ ] Child login with password works after setup
+[ ] Invalid credentials return proper error messages
+[ ] Token verification works for valid tokens
+[ ] Logout clears stored tokens
+
+Feature Tests (after authentication):
+[ ] Mood check-in records entry and awards points
+[ ] Mood history returns correct data
+[ ] Activities load based on user role
+[ ] Activity completion awards points
+[ ] Gamification stats update after actions
+[ ] Profile updates persist correctly
+
+================================================================================
+                    📞 SUPPORT
+================================================================================
+
+Backend API Docs: /docs/Documentations.md
+Postman Collection: /docs/FamilyWellnessAPI.postman_collection.json
+Swagger UI: http://localhost:5000/api-docs (when backend running)
+
+Common Issues:
+- "Network error": Check if backend is running and URL is correct
+- "Unauthorized": Token expired or invalid - re-authenticate
+- "Forbidden": Wrong user role for endpoint - check role requirements
+
+================================================================================
+Document Version: 1.0
+Last Updated: December 2024
+================================================================================
