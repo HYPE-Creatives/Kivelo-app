@@ -256,7 +256,7 @@ export default function FamilyGroupChatScreen() {
       name: child?.name || msg.senderName || 'Family Member', 
       isMe: false,
       color: '#FF6B9D',
-      avatar: child?.avatar?.url || null
+      avatar: child?.user?.avatar?.url || null
     };
   };
 
@@ -271,7 +271,7 @@ export default function FamilyGroupChatScreen() {
         id: child.user?._id || child.user,
         name: child.name,
         role: 'child',
-        avatar: child.avatar?.url
+        avatar: child.user?.avatar?.url
       });
     });
     
