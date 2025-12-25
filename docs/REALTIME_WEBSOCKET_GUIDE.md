@@ -17,8 +17,128 @@ The Kivelo backend uses **Socket.io** for real-time bidirectional communication 
 5. [Authentication with Sockets](#authentication-with-sockets)
 6. [React Native / Expo Implementation](#react-native--expo-implementation)
 7. [Event Reference](#event-reference)
-8. [Best Practices](#best-practices)
-9. [Troubleshooting](#troubleshooting)
+8. [API Testing with Swagger](#api-testing-with-swagger)
+9. [Best Practices](#best-practices)
+10. [Troubleshooting](#troubleshooting)
+
+---
+
+## API Testing with Swagger
+
+### Swagger Documentation URLs
+
+| Environment | Swagger URL |
+|-------------|-------------|
+| **Local Development** | http://localhost:5000/api-docs |
+| **Production** | https://family-wellness.onrender.com/api-docs |
+
+### Testing Chat & Notifications Flow
+
+The conversation/chat endpoints that trigger socket events are fully documented in Swagger. Here's how to test:
+
+#### Step 1: Authenticate
+1. Open Swagger at `/api-docs`
+2. Use `POST /api/v1/auth/parent-login` or `POST /api/v1/auth/child-login-password`
+3. Copy the `accessToken` from response
+4. Click "Authorize" button (🔒) at top of Swagger
+5. Enter: `Bearer <your_token>`
+
+#### Step 2: Create/Get Conversation
+- **For AI Chat (Child only)**: `GET /api/v1/conversations/ai`
+- **For Family Chat**: `POST /api/v1/conversations/family` with:
+  ```json
+  {
+    "participantIds": ["userId1", "userId2"],
+    "type": "parent_child"
+  }
+  ```
+
+#### Step 3: Send Message (Triggers Socket Events)
+Use `POST /api/v1/conversations/message`:
+```json
+{
+  "conversationId": "your_conversation_id",
+  "content": "Hello! This is a test message",
+  "type": "text"
+}
+```
+
+**This will trigger:**
+- `new_message` socket event to conversation room
+- `notification` socket event to recipient's user room
+- Database notification created
+
+#### Available Conversation Endpoints in Swagger
+
+| Method | Endpoint | Description | Socket Events |
+|--------|----------|-------------|---------------|
+| GET | `/api/v1/conversations/ai` | Get/create AI chat | None |
+| POST | `/api/v1/conversations/ai/{id}/end` | End AI conversation | None |
+| POST | `/api/v1/conversations/ai/response` | Add AI response | `ai_response` |
+| GET | `/api/v1/conversations/family` | List family chats | None |
+| POST | `/api/v1/conversations/family` | Create family chat | None |
+| GET | `/api/v1/conversations/{id}` | Get chat history | None |
+| POST | `/api/v1/conversations/message` | **Send message** | `new_message`, `notification` |
+| POST | `/api/v1/conversations/{id}/read` | Mark as read | `message_read_receipt` (client-side) |
+| PUT | `/api/v1/conversations/{id}/messages/{msgId}` | Edit message | None |
+| DELETE | `/api/v1/conversations/{id}/messages/{msgId}` | Delete message | None |
+| GET | `/api/v1/conversations/parent/flagged` | Get flagged chats | None |
+| POST | `/api/v1/conversations/parent/review/{id}` | Review flagged | None |
+
+### Testing Socket Events (Without Frontend)
+
+To test socket events without a frontend, use a Socket.io testing tool:
+
+#### Option 1: Socket.io Client (Browser Console)
+```javascript
+// Open browser console on your app or use https://piehost.com/socketio-tester
+
+const socket = io('https://family-wellness.onrender.com', {
+  transports: ['websocket']
+});
+
+socket.on('connect', () => {
+  console.log('Connected:', socket.id);
+  
+  // Join user room for notifications
+  socket.emit('join_user', 'your_user_id');
+  
+  // Join conversation room
+  socket.emit('join_conversation', 'your_conversation_id');
+});
+
+// Listen for events
+socket.on('new_message', (data) => console.log('New message:', data));
+socket.on('notification', (data) => console.log('Notification:', data));
+socket.on('ai_response', (data) => console.log('AI response:', data));
+```
+
+#### Option 2: Postman WebSocket
+1. Create new WebSocket Request
+2. URL: `wss://family-wellness.onrender.com/socket.io/?EIO=4&transport=websocket`
+3. Connect and send events
+
+#### Option 3: CLI Tool (wscat)
+```bash
+npm install -g wscat
+wscat -c "wss://family-wellness.onrender.com/socket.io/?EIO=4&transport=websocket"
+```
+
+### Complete Test Flow
+
+```
+1. Login (Swagger) → Get token
+                  ↓
+2. Connect Socket → socket.emit('join_user', userId)
+                  ↓
+3. Get/Create Conversation (Swagger) → Get conversationId
+                  ↓
+4. Join Conversation → socket.emit('join_conversation', conversationId)
+                  ↓
+5. Send Message (Swagger POST /conversations/message)
+                  ↓
+6. Receive Events → socket.on('new_message') + socket.on('notification')
+```
 
 ---
 
