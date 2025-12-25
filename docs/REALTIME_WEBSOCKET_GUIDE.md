@@ -810,6 +810,182 @@ socket.on('connect', () => {
 
 ---
 
+## Recent Updates (December 2024)
+
+### Real-Time Notification Integration
+
+The `NotificationContext` has been updated to include built-in Socket.io connection for real-time notifications. The frontend now automatically:
+
+1. **Connects to WebSocket server** when user logs in
+2. **Joins user room** (`user:{userId}`) to receive personal notifications
+3. **Listens for `notification` events** and updates the notification bell in real-time
+4. **Disconnects** when user logs out
+
+#### NotificationContext Socket Integration
+
+```typescript
+// context/NotificationContext.tsx - Now includes socket connection
+import { io, Socket } from "socket.io-client";
+
+// Socket is auto-connected when user logs in
+useEffect(() => {
+  if (user && role) {
+    const newSocket = io(SOCKET_URL, {
+      auth: { token: accessToken },
+      transports: ["websocket", "polling"],
+    });
+
+    newSocket.on("connect", () => {
+      // Auto-join user room
+      newSocket.emit("join_user", user._id);
+    });
+
+    // Listen for real-time notifications
+    newSocket.on("notification", (data) => {
+      // Add to notification list
+      setNotifications(prev => [data.notification, ...prev]);
+      // Update unread count
+      setStats(prev => ({ ...prev, unread: prev.unread + 1 }));
+    });
+  }
+}, [user, role]);
+```
+
+#### New Properties in NotificationContext
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `isSocketConnected` | `boolean` | Whether socket is currently connected |
+
+### Chat Notification Navigation Fix
+
+**Problem**: Clicking a chat notification from a child was navigating to the family group chat instead of the private chat.
+
+**Solution**: Updated notification tap handler to detect chat type and navigate correctly:
+
+```typescript
+// app/(dashboard)/parent/notifications.tsx
+case "new_message":
+case "chat_message":
+  if (data?.senderRole === 'child' || data?.chatType === 'parent_child') {
+    // Navigate to private chat with child
+    router.push({
+      pathname: '/(dashboard)/parent/chat',
+      params: {
+        conversationId: data.conversationId,
+        childName: data.senderName,
+      }
+    });
+  } else {
+    // Navigate to family group chat
+    router.push('/(dashboard)/parent/family-chat');
+  }
+  break;
+```
+
+#### Parent Chat Screen Updates
+
+The `chat.tsx` screen now accepts `conversationId` directly from notifications:
+
+```typescript
+// app/(dashboard)/parent/chat.tsx
+const params = useLocalSearchParams();
+const initialConversationId = params.conversationId as string;
+const childId = params.childId as string;
+
+useEffect(() => {
+  if (initialConversationId) {
+    // Load existing conversation directly
+    loadChatFromConversationId(initialConversationId);
+  } else if (childId) {
+    // Create/get conversation with child
+    initializeChat();
+  }
+}, [childId, initialConversationId]);
+```
+
+### Child Avatar Display Fix
+
+**Problem**: Child avatars not showing in family group chat.
+
+**Cause**: Avatar was accessed as `child.avatar?.url` but the correct path is `child.user?.avatar?.url`.
+
+**Fix in `family-chat.tsx`**:
+
+```typescript
+// Before (incorrect)
+avatar: child?.avatar?.url
+
+// After (correct)
+avatar: child?.user?.avatar?.url
+```
+
+Fixed in two locations:
+- `getSenderInfo()` - For message bubble avatars
+- `getFamilyMembers()` - For header member strip avatars
+
+### Notification Data Structure
+
+When a chat message triggers a notification, the following data is included:
+
+```typescript
+// Notification payload for chat messages
+{
+  type: 'new_message',
+  notification: {
+    _id: 'notification_id',
+    title: 'New message from ChildName',
+    message: 'Message preview...',
+    data: {
+      conversationId: 'conv_id',
+      senderId: 'user_id',
+      senderName: 'Child Name',
+      senderRole: 'child',  // or 'parent'
+      messagePreview: 'Full message text'
+    },
+    createdAt: '2024-12-25T...'
+  }
+}
+```
+
+### Backend Logging for Chat Notifications
+
+The `sendChatNotification` helper now includes detailed logging:
+
+```javascript
+// controllers/conversationController.js
+console.log(`[CHAT NOTIFICATION] Attempting to create notification:`, {
+  senderId,
+  recipientId,
+  senderName,
+  conversationId
+});
+
+console.log(`[CHAT NOTIFICATION] Created notification:`, {
+  notificationId: notification._id,
+  userId: notification.userId,
+  type: notification.type,
+  title: notification.title
+});
+```
+
+### Frontend Socket.io Installation
+
+The `socket.io-client` package was added to the frontend:
+
+```json
+// kivelo-frontend/package.json
+{
+  "dependencies": {
+    "socket.io-client": "^4.8.1"
+  }
+}
+```
+
+**Important**: Run `npm install` after pulling these changes.
+
+---
+
 ## Troubleshooting
 
 ### Common Issues
@@ -884,4 +1060,4 @@ For questions or issues with WebSocket implementation:
 
 ---
 
-*Last Updated: December 2024*
+*Last Updated: December 25, 2024*
