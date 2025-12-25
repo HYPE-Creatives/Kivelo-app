@@ -529,7 +529,6 @@ export const login = async (req, res) => {
     if (!email || !password) return res.status(400).json({ success: false, message: 'Email and password are required' });
 
     const user = await User.findOne({ email: email.toLowerCase().trim() }).select('+password');
-    console.log('🔍 Login - User avatar from DB:', user?.avatar); // Debug log
     if (!user) return res.status(401).json({ success: false, message: 'Invalid email or password' });
 
     if (!user.isVerified) {

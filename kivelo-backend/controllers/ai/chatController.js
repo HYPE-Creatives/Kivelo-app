@@ -139,17 +139,8 @@ export const chat = async (req, res) => {
       } : null
     };
 
-    console.log(`📤 Chat request from ${username}: "${message}"`, moodContext ? `(Mood: ${moodContext.currentMood?.emoji})` : '');
-
     // Call AI and get RAW response
     const aiResponse = await askKivelo(payload);
-
-    // Debug logging
-    console.log("📥 AI Response:", {
-      isMock: aiResponse.isMock,
-      replyLength: aiResponse.reply?.length,
-      hasReply: !!aiResponse.reply
-    });
 
     // Save AI response to conversation
     if (conversation && aiResponse.reply) {

@@ -98,13 +98,10 @@ setIO(io);
 
 // Socket.io connection handler with room management
 io.on("connection", (socket) => {
-  console.log("Socket connected:", socket.id);
-
   // Join user's personal room (for direct notifications)
   socket.on("join_user", (userId) => {
     if (userId) {
       socket.join(`user:${userId}`);
-      console.log(`Socket ${socket.id} joined user room: user:${userId}`);
     }
   });
 
@@ -112,7 +109,6 @@ io.on("connection", (socket) => {
   socket.on("join_conversation", (conversationId) => {
     if (conversationId) {
       socket.join(`conversation:${conversationId}`);
-      console.log(`Socket ${socket.id} joined conversation: conversation:${conversationId}`);
     }
   });
 
@@ -120,7 +116,6 @@ io.on("connection", (socket) => {
   socket.on("leave_conversation", (conversationId) => {
     if (conversationId) {
       socket.leave(`conversation:${conversationId}`);
-      console.log(`Socket ${socket.id} left conversation: conversation:${conversationId}`);
     }
   });
 
@@ -153,7 +148,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    console.log("Socket disconnected:", socket.id);
+    // Socket disconnected
   });
 });
 

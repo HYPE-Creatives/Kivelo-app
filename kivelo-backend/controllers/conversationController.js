@@ -55,8 +55,6 @@ async function sendChatNotification(senderId, recipientId, senderName, messagePr
         }
       });
     }
-
-    console.log(`[CHAT NOTIFICATION] Sent to ${recipientId} from ${senderDisplayName}`);
   } catch (error) {
     console.error('Error sending chat notification:', error);
     // Don't throw - notifications are non-critical
