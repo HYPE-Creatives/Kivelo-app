@@ -1,10 +1,17 @@
 // context/NotificationContext.tsx
-import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { io, Socket } from "socket.io-client";
 import { useAuth } from "./AuthContext";
 
 const ACCESS_TOKEN_KEY = "kivelo_access_token";
 const PREFERENCES_KEY = "kivelo_notification_preferences";
+
+// Socket server URLs
+const SOCKET_URLS = [
+  "http://localhost:5000",
+  "https://family-wellness.onrender.com",
+];
 
 // Types - matching backend Notification model
 export interface Notification {
@@ -80,6 +87,7 @@ interface NotificationContextType {
   refreshNotifications: () => Promise<void>;
   updatePreferences: (prefs: Partial<NotificationPreferences>) => Promise<void>;
   unreadCount: number;
+  isSocketConnected: boolean;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -90,7 +98,7 @@ const API_URLS = [
 ];
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
-  const { role } = useAuth();
+  const { user, role } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [stats, setStats] = useState<NotificationStats | null>(null);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
@@ -98,6 +106,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const [error, setError] = useState<string | null>(null);
   const [workingUrl, setWorkingUrl] = useState<string | null>(null);
   const [preferences, setPreferences] = useState<NotificationPreferences>(DEFAULT_PREFERENCES);
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
+  const socketRef = useRef<Socket | null>(null);
 
   // Calculate unread count from stats or notifications (with safe fallback)
   const unreadCount = stats?.unread ?? (Array.isArray(notifications) ? notifications.filter(n => !n.isRead).length : 0);
@@ -377,6 +387,131 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     }
   }, [role]);
 
+  // Socket connection for real-time notifications
+  useEffect(() => {
+    if (!user || !role) {
+      // User logged out - disconnect socket
+      if (socketRef.current) {
+        console.log("[NOTIFICATION SOCKET] Disconnecting - user logged out");
+        socketRef.current.disconnect();
+        socketRef.current = null;
+        setIsSocketConnected(false);
+      }
+      return;
+    }
+
+    const connectSocket = async () => {
+      const accessToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+      if (!accessToken) {
+        console.log("[NOTIFICATION SOCKET] No access token, skipping connection");
+        return;
+      }
+
+      // Try each URL until one works
+      for (const url of SOCKET_URLS) {
+        try {
+          console.log(`[NOTIFICATION SOCKET] Attempting connection to ${url}...`);
+          
+          const newSocket = io(url, {
+            auth: { token: accessToken },
+            transports: ["websocket", "polling"],
+            timeout: 10000,
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000,
+          });
+
+          newSocket.on("connect", () => {
+            console.log(`[NOTIFICATION SOCKET] Connected to ${url}`);
+            setIsSocketConnected(true);
+            
+            // Join user room to receive notifications
+            const userId = user._id || user.id;
+            if (userId) {
+              console.log(`[NOTIFICATION SOCKET] Joining user room: user:${userId}`);
+              newSocket.emit("join_user", userId);
+            }
+          });
+
+          newSocket.on("disconnect", (reason) => {
+            console.log(`[NOTIFICATION SOCKET] Disconnected: ${reason}`);
+            setIsSocketConnected(false);
+          });
+
+          // Listen for real-time notifications
+          newSocket.on("notification", (data: any) => {
+            console.log("[NOTIFICATION SOCKET] Received notification:", data);
+            
+            if (data?.notification) {
+              // Add new notification to the beginning of the list
+              setNotifications(prev => {
+                // Check if notification already exists
+                const exists = prev.some(n => n._id === data.notification._id);
+                if (exists) return prev;
+                return [data.notification, ...prev];
+              });
+              
+              // Update unread count
+              setStats(prev => {
+                if (!prev) return { total: 1, unread: 1, read: 0 };
+                return {
+                  ...prev,
+                  total: prev.total + 1,
+                  unread: prev.unread + 1,
+                };
+              });
+            }
+          });
+
+          // Listen for new messages (can also trigger notification refresh)
+          newSocket.on("new_message", (data: any) => {
+            console.log("[NOTIFICATION SOCKET] Received new_message:", data);
+            // Optionally refresh notifications to ensure we have the latest
+          });
+
+          socketRef.current = newSocket;
+          
+          // Wait for connection
+          await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              if (!newSocket.connected) {
+                newSocket.disconnect();
+                reject(new Error("Connection timeout"));
+              }
+            }, 10000);
+
+            newSocket.once("connect", () => {
+              clearTimeout(timeout);
+              resolve();
+            });
+
+            newSocket.once("connect_error", () => {
+              clearTimeout(timeout);
+              reject(new Error("Connection failed"));
+            });
+          });
+
+          console.log(`[NOTIFICATION SOCKET] Successfully connected`);
+          return;
+        } catch (err) {
+          console.log(`[NOTIFICATION SOCKET] Failed to connect to ${url}, trying next...`);
+          continue;
+        }
+      }
+
+      console.log("[NOTIFICATION SOCKET] All connection attempts failed");
+    };
+
+    connectSocket();
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+    };
+  }, [user, role]);
+
   const value: NotificationContextType = {
     notifications,
     stats,
@@ -392,6 +527,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     refreshNotifications,
     updatePreferences,
     unreadCount,
+    isSocketConnected,
   };
 
   return (
