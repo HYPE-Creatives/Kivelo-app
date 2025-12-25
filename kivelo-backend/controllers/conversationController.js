@@ -23,7 +23,7 @@ async function sendChatNotification(senderId, recipientId, senderName, messagePr
     const senderRole = sender?.role || 'family member';
 
     // Create notification for recipient
-    await Notification.create({
+    const notification = await Notification.create({
       userId: recipientId,
       type: 'new_message',
       title: `New message from ${senderDisplayName}`,
@@ -40,6 +40,21 @@ async function sendChatNotification(senderId, recipientId, senderName, messagePr
       priority: 4, // High priority for chat messages
       isRead: false
     });
+
+    // Emit socket event for real-time notification
+    const io = getIO();
+    if (io) {
+      io.to(`user:${recipientId}`).emit('notification', {
+        type: 'new_message',
+        notification: {
+          _id: notification._id,
+          title: notification.title,
+          message: notification.message,
+          data: notification.data,
+          createdAt: notification.createdAt
+        }
+      });
+    }
 
     console.log(`[CHAT NOTIFICATION] Sent to ${recipientId} from ${senderDisplayName}`);
   } catch (error) {
@@ -212,11 +227,12 @@ export async function sendMessage(req, res) {
 
     await conversation.addMessage(messageData);
 
-    // Send notification to recipients (only for family chat, not AI chat)
-    if (conversation.type === 'family_chat' && conversation.participants?.length > 0) {
+    // Send notification to recipients (for all chat types except AI chat)
+    const chatTypesWithNotifications = ['family_chat', 'parent_child', 'sibling'];
+    if (chatTypesWithNotifications.includes(conversation.type) && conversation.participants?.length > 0) {
       // Get sender info for notification
-      const sender = await User.findById(senderId).select('firstName lastName role');
-      const senderName = sender ? `${sender.firstName} ${sender.lastName}` : 'Someone';
+      const sender = await User.findById(senderId).select('name role');
+      const senderName = sender?.name || 'Someone';
       
       // Notify all participants except the sender
       for (const participant of conversation.participants) {

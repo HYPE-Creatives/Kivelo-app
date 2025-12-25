@@ -170,6 +170,7 @@ export const disconnectSocket = () => {
 |------------|-------------|---------|
 | `new_message` | New chat message in conversation | `{ conversationId, message, senderId, senderRole }` |
 | `ai_response` | AI assistant response in AI chat | `{ conversationId, message }` |
+| `notification` | New notification (chat, alerts, etc.) | `{ type, notification: { _id, title, message, data, createdAt } }` |
 | `user_typing` | User typing indicator | `{ conversationId, userId, userName, isTyping }` |
 | `message_read_receipt` | Message was read by user | `{ conversationId, userId, messageId, readAt }` |
 | `analytics:update` | Real-time analytics data update | `{ route, method, clientType, statusCode, timestamp }` |
