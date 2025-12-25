@@ -14,18 +14,8 @@ import { getIO } from '../utils/socket.js';
 =============================================================== */
 async function sendChatNotification(senderId, recipientId, senderName, messagePreview, conversationId) {
   try {
-    console.log(`[CHAT NOTIFICATION] Attempting to create notification:`, {
-      senderId,
-      recipientId,
-      senderName,
-      conversationId
-    });
-
     // Don't notify the sender
-    if (senderId === recipientId) {
-      console.log(`[CHAT NOTIFICATION] Skipping - sender is recipient`);
-      return;
-    }
+    if (senderId === recipientId) return;
 
     // Get sender info for personalized notification
     const sender = await User.findById(senderId).select('name role').lean();
@@ -49,13 +39,6 @@ async function sendChatNotification(senderId, recipientId, senderName, messagePr
       },
       priority: 4, // High priority for chat messages
       isRead: false
-    });
-
-    console.log(`[CHAT NOTIFICATION] Created notification:`, {
-      notificationId: notification._id,
-      userId: notification.userId,
-      type: notification.type,
-      title: notification.title
     });
 
     // Emit socket event for real-time notification
