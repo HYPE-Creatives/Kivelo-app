@@ -126,16 +126,24 @@ export default function NotificationsScreen() {
         break;
       case "new_message":
       case "chat_message":
-        // Navigate to chat with the conversation
+        // Navigate to the appropriate chat based on conversation type
         if (data?.conversationId) {
-          router.push({
-            pathname: '/(dashboard)/parent/family-chat',
-            params: {
-              conversationId: data.conversationId,
-              contactName: data.senderName || 'Family',
-              contactRole: data.senderRole || 'child',
-            }
-          });
+          // For parent_child or sibling chats, go to direct chat
+          // For family_chat, go to family group chat
+          if (data?.senderRole === 'child' || data?.chatType === 'parent_child') {
+            router.push({
+              pathname: '/(dashboard)/parent/chat',
+              params: {
+                conversationId: data.conversationId,
+                childName: data.senderName || 'Child',
+                // If senderId is available, pass it as childId for fallback
+                childId: data.senderId || undefined,
+              }
+            });
+          } else {
+            // Family group chat
+            router.push('/(dashboard)/parent/family-chat');
+          }
         } else {
           router.push('/(dashboard)/parent/chat');
         }

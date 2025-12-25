@@ -52,8 +52,10 @@ export default function ParentChatScreen() {
   const childId = params.childId as string;
   const childName = params.childName as string || 'Child';
   const childAvatar = params.childAvatar as string || null;
+  // Also accept conversationId directly (from notifications)
+  const initialConversationId = params.conversationId as string;
 
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(initialConversationId || null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [message, setMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -71,13 +73,32 @@ export default function ParentChatScreen() {
 
   // Initialize conversation with child
   useEffect(() => {
-    if (childId) {
+    if (initialConversationId) {
+      // ConversationId provided directly (from notification) - load messages
+      loadChatFromConversationId(initialConversationId);
+    } else if (childId) {
+      // ChildId provided - create/get conversation
       initializeChat();
     } else {
-      // No child specified - go back
+      // No child or conversation specified - go back
       router.back();
     }
-  }, [childId]);
+  }, [childId, initialConversationId]);
+
+  // Load chat when conversationId is provided directly
+  const loadChatFromConversationId = async (convId: string) => {
+    setLoading(true);
+    try {
+      setConversationId(convId);
+      const history = await getConversationHistory(convId);
+      setMessages(history);
+      scrollToEnd();
+      setTimeout(() => inputRef.current?.focus(), 500);
+    } catch (error) {
+      console.error('Error loading chat from conversationId:', error);
+    }
+    setLoading(false);
+  };
 
   const initializeChat = async () => {
     setLoading(true);
