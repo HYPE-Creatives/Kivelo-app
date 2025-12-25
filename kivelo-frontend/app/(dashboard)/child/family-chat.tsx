@@ -59,6 +59,8 @@ export default function FamilyChatScreen() {
   const scrollRef = useRef<ScrollView | null>(null);
   const inputRef = useRef<TextInput | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const hasMarkedRead = useRef(false);  // Track if we've already marked as read
+  const isInitializing = useRef(false);  // Prevent multiple simultaneous initializations
 
   // Initialize conversation
   useEffect(() => {
@@ -79,6 +81,10 @@ export default function FamilyChatScreen() {
   }, []);
 
   const initializeChat = async () => {
+    // Prevent multiple simultaneous initializations
+    if (isInitializing.current) return;
+    isInitializing.current = true;
+    
     setLoading(true);
     try {
       let chatConversationId = existingConversationId;
@@ -89,7 +95,11 @@ export default function FamilyChatScreen() {
         // Fetch messages for existing conversation
         const history = await getConversationHistory(chatConversationId);
         setMessages(history);
-        await markConversationRead(chatConversationId);
+        // Only mark as read once
+        if (!hasMarkedRead.current) {
+          hasMarkedRead.current = true;
+          await markConversationRead(chatConversationId);
+        }
       } else if (participantId) {
         // Only create new conversation if we don't have an existing one
         const chatType = contactType === 'parent' ? 'parent_child' : 'sibling';
@@ -100,7 +110,11 @@ export default function FamilyChatScreen() {
           setConversationId(chatConversationId);
           const history = await getConversationHistory(chatConversationId);
           setMessages(history);
-          await markConversationRead(chatConversationId);
+          // Only mark as read once
+          if (!hasMarkedRead.current) {
+            hasMarkedRead.current = true;
+            await markConversationRead(chatConversationId);
+          }
         }
       }
       
@@ -115,6 +129,7 @@ export default function FamilyChatScreen() {
       );
     }
     setLoading(false);
+    isInitializing.current = false;
   };
 
   const scrollToEnd = () => {
