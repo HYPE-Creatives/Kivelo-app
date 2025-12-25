@@ -65,7 +65,7 @@ router.use(auth);
  *         name: type
  *         schema:
  *           type: string
- *           enum: [mood_alert, streak_milestone, new_journal, points_earned, badge_earned, system, parent_alert, ai_suggestion, all]
+ *           enum: [mood_alert, streak_milestone, new_journal, new_activity, activity_completed, activity_submission, submission_reviewed, points_earned, badge_earned, system, reminder, parent_alert, ai_suggestion, new_message, chat_message, all]
  *         description: Filter by notification type
  *       - in: query
  *         name: priority
@@ -387,7 +387,7 @@ router.delete('/clear-read', clearAllRead);
  *         name: type
  *         schema:
  *           type: string
- *           enum: [mood_alert, streak_milestone, new_journal, points_earned, badge_earned, system, parent_alert, ai_suggestion, all]
+ *           enum: [mood_alert, streak_milestone, new_journal, new_activity, activity_completed, activity_submission, submission_reviewed, points_earned, badge_earned, system, reminder, parent_alert, ai_suggestion, new_message, chat_message, all]
  *         description: Filter by notification type
  *     responses:
  *       200:
