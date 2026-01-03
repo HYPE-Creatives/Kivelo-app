@@ -1,8 +1,10 @@
+import mongoose from 'mongoose';
 import Admin from '../models/Admin.js';
 import User from '../models/User.js';
 import Parent from '../models/Parent.js';
 import Child from '../models/Child.js';
 import Activity from '../models/Activity.js';
+import AuditLog from '../models/AuditLog.js';
 import generateToken from '../utils/generateToken.js';
 import jwt from 'jsonwebtoken';
 import { setRefreshCookie, clearRefreshCookie, ADMIN_COOKIE } from "../utils/tokenCookies.js";
@@ -294,7 +296,7 @@ export const createAdmin = async (req, res) => {
 
   } catch (error) {
     console.error('Create admin error:', error);
-    
+
     // Handle validation errors specifically
     if (error.name === 'ValidationError') {
       const errors = Object.values(error.errors).map(err => err.message);
@@ -324,7 +326,7 @@ export const createAdmin = async (req, res) => {
 export const getAdmins = async (req, res) => {
   try {
     const { page = 1, limit = 10, role, isActive } = req.query;
-    
+
     const filter = {};
     if (role) filter.role = role;
     if (isActive !== undefined) filter.isActive = isActive === 'true';
@@ -534,11 +536,11 @@ export const deleteAdmin = async (req, res) => {
 export const getUsers = async (req, res) => {
   try {
     const { page = 1, limit = 10, role, isActive, search } = req.query;
-    
+
     const filter = {};
     if (role) filter.role = role;
     if (isActive !== undefined) filter.isActive = isActive === 'true';
-    
+
     if (search) {
       filter.$or = [
         { name: { $regex: search, $options: 'i' } },
@@ -587,7 +589,7 @@ export const getUserDetails = async (req, res) => {
     }
 
     let additionalData = {};
-    
+
     if (user.role === 'parent') {
       const parent = await Parent.findOne({ user: id }).populate('children');
       additionalData.parent = parent;
@@ -663,7 +665,7 @@ export const getAdminDashboard = async (req, res) => {
       User.countDocuments(),
       User.countDocuments({ role: 'parent' }),
       User.countDocuments({ role: 'child' }),
-      Activity.countDocuments(),
+      AuditLog.countDocuments(),
       User.find().sort({ createdAt: -1 }).limit(5).select('name email role createdAt'),
       User.countDocuments({
         lastLogin: {
@@ -871,7 +873,7 @@ export const changeAdminPassword = async (req, res) => {
 
     // Get admin with password
     const admin = await Admin.findById(req.admin._id).select('+password');
-    
+
     // Verify current password
     const isCurrentPasswordValid = await admin.comparePassword(currentPassword);
     if (!isCurrentPasswordValid) {
@@ -901,7 +903,7 @@ export const changeAdminPassword = async (req, res) => {
 
 // ========================= ENHANCED USER MANAGEMENT =========================
 
-// Ban/Unban user
+// Ban / Unban user
 export const toggleUserBan = async (req, res) => {
   try {
     const { id } = req.params;
@@ -909,7 +911,7 @@ export const toggleUserBan = async (req, res) => {
 
     const user = await User.findByIdAndUpdate(
       id,
-      { 
+      {
         banned,
         banReason: banned ? reason : null,
         bannedAt: banned ? new Date() : null
@@ -918,24 +920,22 @@ export const toggleUserBan = async (req, res) => {
     ).select('-password');
 
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Log action in audit log
-    const { AuditLog } = await import('../models/AuditLog.js');
     await AuditLog.create({
-      userId: req.user._id,
+      userId: req.admin._id,          // actor
+      targetUserId: user._id,         // affected user
       action: banned ? 'USER_BANNED' : 'USER_UNBANNED',
-      targetUserId: id,
+      description: banned
+        ? `Admin banned user. Reason: ${reason || 'not provided'}`
+        : 'Admin unbanned user',
       details: { reason },
       ipAddress: req.ip,
-      timestamp: new Date()
+      userAgent: req.headers['user-agent']
     });
 
-    res.status(200).json({
+    res.json({
       success: true,
       message: `User ${banned ? 'banned' : 'unbanned'} successfully`,
       user
@@ -943,10 +943,7 @@ export const toggleUserBan = async (req, res) => {
 
   } catch (error) {
     console.error('Toggle user ban error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error updating user ban status'
-    });
+    res.status(500).json({ success: false, message: 'Error updating user ban status' });
   }
 };
 
@@ -957,52 +954,40 @@ export const forcePasswordReset = async (req, res) => {
     const { tempPassword } = req.body;
 
     if (!tempPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'Temporary password is required'
-      });
+      return res.status(400).json({ success: false, message: 'Temporary password is required' });
     }
 
     const user = await User.findById(id);
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Hash and set temporary password
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(tempPassword, salt);
     user.mustChangePassword = true;
     await user.save();
 
-    // Log action
-    const { AuditLog } = await import('../models/AuditLog.js');
     await AuditLog.create({
-      userId: req.user._id,
+      userId: req.admin._id,
+      targetUserId: user._id,
       action: 'FORCE_PASSWORD_RESET',
-      targetUserId: id,
+      description: 'Admin forced password reset for user',
       ipAddress: req.ip,
-      timestamp: new Date()
+      userAgent: req.headers['user-agent']
     });
 
-    res.status(200).json({
+    res.json({
       success: true,
-      message: 'Password reset initiated. User must change password on next login.',
-      tempPassword
+      message: 'Password reset initiated. User must change password on next login.'
     });
 
   } catch (error) {
     console.error('Force password reset error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error resetting password'
-    });
+    res.status(500).json({ success: false, message: 'Error resetting password' });
   }
 };
 
-// Force logout (invalidate all sessions)
+// Force logout
 export const forceLogout = async (req, res) => {
   try {
     const { id } = req.params;
@@ -1014,23 +999,19 @@ export const forceLogout = async (req, res) => {
     ).select('-password');
 
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Log action
-    const { AuditLog } = await import('../models/AuditLog.js');
     await AuditLog.create({
-      userId: req.user._id,
+      userId: req.admin._id,
+      targetUserId: user._id,
       action: 'FORCE_LOGOUT',
-      targetUserId: id,
+      description: 'Admin forced user logout',
       ipAddress: req.ip,
-      timestamp: new Date()
+      userAgent: req.headers['user-agent']
     });
 
-    res.status(200).json({
+    res.json({
       success: true,
       message: 'User logged out successfully',
       user
@@ -1038,10 +1019,7 @@ export const forceLogout = async (req, res) => {
 
   } catch (error) {
     console.error('Force logout error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error forcing logout'
-    });
+    res.status(500).json({ success: false, message: 'Error forcing logout' });
   }
 };
 
@@ -1060,41 +1038,30 @@ export const deleteUser = async (req, res) => {
 
     const user = await User.findByIdAndDelete(id);
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Delete related data
     await Promise.all([
       Parent.deleteMany({ user: id }),
       Child.deleteMany({ user: id }),
       Activity.deleteMany({ userId: id })
     ]);
 
-    // Log action
-    const { AuditLog } = await import('../models/AuditLog.js');
     await AuditLog.create({
-      userId: req.user._id,
+      userId: req.admin._id,
+      targetUserId: user._id,
       action: 'USER_DELETED',
-      targetUserId: id,
+      description: 'Admin permanently deleted user',
       details: { email: user.email, role: user.role },
       ipAddress: req.ip,
-      timestamp: new Date()
+      userAgent: req.headers['user-agent']
     });
 
-    res.status(200).json({
-      success: true,
-      message: 'User deleted successfully'
-    });
+    res.json({ success: true, message: 'User deleted successfully' });
 
   } catch (error) {
     console.error('Delete user error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting user'
-    });
+    res.status(500).json({ success: false, message: 'Error deleting user' });
   }
 };
 
@@ -1102,103 +1069,30 @@ export const deleteUser = async (req, res) => {
 export const getUserActivityLogs = async (req, res) => {
   try {
     const { id } = req.params;
-    const { days = 30, limit = 50 } = req.query;
 
-    const { AuditLog } = await import('../models/AuditLog.js');
-    
-    const dateFilter = new Date();
-    dateFilter.setDate(dateFilter.getDate() - parseInt(days));
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid user ID' });
+    }
+
+    const days = Number(req.query.days) || 30;
+    const limit = Math.min(Number(req.query.limit) || 50, 500);
+
+    const since = new Date();
+    since.setDate(since.getDate() - days);
 
     const logs = await AuditLog.find({
-      $or: [
-        { userId: id },
-        { targetUserId: id }
-      ],
-      timestamp: { $gte: dateFilter }
+      $or: [{ userId: id }, { targetUserId: id }],
+      createdAt: { $gte: since }
     })
-      .sort({ timestamp: -1 })
-      .limit(parseInt(limit));
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
 
-    res.status(200).json({
-      success: true,
-      logs,
-      count: logs.length
-    });
+    res.json({ success: true, logs, count: logs.length });
 
   } catch (error) {
     console.error('Get user activity logs error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching user activity logs'
-    });
-  }
-};
-
-// Get comprehensive user statistics
-export const getUserStatistics = async (req, res) => {
-  try {
-    const { days = 30 } = req.query;
-
-    const dateFilter = new Date();
-    dateFilter.setDate(dateFilter.getDate() - parseInt(days));
-
-    const [
-      totalUsers,
-      totalParents,
-      totalChildren,
-      activeUsers,
-      bannedUsers,
-      newUsersThisPeriod,
-      usersByRole,
-      usersWithoutLogin,
-      suspiciousAccounts
-    ] = await Promise.all([
-      User.countDocuments(),
-      User.countDocuments({ role: 'parent' }),
-      User.countDocuments({ role: 'child' }),
-      User.countDocuments({ lastLogin: { $exists: true, $ne: null } }),
-      User.countDocuments({ banned: true }),
-      User.countDocuments({ createdAt: { $gte: dateFilter } }),
-      User.aggregate([
-        { $group: { _id: '$role', count: { $sum: 1 } } }
-      ]),
-      User.countDocuments({ lastLogin: null, createdAt: { $lte: dateFilter } }),
-      User.find({ failed_login_attempts: { $gte: 5 } }).select('email role failed_login_attempts')
-    ]);
-
-    // Daily signups over period
-    const dailySignups = await User.aggregate([
-      { $match: { createdAt: { $gte: dateFilter } } },
-      { $group: {
-        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
-        count: { $sum: 1 }
-      }},
-      { $sort: { _id: 1 } }
-    ]);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        totalUsers,
-        totalParents,
-        totalChildren,
-        activeUsers,
-        bannedUsers,
-        newUsersThisPeriod,
-        usersWithoutLogin,
-        suspiciousAccounts: suspiciousAccounts.length,
-        usersByRole,
-        dailySignups,
-        period: days + ' days'
-      }
-    });
-
-  } catch (error) {
-    console.error('Get user statistics error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching user statistics'
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -1219,27 +1113,24 @@ export const editUserDetails = async (req, res) => {
     if (name) updateData.name = name;
     if (email) updateData.email = email.toLowerCase();
 
-    const user = await User.findByIdAndUpdate(id, updateData, { new: true }).select('-password');
+    const user = await User.findByIdAndUpdate(id, updateData, { new: true })
+      .select('-password');
 
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
+      return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Log action
-    const { AuditLog } = await import('../models/AuditLog.js');
     await AuditLog.create({
-      userId: req.user._id,
+      userId: req.admin._id,
+      targetUserId: user._id,
       action: 'USER_DETAILS_UPDATED',
-      targetUserId: id,
+      description: 'Admin updated user details',
       details: updateData,
       ipAddress: req.ip,
-      timestamp: new Date()
+      userAgent: req.headers['user-agent']
     });
 
-    res.status(200).json({
+    res.json({
       success: true,
       message: 'User details updated successfully',
       user
@@ -1247,10 +1138,102 @@ export const editUserDetails = async (req, res) => {
 
   } catch (error) {
     console.error('Edit user details error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error updating user details'
-    });
+    res.status(500).json({ success: false, message: 'Error updating user details' });
   }
 };
 
+// Get comprehensive user statistics 
+export const getUserStatistics = async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    const dateFilter = new Date();
+    dateFilter.setDate(dateFilter.getDate() - parseInt(days));
+    const [
+      totalUsers,
+      totalParents,
+      totalChildren,
+      activeUsers,
+      bannedUsers,
+      newUsersThisPeriod,
+      usersByRole,
+      usersWithoutLogin,
+      suspiciousAccounts
+    ] = await Promise.all(
+      [User.countDocuments(),
+      User.countDocuments(
+        { role: 'parent' }
+      ),
+      User.countDocuments(
+        { role: 'child' }
+      ),
+      User.countDocuments(
+        { lastLogin: { $exists: true, $ne: null } }
+      ),
+      User.countDocuments(
+        { banned: true }
+      ),
+      User.countDocuments(
+        { createdAt: { $gte: dateFilter } }
+      ),
+      User.aggregate(
+        [{
+          $group: {
+            _id: '$role',
+            count: { $sum: 1 }
+          }
+        }]
+      ),
+      User.countDocuments({
+        lastLogin: null,
+        createdAt: { $lte: dateFilter }
+      }),
+      User.find({
+        failed_login_attempts: { $gte: 5 }
+      }).select('email role failed_login_attempts')],
+      User.find({
+        failed_login_attempts: { $gte: 5 }
+      }).select('email role failed_login_attempts')
+    );
+
+    // Daily signups over period 
+    const dailySignups = await User.aggregate([
+      {
+        $match: {
+          createdAt: {
+            $gte: dateFilter
+          }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: {
+              format: '%Y-%m-%d', date: '$createdAt'
+            }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+    res.status(200).json({
+      success: true,
+      data: {
+        totalUsers,
+        totalParents,
+        totalChildren,
+        activeUsers,
+        bannedUsers,
+        newUsersThisPeriod,
+        usersWithoutLogin,
+        suspiciousAccounts: suspiciousAccounts.length,
+        usersByRole,
+        dailySignups,
+        period: days + ' days'
+      }
+    });
+  } catch (error) {
+    console.error('Get user statistics error:', error);
+    res.status(500).json({ success: false, message: 'Error fetching user statistics' });
+  }
+};

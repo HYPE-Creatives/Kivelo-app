@@ -445,6 +445,51 @@
   </div>
 </div>
 
+<div id="activityLogsModal" class="modal">
+  <div class="modal-content" style="max-width: 900px; max-height: 80vh; overflow-y: auto;">
+    <h2>📋 User Activity Logs</h2>
+    
+    <div style="background: rgba(96,165,250,0.08); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; font-size: 13px;">
+        <div>
+          <strong style="color: #a5b4fc;">User:</strong>
+          <div id="activityUserName" style="color: #e0e7ff;">-</div>
+        </div>
+        <div>
+          <strong style="color: #a5b4fc;">Email:</strong>
+          <div id="activityUserEmail" style="color: #e0e7ff; word-break: break-all;">-</div>
+        </div>
+        <div>
+          <strong style="color: #a5b4fc;">Total Activities:</strong>
+          <div id="activityCount" style="color: #e0e7ff;">0</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-bottom: 15px; display: flex; gap: 10px;">
+      <select id="activityFilter" onchange="filterActivityLogs()" style="padding: 8px; border-radius: 6px; border: 1px solid rgba(96,165,250,0.3); background: rgba(30,33,57,0.8); color: #e0e7ff;">
+        <option value="">All Activities</option>
+        <option value="login">Login</option>
+        <option value="logout">Logout</option>
+        <option value="create">Create</option>
+        <option value="update">Update</option>
+        <option value="delete">Delete</option>
+        <option value="view">View</option>
+      </select>
+      <input id="activitySearch" type="text" placeholder="Search activities..." onkeyup="filterActivityLogs()" style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid rgba(96,165,250,0.3); background: rgba(30,33,57,0.8); color: #e0e7ff;"/>
+    </div>
+
+    <div id="activityLogsContainer" style="display: grid; gap: 12px; max-height: 400px; overflow-y: auto;">
+      <!-- Dynamically populated -->
+    </div>
+
+    <div style="display: flex; gap: 10px; margin-top: 20px;">
+      <button onclick="exportActivityLogs()" style="flex: 1; background: rgba(96,165,250,0.3); border: 1px solid rgba(96,165,250,0.5);">📥 Export to CSV</button>
+      <button onclick="closeModal('activityLogsModal')" style="flex: 1; background: rgba(99,102,241,0.2);">Close</button>
+    </div>
+  </div>
+</div>
+
 <script>
   const API_BASE = '/api/v1/admin';
   let currentUserId = null;
@@ -733,19 +778,141 @@
     } catch (e) { showMessage('Error: ' + e.message, false); }
   }
 
+  let allActivityLogs = [];
+
   async function viewActivityLogs() {
+    if (!currentUserId) {
+      alert('Please select a user first');
+      return;
+    }
+
     try {
-      const res = await fetch(`${API_BASE}/users/${currentUserId}/activity-logs?days=30&limit=50`, {
+      // Fetch user details
+      const userRes = await fetch(`${API_BASE}/users/${currentUserId}`, {
         method: 'GET',
         headers: getAuthHeaders(),
         credentials: 'include'
       });
-      const json = await res.json();
-      if (json.success) {
-        const html = json.logs.map(log => `<div style="padding: 10px; border-bottom: 1px solid rgba(96,165,250,0.1);"><strong>${log.action}</strong> - ${new Date(log.timestamp).toLocaleString()}</div>`).join('');
-        document.getElementById('actionResult').innerHTML = `<div style="background: rgba(96,165,250,0.08); border-radius: 8px; padding: 15px;">${html || 'No activity logs'}</div>`;
+      const userData = await userRes.json();
+      const user = userData.user;
+
+      // Display user info
+      document.getElementById('activityUserName').textContent = user.name || '-';
+      document.getElementById('activityUserEmail').textContent = user.email || '-';
+
+      // Fetch activity logs
+      const logsRes = await fetch(`${API_BASE}/users/${currentUserId}/activity-logs?days=90&limit=500`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+        credentials: 'include'
+      });
+
+      const logsData = await logsRes.json();
+      
+      if (logsData.success && Array.isArray(logsData.logs)) {
+        allActivityLogs = logsData.logs;
+        document.getElementById('activityCount').textContent = allActivityLogs.length;
+        displayActivityLogs(allActivityLogs);
+        openModal('activityLogsModal');
+      } else {
+        showMessage('Error loading activity logs', false);
       }
-    } catch (e) { showMessage('Error: ' + e.message, false); }
+    } catch (e) {
+      console.error('Error fetching activity logs:', e);
+      showMessage('Error: ' + e.message, false);
+    }
+  }
+
+  function displayActivityLogs(logs) {
+    const container = document.getElementById('activityLogsContainer');
+    container.innerHTML = '';
+
+    if (logs.length === 0) {
+      container.innerHTML = '<div style="padding: 20px; text-align: center; color: #a5b4fc;">No activity logs found</div>';
+      return;
+    }
+
+    logs.forEach(log => {
+      const date = new Date(log.timestamp);
+      const formattedDate = date.toLocaleString();
+      const actionType = log.action?.split(' ')[0]?.toLowerCase() || 'activity';
+      
+      // Color code based on action type
+      let actionColor = '#60a5fa';
+      if (actionType.includes('delete')) actionColor = '#ef4444';
+      else if (actionType.includes('create')) actionColor = '#10b981';
+      else if (actionType.includes('update')) actionColor = '#f59e0b';
+      else if (actionType.includes('login')) actionColor = '#6366f1';
+      else if (actionType.includes('logout')) actionColor = '#ec4899';
+
+      const logEntry = document.createElement('div');
+      logEntry.style.background = 'rgba(96,165,250,0.08)';
+      logEntry.style.padding = '12px';
+      logEntry.style.borderRadius = '6px';
+      logEntry.style.borderLeft = `4px solid ${actionColor}`;
+      logEntry.style.fontSize = '13px';
+      logEntry.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: start; gap: 10px;">
+          <div style="flex: 1;">
+            <strong style="color: ${actionColor};">${log.action || 'Activity'}</strong>
+            <div style="color: #a5b4fc; margin-top: 4px; font-size: 12px;">
+              ${formattedDate}
+            </div>
+            ${log.details ? `<div style="color: #a5b4fc; margin-top: 4px; font-size: 11px;">${log.details}</div>` : ''}
+            ${log.ipAddress ? `<div style="color: #64748b; margin-top: 4px; font-size: 11px;">IP: ${log.ipAddress}</div>` : ''}
+          </div>
+          <span style="background: ${actionColor}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; white-space: nowrap;">${actionType.toUpperCase()}</span>
+        </div>
+      `;
+      container.appendChild(logEntry);
+    });
+  }
+
+  function filterActivityLogs() {
+    const filterValue = document.getElementById('activityFilter').value;
+    const searchValue = document.getElementById('activitySearch').value.toLowerCase();
+
+    const filtered = allActivityLogs.filter(log => {
+      const matchesFilter = !filterValue || log.action.toLowerCase().includes(filterValue);
+      const matchesSearch = !searchValue || 
+        log.action.toLowerCase().includes(searchValue) || 
+        (log.details && log.details.toLowerCase().includes(searchValue));
+      
+      return matchesFilter && matchesSearch;
+    });
+
+    displayActivityLogs(filtered);
+  }
+
+  function exportActivityLogs() {
+    if (allActivityLogs.length === 0) {
+      alert('No activity logs to export');
+      return;
+    }
+
+    // Create CSV content
+    let csv = 'Action,Timestamp,Details,IP Address\n';
+    
+    allActivityLogs.forEach(log => {
+      const timestamp = new Date(log.timestamp).toLocaleString();
+      const details = (log.details || '').replace(/,/g, ';'); // Replace commas in details
+      const ipAddress = log.ipAddress || 'N/A';
+      
+      csv += `"${log.action}","${timestamp}","${details}","${ipAddress}"\n`;
+    });
+
+    // Create blob and download
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `activity-logs-${currentUserId}-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+
+    showMessage('✅ Activity logs exported successfully', true);
   }
 
   let currentUserPrivileges = {};
