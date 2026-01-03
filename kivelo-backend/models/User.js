@@ -19,7 +19,7 @@ const userSchema = new mongoose.Schema({
     minlength: 6,
     select: false
   },
-  
+
   // OAuth fields
   authProvider: {
     type: String,
@@ -36,7 +36,7 @@ const userSchema = new mongoose.Schema({
     unique: true,
     sparse: true
   },
-  
+
   role: {
     type: String,
     enum: ['parent', 'child'],
@@ -147,7 +147,7 @@ const userSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Badge'
     },
-    earnedAt: { type: Date , default: Date.now },
+    earnedAt: { type: Date, default: Date.now },
     progress: Number
   }],
   // Move points from child object to root (keep both for backward compatibility)
@@ -175,6 +175,23 @@ const userSchema = new mongoose.Schema({
     completedAt: Date,
     quizScore: Number
   }],
+
+  // User activity logs
+  activities: [
+    {
+      action: {
+        type: String,
+        required: true, // "login", "logout", "profile_update", etc
+      },
+      description: String,
+      ip: String,
+      metadata: Object,
+      createdAt: {
+        type: Date,
+        default: Date.now,
+      },
+    }
+  ],
 
   // Communication coaching preferences
   coachingPreferences: {

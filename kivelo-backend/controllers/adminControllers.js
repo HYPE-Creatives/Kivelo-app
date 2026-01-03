@@ -9,6 +9,7 @@ import generateToken from '../utils/generateToken.js';
 import jwt from 'jsonwebtoken';
 import { setRefreshCookie, clearRefreshCookie, ADMIN_COOKIE } from "../utils/tokenCookies.js";
 import bcrypt from 'bcryptjs';
+import { fetchUserActivityLogs } from '../utils/logAudit.js';
 
 // ========================= ADMIN AUTHENTICATION =========================
 // Super Admin Initial Setup (Run once to create first super admin)
@@ -1069,30 +1070,21 @@ export const deleteUser = async (req, res) => {
 export const getUserActivityLogs = async (req, res) => {
   try {
     const { id } = req.params;
+    const { days = 90, limit = 500 } = req.query;
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    const { logs, count } = await fetchUserActivityLogs({
+      userId: id,
+      days,
+      limit,
+    });
+
+    return res.json({ success: true, logs, count });
+  } catch (error) {
+    if (error && error.message === 'INVALID_USER_ID') {
       return res.status(400).json({ success: false, message: 'Invalid user ID' });
     }
-
-    const days = Number(req.query.days) || 30;
-    const limit = Math.min(Number(req.query.limit) || 50, 500);
-
-    const since = new Date();
-    since.setDate(since.getDate() - days);
-
-    const logs = await AuditLog.find({
-      $or: [{ userId: id }, { targetUserId: id }],
-      createdAt: { $gte: since }
-    })
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .lean();
-
-    res.json({ success: true, logs, count: logs.length });
-
-  } catch (error) {
     console.error('Get user activity logs error:', error);
-    res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({ success: false, message: 'Error fetching user activity logs' });
   }
 };
 

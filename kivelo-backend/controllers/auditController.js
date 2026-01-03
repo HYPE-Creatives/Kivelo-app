@@ -1,5 +1,6 @@
 import AuditLog from "../models/AuditLog.js";
 import { Parser as Json2csvParser } from "json2csv";
+import mongoose from "mongoose";
 
 // ========================= CREATE AUDIT LOG =========================
 // ========================= CREATE AUDIT LOG =========================
@@ -211,13 +212,13 @@ export const exportAuditLogs = async (req, res) => {
 };
 
 
-// ========================= GET USER ACTIVITY LOGS =========================
+// ========================= GET USER ACTIVITY LOGS ========================
 export const getUserActivityLogs = async (req, res) => {
   try {
-    const { userId: id } = req.params;
+    const { userId } = req.params;
     const { days = 90, limit = 500 } = req.query;
 
-    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({
         success: false,
         message: "Invalid user ID",
@@ -228,15 +229,15 @@ export const getUserActivityLogs = async (req, res) => {
     since.setDate(since.getDate() - Number(days));
 
     const logs = await AuditLog.find({
-      $or: [
-        { "actor.id": id },   // user actions
-        { "target.id": id },  // admin actions ON user
-      ],
       timestamp: { $gte: since },
+      archived: false,
+      $or: [
+        { "actor.id": userId },
+        { "target.id": userId },
+      ],
     })
       .sort({ timestamp: -1 })
-      .limit(Number(limit))
-      .lean();
+      .limit(Number(limit));
 
     res.json({
       success: true,
@@ -244,7 +245,7 @@ export const getUserActivityLogs = async (req, res) => {
       count: logs.length,
     });
   } catch (error) {
-    console.error("getUserActivityLogs:", error);
+    console.error("getUserActivityLogs error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch user activity logs",
