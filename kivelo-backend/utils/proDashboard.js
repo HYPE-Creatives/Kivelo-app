@@ -155,10 +155,18 @@ const getProDashboard = (title) => {
               <span>API Analytics:</span>
               <span><a href="/api-analytics/v1" style="color:#6dd5fa; text-decoration:none;">Analytics Dashboard</a></span>
             </div>
+            <div class="info-row">
+              <span>Admin Access:</span>
+              <span><a href="/admin-login.html" style="color:#fa6d6d; text-decoration:none;">Admin Login</a></span>
+            </div>
         </div>
 
         <a href="/api-docs/v1" class="btn">
           <i class="fa-solid fa-book"></i> Open API Documentation
+        </a>
+
+        <a href="/admin-login.html" class="btn" style="background: linear-gradient(135deg, #fa6d6d, #ff6b9d); margin-left: 10px;">
+          <i class="fa-solid fa-shield"></i> Admin Portal
         </a>
 
         <div class="footer">© ${new Date().getFullYear()} KIVELO — All rights reserved.</div>
