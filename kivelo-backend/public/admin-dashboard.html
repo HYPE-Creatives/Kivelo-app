@@ -1,585 +1,676 @@
 <!doctype html>
 <html>
+
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<meta http-equiv="X-UA-Compatible" content="ie=edge"/>
-<title>Kivelo Admin Dashboard</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<style>
-  * { box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
-    margin: 0;
-    padding: 20px;
-    background: linear-gradient(135deg, #0a0e27, #1a1d3a, #1e2139);
-    color: #e0e7ff;
-    min-height: 100vh;
-  }
-  .container { max-width: 1600px; margin: 0 auto; }
-  .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 30px;
-  }
-  .header h1 {
-    margin: 0;
-    font-size: 32px;
-    background: linear-gradient(135deg, #60a5fa, #a78bfa, #f472b6);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  .logout-btn {
-    padding: 10px 18px;
-    background: rgba(239, 68, 68, 0.2);
-    color: #f87171;
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 600;
-    transition: all 0.2s;
-  }
-  .logout-btn:hover {
-    background: rgba(239, 68, 68, 0.3);
-  }
-  .tabs {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 30px;
-    border-bottom: 1px solid rgba(96, 165, 250, 0.2);
-    flex-wrap: wrap;
-  }
-  .tab-btn {
-    padding: 12px 20px;
-    background: transparent;
-    border: none;
-    color: #a5b4fc;
-    cursor: pointer;
-    font-weight: 600;
-    border-bottom: 3px solid transparent;
-    transition: all 0.2s;
-    font-size: 14px;
-  }
-  .tab-btn.active {
-    color: #60a5fa;
-    border-bottom-color: #60a5fa;
-  }
-  .tab-content {
-    display: none;
-  }
-  .tab-content.active {
-    display: block;
-    animation: fadeIn 0.3s ease-out;
-  }
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px;
-    margin-bottom: 30px;
-  }
-  .stat-card {
-    background: linear-gradient(135deg, rgba(96, 165, 250, 0.1), rgba(167, 139, 250, 0.1));
-    padding: 20px;
-    border-radius: 12px;
-    border: 1px solid rgba(96, 165, 250, 0.2);
-    text-align: center;
-  }
-  .stat-card h3 {
-    margin: 0 0 10px 0;
-    font-size: 28px;
-    background: linear-gradient(135deg, #60a5fa, #a78bfa);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  .stat-card p {
-    margin: 0;
-    color: #a5b4fc;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-  .controls {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-  }
-  input, select {
-    padding: 10px 14px;
-    border-radius: 8px;
-    border: 1px solid rgba(148, 163, 247, 0.3);
-    background: rgba(30, 33, 57, 0.8);
-    color: #e0e7ff;
-    font-family: inherit;
-    font-size: 13px;
-  }
-  input:focus, select:focus {
-    outline: none;
-    border-color: #60a5fa;
-    background: rgba(30, 33, 57, 0.95);
-  }
-  button {
-    padding: 10px 18px;
-    background: linear-gradient(135deg, #60a5fa, #a78bfa);
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 13px;
-    cursor: pointer;
-    box-shadow: 0 4px 15px rgba(96, 165, 250, 0.3);
-    transition: box-shadow 0.2s;
-  }
-  button:hover {
-    box-shadow: 0 6px 20px rgba(96, 165, 250, 0.4);
-  }
-  button:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-  }
-  .users-table {
-    background: rgba(99, 102, 241, 0.08);
-    border-radius: 12px;
-    border: 1px solid rgba(96, 165, 250, 0.15);
-    overflow: hidden;
-    margin-bottom: 30px;
-  }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-  }
-  table th {
-    background: rgba(96, 165, 250, 0.15);
-    padding: 14px;
-    text-align: left;
-    color: #60a5fa;
-    font-weight: 600;
-    border-bottom: 1px solid rgba(96, 165, 250, 0.2);
-  }
-  table td {
-    padding: 12px 14px;
-    border-bottom: 1px solid rgba(96, 165, 250, 0.1);
-    color: #e0e7ff;
-  }
-  table tr:hover {
-    background: rgba(96, 165, 250, 0.08);
-  }
-  .badge {
-    display: inline-block;
-    padding: 4px 10px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-  }
-  .badge.active {
-    background: rgba(16, 185, 129, 0.2);
-    color: #6ee7b7;
-  }
-  .badge.inactive {
-    background: rgba(239, 68, 68, 0.2);
-    color: #fca5a5;
-  }
-  .badge.parent {
-    background: rgba(96, 165, 250, 0.2);
-    color: #93c5fd;
-  }
-  .badge.child {
-    background: rgba(167, 139, 250, 0.2);
-    color: #d8b4fe;
-  }
-  .actions {
-    display: flex;
-    gap: 6px;
-  }
-  .action-btn {
-    padding: 6px 10px;
-    background: rgba(96, 165, 250, 0.2);
-    color: #93c5fd;
-    border: 1px solid rgba(96, 165, 250, 0.3);
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 11px;
-    font-weight: 600;
-    transition: all 0.2s;
-  }
-  .action-btn:hover {
-    background: rgba(96, 165, 250, 0.3);
-  }
-  .modal {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    z-index: 1000;
-    align-items: center;
-    justify-content: center;
-  }
-  .modal.active {
-    display: flex;
-  }
-  .modal-content {
-    background: linear-gradient(135deg, rgba(26, 29, 58, 0.95), rgba(30, 33, 57, 0.95));
-    border: 1px solid rgba(96, 165, 250, 0.2);
-    border-radius: 12px;
-    padding: 30px;
-    max-width: 500px;
-    width: 90%;
-    color: #e0e7ff;
-  }
-  .modal-content h2 {
-    margin-top: 0;
-    color: #60a5fa;
-  }
-  .form-group {
-    margin-bottom: 15px;
-  }
-  .form-group label {
-    display: block;
-    margin-bottom: 5px;
-    color: #a5b4fc;
-    font-size: 12px;
-    font-weight: 600;
-  }
-  .form-group input, .form-group textarea {
-    width: 100%;
-    padding: 10px;
-    border-radius: 8px;
-    border: 1px solid rgba(148, 163, 247, 0.3);
-    background: rgba(30, 33, 57, 0.8);
-    color: #e0e7ff;
-  }
-  .chart-container {
-    background: rgba(99, 102, 241, 0.08);
-    padding: 20px;
-    border-radius: 12px;
-    border: 1px solid rgba(96, 165, 250, 0.15);
-    margin-bottom: 20px;
-  }
-  .error { color: #f87171; padding: 15px; background: rgba(239, 68, 68, 0.1); border-radius: 8px; }
-  .success { color: #6ee7b7; padding: 15px; background: rgba(16, 185, 129, 0.1); border-radius: 8px; }
-  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-  @media (max-width: 768px) {
-    .header { flex-direction: column; gap: 15px; }
-    .stats-grid { grid-template-columns: 1fr; }
-  }
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+  <title>Kivelo Admin Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: linear-gradient(135deg, #0a0e27, #1a1d3a, #1e2139);
+      color: #e0e7ff;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+
+    .header h1 {
+      margin: 0;
+      font-size: 32px;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa, #f472b6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .logout-btn {
+      padding: 10px 18px;
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .logout-btn:hover {
+      background: rgba(239, 68, 68, 0.3);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 30px;
+      border-bottom: 1px solid rgba(96, 165, 250, 0.2);
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      padding: 12px 20px;
+      background: transparent;
+      border: none;
+      color: #a5b4fc;
+      cursor: pointer;
+      font-weight: 600;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+      font-size: 14px;
+    }
+
+    .tab-btn.active {
+      color: #60a5fa;
+      border-bottom-color: #60a5fa;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 30px;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, rgba(96, 165, 250, 0.1), rgba(167, 139, 250, 0.1));
+      padding: 20px;
+      border-radius: 12px;
+      border: 1px solid rgba(96, 165, 250, 0.2);
+      text-align: center;
+    }
+
+    .stat-card h3 {
+      margin: 0 0 10px 0;
+      font-size: 28px;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .stat-card p {
+      margin: 0;
+      color: #a5b4fc;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    input,
+    select {
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(148, 163, 247, 0.3);
+      background: rgba(30, 33, 57, 0.8);
+      color: #e0e7ff;
+      font-family: inherit;
+      font-size: 13px;
+    }
+
+    input:focus,
+    select:focus {
+      outline: none;
+      border-color: #60a5fa;
+      background: rgba(30, 33, 57, 0.95);
+    }
+
+    button {
+      padding: 10px 18px;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(96, 165, 250, 0.3);
+      transition: box-shadow 0.2s;
+    }
+
+    button:hover {
+      box-shadow: 0 6px 20px rgba(96, 165, 250, 0.4);
+    }
+
+    button:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+
+    .users-table {
+      background: rgba(99, 102, 241, 0.08);
+      border-radius: 12px;
+      border: 1px solid rgba(96, 165, 250, 0.15);
+      overflow: hidden;
+      margin-bottom: 30px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    table th {
+      background: rgba(96, 165, 250, 0.15);
+      padding: 14px;
+      text-align: left;
+      color: #60a5fa;
+      font-weight: 600;
+      border-bottom: 1px solid rgba(96, 165, 250, 0.2);
+    }
+
+    table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(96, 165, 250, 0.1);
+      color: #e0e7ff;
+    }
+
+    table tr:hover {
+      background: rgba(96, 165, 250, 0.08);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .badge.active {
+      background: rgba(16, 185, 129, 0.2);
+      color: #6ee7b7;
+    }
+
+    .badge.inactive {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+    }
+
+    .badge.parent {
+      background: rgba(96, 165, 250, 0.2);
+      color: #93c5fd;
+    }
+
+    .badge.child {
+      background: rgba(167, 139, 250, 0.2);
+      color: #d8b4fe;
+    }
+
+    .actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .action-btn {
+      padding: 6px 10px;
+      background: rgba(96, 165, 250, 0.2);
+      color: #93c5fd;
+      border: 1px solid rgba(96, 165, 250, 0.3);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+      background: rgba(96, 165, 250, 0.3);
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: linear-gradient(135deg, rgba(26, 29, 58, 0.95), rgba(30, 33, 57, 0.95));
+      border: 1px solid rgba(96, 165, 250, 0.2);
+      border-radius: 12px;
+      padding: 30px;
+      max-width: 500px;
+      width: 90%;
+      color: #e0e7ff;
+    }
+
+    .modal-content h2 {
+      margin-top: 0;
+      color: #60a5fa;
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      color: #a5b4fc;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(148, 163, 247, 0.3);
+      background: rgba(30, 33, 57, 0.8);
+      color: #e0e7ff;
+    }
+
+    .chart-container {
+      background: rgba(99, 102, 241, 0.08);
+      padding: 20px;
+      border-radius: 12px;
+      border: 1px solid rgba(96, 165, 250, 0.15);
+      margin-bottom: 20px;
+    }
+
+    .error {
+      color: #f87171;
+      padding: 15px;
+      background: rgba(239, 68, 68, 0.1);
+      border-radius: 8px;
+    }
+
+    .success {
+      color: #6ee7b7;
+      padding: 15px;
+      background: rgba(16, 185, 129, 0.1);
+      border-radius: 8px;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .header {
+        flex-direction: column;
+        gap: 15px;
+      }
+
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
+
 <body>
-<div class="container">
-  <div class="header">
-    <h1>👥 Admin Dashboard</h1>
-    <button class="logout-btn" onclick="handleLogout()">🚪 Logout Securely</button>
-  </div>
+  <div class="container">
+    <div class="header">
+      <h1>👥 Admin Dashboard</h1>
+      <button class="logout-btn" onclick="handleLogout()">🚪 Logout Securely</button>
+    </div>
 
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="overview">Overview</button>
-    <button class="tab-btn" data-tab="users">Users</button>
-    <button class="tab-btn" data-tab="actions">Actions</button>
-  </div>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="overview">Overview</button>
+      <button class="tab-btn" data-tab="users">Users</button>
+      <button class="tab-btn" data-tab="actions">Actions</button>
+    </div>
 
-  <div id="overview" class="tab-content active">
-    <div class="stats-grid" id="statsGrid"></div>
-    <div class="chart-container">
-      <h3 style="margin-top: 0; color: #a5b4fc;">Daily Signups</h3>
-      <canvas id="signupsChart" style="max-height: 300px;"></canvas>
-    </div>
-  </div>
-
-  <div id="users" class="tab-content">
-    <div class="controls">
-      <input id="searchInput" type="text" placeholder="Search by name or email..."/>
-      <select id="roleFilter">
-        <option value="">All roles</option>
-        <option value="parent">Parent</option>
-        <option value="child">Child</option>
-      </select>
-      <select id="statusFilter">
-        <option value="">All statuses</option>
-        <option value="true">Active</option>
-        <option value="false">Inactive</option>
-      </select>
-      <button onclick="loadUsers()">🔍 Search</button>
-    </div>
-    <div class="users-table">
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th>Status</th>
-            <th>Joined</th>
-            <th>Last Login</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="usersBody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <div id="actions" class="tab-content">
-    <div class="controls">
-      <input id="userIdInput" type="text" placeholder="Enter User ID..."/>
-    </div>
-    <div id="actionResult"></div>
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 20px;">
-      <button onclick="openModal('editModal')">✏️ Edit User</button>
-      <button onclick="openModal('banModal')">🚫 Ban User</button>
-      <button onclick="openModal('passwordModal')">🔐 Reset Password</button>
-      <button onclick="viewPrivileges()" style="background: rgba(16,185,129,0.3); border: 1px solid rgba(16,185,129,0.5);">🔐 View Privileges</button>
-      <button onclick="forceLogoutUser()" style="background: rgba(100,116,139,0.5);">👋 Force Logout</button>
-      <button onclick="viewActivityLogs()" style="background: rgba(100,116,139,0.5);">📋 Activity Logs</button>
-      <button onclick="openModal('deleteModal')" style="background: rgba(239,68,68,0.5);">🗑️ Delete User</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODALS -->
-<div id="editModal" class="modal">
-  <div class="modal-content">
-    <h2>✏️ Edit User Details</h2>
-    <div class="form-group">
-      <label>Full Name</label>
-      <input id="editName" type="text" placeholder="Enter user name"/>
-    </div>
-    <div class="form-group">
-      <label>Email Address</label>
-      <input id="editEmail" type="email" placeholder="Enter email address"/>
-    </div>
-    <div style="display: flex; gap: 10px;">
-      <button onclick="submitEdit()" style="flex: 1;">💾 Save Changes</button>
-      <button onclick="closeModal('editModal')" style="flex: 1; background: rgba(99,102,241,0.2);">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<div id="banModal" class="modal">
-  <div class="modal-content">
-    <h2>Ban User</h2>
-    <div class="form-group">
-      <label>Reason</label>
-      <textarea id="banReason" placeholder="Reason for banning..." style="resize: vertical; min-height: 80px;"></textarea>
-    </div>
-    <div style="display: flex; gap: 10px;">
-      <button onclick="submitBan()" style="flex: 1; background: rgba(239,68,68,0.5);">Ban User</button>
-      <button onclick="closeModal('banModal')" style="flex: 1; background: rgba(99,102,241,0.2);">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<div id="passwordModal" class="modal">
-  <div class="modal-content">
-    <h2>Reset Password</h2>
-    <div class="form-group">
-      <label>Temporary Password</label>
-      <input id="tempPassword" type="text" placeholder="Enter temporary password..."/>
-    </div>
-    <div style="display: flex; gap: 10px;">
-      <button onclick="submitPasswordReset()" style="flex: 1;">Reset</button>
-      <button onclick="closeModal('passwordModal')" style="flex: 1; background: rgba(99,102,241,0.2);">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<div id="deleteModal" class="modal">
-  <div class="modal-content">
-    <h2 style="color: #f87171;">⚠️ Delete User Permanently</h2>
-    <p style="color: #fca5a5; margin-bottom: 15px;">This action cannot be undone. All user data will be deleted.</p>
-    <div class="form-group">
-      <label>Type "confirm" to delete</label>
-      <input id="deleteConfirm" type="text"/>
-    </div>
-    <div style="display: flex; gap: 10px;">
-      <button onclick="submitDelete()" style="flex: 1; background: rgba(239,68,68,0.5);">Delete</button>
-      <button onclick="closeModal('deleteModal')" style="flex: 1; background: rgba(99,102,241,0.2);">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<div id="privilegesModal" class="modal">
-  <div class="modal-content" style="max-width: 600px;">
-    <h2>👤 User Privileges & Access Control</h2>
-    
-    <div style="background: rgba(96,165,250,0.08); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px;">
-        <div>
-          <strong style="color: #a5b4fc;">Name:</strong>
-          <div id="privName" style="color: #e0e7ff;">-</div>
-        </div>
-        <div>
-          <strong style="color: #a5b4fc;">Email:</strong>
-          <div id="privEmail" style="color: #e0e7ff; word-break: break-all;">-</div>
-        </div>
-        <div>
-          <strong style="color: #a5b4fc;">Role:</strong>
-          <div id="privRole" style="color: #e0e7ff;">-</div>
-        </div>
-        <div>
-          <strong style="color: #a5b4fc;">Status:</strong>
-          <div id="privStatus" style="color: #e0e7ff;">-</div>
-        </div>
+    <div id="overview" class="tab-content active">
+      <div class="stats-grid" id="statsGrid"></div>
+      <div class="chart-container">
+        <h3 style="margin-top: 0; color: #a5b4fc;">Daily Signups</h3>
+        <canvas id="signupsChart" style="max-height: 300px;"></canvas>
       </div>
     </div>
 
-    <div style="margin-bottom: 20px;">
-      <h3 style="color: #a5b4fc; margin-bottom: 15px;">🔐 Permissions</h3>
-      <div id="privilegesContainer" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+    <div id="users" class="tab-content">
+      <div class="controls">
+        <input id="searchInput" type="text" placeholder="Search by name or email..." />
+        <select id="roleFilter">
+          <option value="">All roles</option>
+          <option value="parent">Parent</option>
+          <option value="child">Child</option>
+        </select>
+        <select id="statusFilter">
+          <option value="">All statuses</option>
+          <option value="true">Active</option>
+          <option value="false">Inactive</option>
+        </select>
+        <button onclick="loadUsers()">🔍 Search</button>
+      </div>
+      <div class="users-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Joined</th>
+              <th>Last Login</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="usersBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="actions" class="tab-content">
+      <div class="controls">
+        <input id="userIdInput" type="text" placeholder="Enter User ID..." />
+      </div>
+      <div id="actionResult"></div>
+      <div
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 20px;">
+        <button onclick="openModal('editModal')">✏️ Edit User</button>
+        <button onclick="openModal('banModal')">🚫 Ban User</button>
+        <button onclick="openModal('passwordModal')">🔐 Reset Password</button>
+        <button onclick="viewPrivileges()"
+          style="background: rgba(16,185,129,0.3); border: 1px solid rgba(16,185,129,0.5);">🔐 View Privileges</button>
+        <button onclick="forceLogoutUser()" style="background: rgba(100,116,139,0.5);">👋 Force Logout</button>
+        <button onclick="viewActivityLogs()" style="background: rgba(100,116,139,0.5);">📋 Activity Logs</button>
+        <button onclick="openModal('deleteModal')" style="background: rgba(239,68,68,0.5);">🗑️ Delete User</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODALS -->
+  <div id="editModal" class="modal">
+    <div class="modal-content">
+      <h2>✏️ Edit User Details</h2>
+      <div class="form-group">
+        <label>Full Name</label>
+        <input id="editName" type="text" placeholder="Enter user name" />
+      </div>
+      <div class="form-group">
+        <label>Email Address</label>
+        <input id="editEmail" type="email" placeholder="Enter email address" />
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button onclick="submitEdit()" style="flex: 1;">💾 Save Changes</button>
+        <button onclick="closeModal('editModal')" style="flex: 1; background: rgba(99,102,241,0.2);">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="banModal" class="modal">
+    <div class="modal-content">
+      <h2>Ban User</h2>
+      <div class="form-group">
+        <label>Reason</label>
+        <textarea id="banReason" placeholder="Reason for banning..."
+          style="resize: vertical; min-height: 80px;"></textarea>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button onclick="submitBan()" style="flex: 1; background: rgba(239,68,68,0.5);">Ban User</button>
+        <button onclick="closeModal('banModal')" style="flex: 1; background: rgba(99,102,241,0.2);">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="passwordModal" class="modal">
+    <div class="modal-content">
+      <h2>Reset Password</h2>
+      <div class="form-group">
+        <label>Temporary Password</label>
+        <input id="tempPassword" type="text" placeholder="Enter temporary password..." />
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button onclick="submitPasswordReset()" style="flex: 1;">Reset</button>
+        <button onclick="closeModal('passwordModal')" style="flex: 1; background: rgba(99,102,241,0.2);">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="deleteModal" class="modal">
+    <div class="modal-content">
+      <h2 style="color: #f87171;">⚠️ Delete User Permanently</h2>
+      <p style="color: #fca5a5; margin-bottom: 15px;">This action cannot be undone. All user data will be deleted.</p>
+      <div class="form-group">
+        <label>Type "confirm" to delete</label>
+        <input id="deleteConfirm" type="text" />
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button onclick="submitDelete()" style="flex: 1; background: rgba(239,68,68,0.5);">Delete</button>
+        <button onclick="closeModal('deleteModal')" style="flex: 1; background: rgba(99,102,241,0.2);">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="privilegesModal" class="modal">
+    <div class="modal-content" style="max-width: 600px;">
+      <h2>👤 User Privileges & Access Control</h2>
+
+      <div style="background: rgba(96,165,250,0.08); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px;">
+          <div>
+            <strong style="color: #a5b4fc;">Name:</strong>
+            <div id="privName" style="color: #e0e7ff;">-</div>
+          </div>
+          <div>
+            <strong style="color: #a5b4fc;">Email:</strong>
+            <div id="privEmail" style="color: #e0e7ff; word-break: break-all;">-</div>
+          </div>
+          <div>
+            <strong style="color: #a5b4fc;">Role:</strong>
+            <div id="privRole" style="color: #e0e7ff;">-</div>
+          </div>
+          <div>
+            <strong style="color: #a5b4fc;">Status:</strong>
+            <div id="privStatus" style="color: #e0e7ff;">-</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 20px;">
+        <h3 style="color: #a5b4fc; margin-bottom: 15px;">🔐 Permissions</h3>
+        <div id="privilegesContainer" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 10px;">
+        <button id="savePrivilegesBtn" onclick="savePrivileges()"
+          style="flex: 1; background: rgba(16,185,129,0.3); border: 1px solid rgba(16,185,129,0.5);">💾 Save
+          Changes</button>
+        <button onclick="closeModal('privilegesModal')"
+          style="flex: 1; background: rgba(99,102,241,0.2);">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="activityLogsModal" class="modal">
+    <div class="modal-content" style="max-width: 900px; max-height: 80vh; overflow-y: auto;">
+      <h2>📋 User Activity Logs</h2>
+
+      <div style="background: rgba(96,165,250,0.08); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; font-size: 13px;">
+          <div>
+            <strong style="color: #a5b4fc;">User:</strong>
+            <div id="activityUserName" style="color: #e0e7ff;">-</div>
+          </div>
+          <div>
+            <strong style="color: #a5b4fc;">Email:</strong>
+            <div id="activityUserEmail" style="color: #e0e7ff; word-break: break-all;">-</div>
+          </div>
+          <div>
+            <strong style="color: #a5b4fc;">Total Activities:</strong>
+            <div id="activityCount" style="color: #e0e7ff;">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 15px; display: flex; gap: 10px;">
+        <select id="activityFilter" onchange="filterActivityLogs()"
+          style="padding: 8px; border-radius: 6px; border: 1px solid rgba(96,165,250,0.3); background: rgba(30,33,57,0.8); color: #e0e7ff;">
+          <option value="">All Activities</option>
+          <option value="login">Login</option>
+          <option value="logout">Logout</option>
+          <option value="create">Create</option>
+          <option value="update">Update</option>
+          <option value="delete">Delete</option>
+          <option value="view">View</option>
+        </select>
+        <input id="activitySearch" type="text" placeholder="Search activities..." onkeyup="filterActivityLogs()"
+          style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid rgba(96,165,250,0.3); background: rgba(30,33,57,0.8); color: #e0e7ff;" />
+      </div>
+
+      <div id="activityLogsContainer" style="display: grid; gap: 12px; max-height: 400px; overflow-y: auto;">
         <!-- Dynamically populated -->
       </div>
-    </div>
 
-    <div style="display: flex; gap: 10px;">
-      <button id="savePrivilegesBtn" onclick="savePrivileges()" style="flex: 1; background: rgba(16,185,129,0.3); border: 1px solid rgba(16,185,129,0.5);">💾 Save Changes</button>
-      <button onclick="closeModal('privilegesModal')" style="flex: 1; background: rgba(99,102,241,0.2);">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<div id="activityLogsModal" class="modal">
-  <div class="modal-content" style="max-width: 900px; max-height: 80vh; overflow-y: auto;">
-    <h2>📋 User Activity Logs</h2>
-    
-    <div style="background: rgba(96,165,250,0.08); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; font-size: 13px;">
-        <div>
-          <strong style="color: #a5b4fc;">User:</strong>
-          <div id="activityUserName" style="color: #e0e7ff;">-</div>
-        </div>
-        <div>
-          <strong style="color: #a5b4fc;">Email:</strong>
-          <div id="activityUserEmail" style="color: #e0e7ff; word-break: break-all;">-</div>
-        </div>
-        <div>
-          <strong style="color: #a5b4fc;">Total Activities:</strong>
-          <div id="activityCount" style="color: #e0e7ff;">0</div>
-        </div>
+      <div style="display: flex; gap: 10px; margin-top: 20px;">
+        <button onclick="exportActivityLogs()"
+          style="flex: 1; background: rgba(96,165,250,0.3); border: 1px solid rgba(96,165,250,0.5);">📥 Export to
+          CSV</button>
+        <button onclick="closeModal('activityLogsModal')"
+          style="flex: 1; background: rgba(99,102,241,0.2);">Close</button>
       </div>
     </div>
-
-    <div style="margin-bottom: 15px; display: flex; gap: 10px;">
-      <select id="activityFilter" onchange="filterActivityLogs()" style="padding: 8px; border-radius: 6px; border: 1px solid rgba(96,165,250,0.3); background: rgba(30,33,57,0.8); color: #e0e7ff;">
-        <option value="">All Activities</option>
-        <option value="login">Login</option>
-        <option value="logout">Logout</option>
-        <option value="create">Create</option>
-        <option value="update">Update</option>
-        <option value="delete">Delete</option>
-        <option value="view">View</option>
-      </select>
-      <input id="activitySearch" type="text" placeholder="Search activities..." onkeyup="filterActivityLogs()" style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid rgba(96,165,250,0.3); background: rgba(30,33,57,0.8); color: #e0e7ff;"/>
-    </div>
-
-    <div id="activityLogsContainer" style="display: grid; gap: 12px; max-height: 400px; overflow-y: auto;">
-      <!-- Dynamically populated -->
-    </div>
-
-    <div style="display: flex; gap: 10px; margin-top: 20px;">
-      <button onclick="exportActivityLogs()" style="flex: 1; background: rgba(96,165,250,0.3); border: 1px solid rgba(96,165,250,0.5);">📥 Export to CSV</button>
-      <button onclick="closeModal('activityLogsModal')" style="flex: 1; background: rgba(99,102,241,0.2);">Close</button>
-    </div>
   </div>
-</div>
 
-<script>
-  const API_BASE = '/api/v1/admin';
-  let currentUserId = null;
-  let signupsChart = null;
-  let authCheckInterval;
-  let accessToken = null;
+  <script>
+    const API_BASE = '/api/v1/admin';
+    let currentUserId = null;
+    let signupsChart = null;
+    let authCheckInterval;
+    let accessToken = null;
 
-  // Get access token from sessionStorage
-  function getAccessToken() {
-    return sessionStorage.getItem('adminAccessToken');
-  }
-
-  // Get auth headers with access token
-  function getAuthHeaders() {
-    const token = getAccessToken();
-    const headers = { 'x-api-key': 'mobile', 'Content-Type': 'application/json' };
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+    // Get access token from sessionStorage
+    function getAccessToken() {
+      return sessionStorage.getItem('adminAccessToken');
     }
-    return headers;
-  }
 
-  // Check authentication on page load
-  async function checkAuth() {
-    try {
+    // Get auth headers with access token
+    function getAuthHeaders() {
       const token = getAccessToken();
-      console.log('checkAuth: Token available?', !!token);
-      
-      if (!token) {
-        console.log('checkAuth: No token found, redirecting to login');
-        redirectToLogin();
-        return false;
+      const headers = { 'x-api-key': 'mobile', 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
       }
-      
-      const res = await fetch(`${API_BASE}/users?limit=1`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-        credentials: 'include'
-      });
-      
-      console.log('checkAuth: Auth check response status', res.status);
-      
-      if (res.status === 401 || res.status === 403) {
-        console.log('checkAuth: Unauthorized, redirecting to login');
-        sessionStorage.removeItem('adminAccessToken');
-        redirectToLogin();
-        return false;
-      }
-      
-      console.log('checkAuth: Authentication successful');
-      return res.ok;
-    } catch (e) {
-      console.error('checkAuth: Error', e);
-      redirectToLogin();
-      return false;
+      return headers;
     }
-  }
 
-  function redirectToLogin() {
-    sessionStorage.removeItem('adminAccessToken');
-    window.location.href = '/admin-login.html';
-  }
+    // Check authentication on page load
+    async function checkAuth() {
+      try {
+        const token = getAccessToken();
+        console.log('checkAuth: Token available?', !!token);
 
-  // Periodic auth check every 5 minutes
-  authCheckInterval = setInterval(checkAuth, 5 * 60 * 1000);
+        if (!token) {
+          console.log('checkAuth: No token found, redirecting to login');
+          redirectToLogin();
+          return false;
+        }
 
-  // Tab switching
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-      const tabName = e.target.dataset.tab;
-      document.getElementById(tabName).classList.add('active');
-      e.target.classList.add('active');
-      if (tabName === 'overview') loadStats();
-      else if (tabName === 'users') loadUsers();
-    });
-  });
+        const res = await fetch(`${API_BASE}/users?limit=1`, {
+          method: 'GET',
+          headers: getAuthHeaders(),
+          credentials: 'include'
+        });
 
-  async function loadStats() {
-    try {
-      const res = await fetch(`${API_BASE}/users/statistics/overview`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-        credentials: 'include'
+        console.log('checkAuth: Auth check response status', res.status);
+
+        if (res.status === 401 || res.status === 403) {
+          console.log('checkAuth: Unauthorized, redirecting to login');
+          sessionStorage.removeItem('adminAccessToken');
+          redirectToLogin();
+          return false;
+        }
+
+        console.log('checkAuth: Authentication successful');
+        return res.ok;
+      } catch (e) {
+        console.error('checkAuth: Error', e);
+        redirectToLogin();
+        return false;
+      }
+    }
+
+    function redirectToLogin() {
+      sessionStorage.removeItem('adminAccessToken');
+      window.location.href = '/admin-login.html';
+    }
+
+    // Periodic auth check every 5 minutes
+    authCheckInterval = setInterval(checkAuth, 5 * 60 * 1000);
+
+    // Tab switching
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        const tabName = e.target.dataset.tab;
+        document.getElementById(tabName).classList.add('active');
+        e.target.classList.add('active');
+        if (tabName === 'overview') loadStats();
+        else if (tabName === 'users') loadUsers();
       });
-      const json = await res.json();
-      if (json.success) {
-        const { totalUsers, totalParents, totalChildren, activeUsers, bannedUsers, newUsersThisPeriod, dailySignups } = json.data;
-        document.getElementById('statsGrid').innerHTML = `
+    });
+
+    async function loadStats() {
+      try {
+        const res = await fetch(`${API_BASE}/users/statistics/overview`, {
+          method: 'GET',
+          headers: getAuthHeaders(),
+          credentials: 'include'
+        });
+        const json = await res.json();
+        if (json.success) {
+          const { totalUsers, totalParents, totalChildren, activeUsers, bannedUsers, newUsersThisPeriod, dailySignups } = json.data;
+          document.getElementById('statsGrid').innerHTML = `
           <div class="stat-card"><h3>${totalUsers}</h3><p>Total Users</p></div>
           <div class="stat-card"><h3>${totalParents}</h3><p>Parents</p></div>
           <div class="stat-card"><h3>${totalChildren}</h3><p>Children</p></div>
@@ -587,54 +678,54 @@
           <div class="stat-card"><h3>${newUsersThisPeriod}</h3><p>New This Month</p></div>
           <div class="stat-card"><h3>${bannedUsers}</h3><p>Banned</p></div>
         `;
-        renderSignupsChart(dailySignups);
-      }
-    } catch (e) { console.error('Load stats error:', e); }
-  }
+          renderSignupsChart(dailySignups);
+        }
+      } catch (e) { console.error('Load stats error:', e); }
+    }
 
-  function renderSignupsChart(data) {
-    const ctx = document.getElementById('signupsChart');
-    if (signupsChart) signupsChart.destroy();
-    const labels = data.map(d => d._id);
-    const counts = data.map(d => d.count);
-    signupsChart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels,
-        datasets: [{
-          label: 'New Signups',
-          data: counts,
-          borderColor: '#60a5fa',
-          backgroundColor: 'rgba(96, 165, 250, 0.08)',
-          tension: 0.4,
-          fill: true,
-          pointRadius: 4,
-          pointBackgroundColor: '#60a5fa'
-        }]
-      },
-      options: { responsive: true, plugins: { legend: { labels: { color: '#a5b4fc' } } }, scales: { x: { ticks: { color: 'rgba(165,180,252,0.6)' }, grid: { color: 'rgba(96,165,250,0.05)' } }, y: { ticks: { color: 'rgba(165,180,252,0.6)' }, grid: { color: 'rgba(96,165,250,0.05)' } } } }
-    });
-  }
-
-  async function loadUsers() {
-    try {
-      const search = document.getElementById('searchInput').value;
-      const role = document.getElementById('roleFilter').value;
-      const isActive = document.getElementById('statusFilter').value;
-      const params = new URLSearchParams({ page: 1, limit: 50 });
-      if (search) params.append('search', search);
-      if (role) params.append('role', role);
-      if (isActive) params.append('isActive', isActive);
-      
-      const res = await fetch(`${API_BASE}/users?${params}`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-        credentials: 'include'
+    function renderSignupsChart(data) {
+      const ctx = document.getElementById('signupsChart');
+      if (signupsChart) signupsChart.destroy();
+      const labels = data.map(d => d._id);
+      const counts = data.map(d => d.count);
+      signupsChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'New Signups',
+            data: counts,
+            borderColor: '#60a5fa',
+            backgroundColor: 'rgba(96, 165, 250, 0.08)',
+            tension: 0.4,
+            fill: true,
+            pointRadius: 4,
+            pointBackgroundColor: '#60a5fa'
+          }]
+        },
+        options: { responsive: true, plugins: { legend: { labels: { color: '#a5b4fc' } } }, scales: { x: { ticks: { color: 'rgba(165,180,252,0.6)' }, grid: { color: 'rgba(96,165,250,0.05)' } }, y: { ticks: { color: 'rgba(165,180,252,0.6)' }, grid: { color: 'rgba(96,165,250,0.05)' } } } }
       });
-      const json = await res.json();
-      if (json.success) {
-        const tbody = document.getElementById('usersBody');
-        tbody.innerHTML = json.users.map(u => `
+    }
+
+    async function loadUsers() {
+      try {
+        const search = document.getElementById('searchInput').value;
+        const role = document.getElementById('roleFilter').value;
+        const isActive = document.getElementById('statusFilter').value;
+        const params = new URLSearchParams({ page: 1, limit: 50 });
+        if (search) params.append('search', search);
+        if (role) params.append('role', role);
+        if (isActive) params.append('isActive', isActive);
+
+        const res = await fetch(`${API_BASE}/users?${params}`, {
+          method: 'GET',
+          headers: getAuthHeaders(),
+          credentials: 'include'
+        });
+        const json = await res.json();
+        if (json.success) {
+          const tbody = document.getElementById('usersBody');
+          tbody.innerHTML = json.users.map(u => `
           <tr>
             <td><strong>${u.name}</strong></td>
             <td>${u.email}</td>
@@ -647,470 +738,461 @@
             </div></td>
           </tr>
         `).join('');
+        }
+      } catch (e) { console.error('Load users error:', e); }
+    }
+
+    function selectUser(userId) {
+      currentUserId = userId;
+      document.querySelectorAll('.tab-btn')[2].click();
+      document.getElementById('userIdInput').value = userId;
+    }
+
+    function openModal(id) {
+      if (!currentUserId && id !== 'overview') {
+        currentUserId = document.getElementById('userIdInput').value;
+        if (!currentUserId) return alert('Please enter a User ID');
       }
-    } catch (e) { console.error('Load users error:', e); }
-  }
 
-  function selectUser(userId) {
-    currentUserId = userId;
-    document.querySelectorAll('.tab-btn')[2].click();
-    document.getElementById('userIdInput').value = userId;
-  }
+      // Load user details for edit modal
+      if (id === 'editModal') {
+        loadUserDetailsForEdit();
+        return; // Don't open modal yet, wait for data to load
+      }
 
-  function openModal(id) {
-    if (!currentUserId && id !== 'overview') {
-      currentUserId = document.getElementById('userIdInput').value;
-      if (!currentUserId) return alert('Please enter a User ID');
+      document.getElementById(id).classList.add('active');
     }
-    
-    // Load user details for edit modal
-    if (id === 'editModal') {
-      loadUserDetailsForEdit();
-      return; // Don't open modal yet, wait for data to load
+
+    async function loadUserDetailsForEdit() {
+      try {
+        const res = await fetch(`${API_BASE}/users/${currentUserId}`, {
+          method: 'GET',
+          headers: getAuthHeaders(),
+          credentials: 'include'
+        });
+
+        if (!res.ok) {
+          alert('Error loading user details');
+          return;
+        }
+
+        const json = await res.json();
+        const user = json.user;
+
+        // Pre-populate the form fields
+        document.getElementById('editName').value = user.name || '';
+        document.getElementById('editName').placeholder = user.name || 'Enter name';
+
+        document.getElementById('editEmail').value = user.email || '';
+        document.getElementById('editEmail').placeholder = user.email || 'Enter email';
+
+        // Now open the modal
+        document.getElementById('editModal').classList.add('active');
+      } catch (e) {
+        console.error('Error loading user details:', e);
+        alert('Error loading user details: ' + e.message);
+      }
     }
-    
-    document.getElementById(id).classList.add('active');
-  }
 
-  async function loadUserDetailsForEdit() {
-    try {
-      const res = await fetch(`${API_BASE}/users/${currentUserId}`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-        credentials: 'include'
-      });
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('active');
+    }
 
-      if (!res.ok) {
-        alert('Error loading user details');
+    async function submitEdit() {
+      try {
+        const res = await fetch(`${API_BASE}/users/${currentUserId}`, {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          credentials: 'include',
+          body: JSON.stringify({ name: document.getElementById('editName').value, email: document.getElementById('editEmail').value })
+        });
+        const json = await res.json();
+        showMessage(json.message, json.success);
+        closeModal('editModal');
+      } catch (e) { showMessage('Error: ' + e.message, false); }
+    }
+
+    async function submitBan() {
+      try {
+        const res = await fetch(`${API_BASE}/users/${currentUserId}/ban`, {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          credentials: 'include',
+          body: JSON.stringify({ banned: true, reason: document.getElementById('banReason').value })
+        });
+        const json = await res.json();
+        showMessage(json.message, json.success);
+        closeModal('banModal');
+      } catch (e) { showMessage('Error: ' + e.message, false); }
+    }
+
+    async function submitPasswordReset() {
+      try {
+        const res = await fetch(`${API_BASE}/users/${currentUserId}/reset-password`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          credentials: 'include',
+          body: JSON.stringify({ tempPassword: document.getElementById('tempPassword').value })
+        });
+        const json = await res.json();
+        showMessage(json.message, json.success);
+        closeModal('passwordModal');
+      } catch (e) { showMessage('Error: ' + e.message, false); }
+    }
+
+    async function forceLogoutUser() {
+      try {
+        const res = await fetch(`${API_BASE}/users/${currentUserId}/force-logout`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          credentials: 'include'
+        });
+        const json = await res.json();
+        showMessage(json.message, json.success);
+      } catch (e) { showMessage('Error: ' + e.message, false); }
+    }
+
+    async function submitDelete() {
+      if (document.getElementById('deleteConfirm').value !== 'confirm') {
+        return alert('Type "confirm" to proceed');
+      }
+      try {
+        const res = await fetch(`${API_BASE}/users/${currentUserId}/delete`, {
+          method: 'DELETE',
+          headers: getAuthHeaders(),
+          credentials: 'include',
+          body: JSON.stringify({ confirmDelete: true })
+        });
+        const json = await res.json();
+        showMessage(json.message, json.success);
+        closeModal('deleteModal');
+      } catch (e) { showMessage('Error: ' + e.message, false); }
+    }
+
+    let allActivityLogs = [];
+
+    async function viewActivityLogs() {
+      if (!currentUserId) {
+        alert('Please select a user first');
         return;
       }
 
-      const json = await res.json();
-      const user = json.user;
+      try {
+        // Fetch user details
+        const userRes = await fetch(`${API_BASE}/users/${currentUserId}`, {
+          method: 'GET',
+          headers: getAuthHeaders(),
+          credentials: 'include'
+        });
+        const userData = await userRes.json();
+        const user = userData.user;
 
-      // Pre-populate the form fields
-      document.getElementById('editName').value = user.name || '';
-      document.getElementById('editName').placeholder = user.name || 'Enter name';
-      
-      document.getElementById('editEmail').value = user.email || '';
-      document.getElementById('editEmail').placeholder = user.email || 'Enter email';
+        // Display user info
+        document.getElementById('activityUserName').textContent = user.name || '-';
+        document.getElementById('activityUserEmail').textContent = user.email || '-';
 
-      // Now open the modal
-      document.getElementById('editModal').classList.add('active');
-    } catch (e) {
-      console.error('Error loading user details:', e);
-      alert('Error loading user details: ' + e.message);
-    }
-  }
+        // Fetch activity logs
+        const logsRes = await fetch(`${API_BASE}/users/${currentUserId}/activity-logs?days=90&limit=500`, {
+          method: 'GET',
+          headers: getAuthHeaders(),
+          credentials: 'include'
+        });
 
-  function closeModal(id) {
-    document.getElementById(id).classList.remove('active');
-  }
+        const logsData = await logsRes.json();
 
-  async function submitEdit() {
-    try {
-      const res = await fetch(`${API_BASE}/users/${currentUserId}`, {
-        method: 'PUT',
-        headers: getAuthHeaders(),
-        credentials: 'include',
-        body: JSON.stringify({ name: document.getElementById('editName').value, email: document.getElementById('editEmail').value })
-      });
-      const json = await res.json();
-      showMessage(json.message, json.success);
-      closeModal('editModal');
-    } catch (e) { showMessage('Error: ' + e.message, false); }
-  }
-
-  async function submitBan() {
-    try {
-      const res = await fetch(`${API_BASE}/users/${currentUserId}/ban`, {
-        method: 'PUT',
-        headers: getAuthHeaders(),
-        credentials: 'include',
-        body: JSON.stringify({ banned: true, reason: document.getElementById('banReason').value })
-      });
-      const json = await res.json();
-      showMessage(json.message, json.success);
-      closeModal('banModal');
-    } catch (e) { showMessage('Error: ' + e.message, false); }
-  }
-
-  async function submitPasswordReset() {
-    try {
-      const res = await fetch(`${API_BASE}/users/${currentUserId}/reset-password`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        credentials: 'include',
-        body: JSON.stringify({ tempPassword: document.getElementById('tempPassword').value })
-      });
-      const json = await res.json();
-      showMessage(json.message, json.success);
-      closeModal('passwordModal');
-    } catch (e) { showMessage('Error: ' + e.message, false); }
-  }
-
-  async function forceLogoutUser() {
-    try {
-      const res = await fetch(`${API_BASE}/users/${currentUserId}/force-logout`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        credentials: 'include'
-      });
-      const json = await res.json();
-      showMessage(json.message, json.success);
-    } catch (e) { showMessage('Error: ' + e.message, false); }
-  }
-
-  async function submitDelete() {
-    if (document.getElementById('deleteConfirm').value !== 'confirm') {
-      return alert('Type "confirm" to proceed');
-    }
-    try {
-      const res = await fetch(`${API_BASE}/users/${currentUserId}/delete`, {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-        credentials: 'include',
-        body: JSON.stringify({ confirmDelete: true })
-      });
-      const json = await res.json();
-      showMessage(json.message, json.success);
-      closeModal('deleteModal');
-    } catch (e) { showMessage('Error: ' + e.message, false); }
-  }
-
-  let allActivityLogs = [];
-
-  async function viewActivityLogs() {
-    if (!currentUserId) {
-      alert('Please select a user first');
-      return;
-    }
-
-    try {
-      // Fetch user details
-      const userRes = await fetch(`${API_BASE}/users/${currentUserId}`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-        credentials: 'include'
-      });
-      const userData = await userRes.json();
-      const user = userData.user;
-
-      // Display user info
-      document.getElementById('activityUserName').textContent = user.name || '-';
-      document.getElementById('activityUserEmail').textContent = user.email || '-';
-
-      // Fetch activity logs
-      const logsRes = await fetch(`${API_BASE}/users/${currentUserId}/activity-logs?days=90&limit=500`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-        credentials: 'include'
-      });
-
-      const logsData = await logsRes.json();
-      
-      if (logsData.success && Array.isArray(logsData.logs)) {
-        allActivityLogs = logsData.logs;
-        document.getElementById('activityCount').textContent = allActivityLogs.length;
-        displayActivityLogs(allActivityLogs);
-        openModal('activityLogsModal');
-      } else {
-        showMessage('Error loading activity logs', false);
+        if (logsData.success && Array.isArray(logsData.logs)) {
+          allActivityLogs = logsData.logs;
+          document.getElementById('activityCount').textContent = allActivityLogs.length;
+          displayActivityLogs(allActivityLogs);
+          openModal('activityLogsModal');
+        } else {
+          showMessage('Error loading activity logs', false);
+        }
+      } catch (e) {
+        console.error('Error fetching activity logs:', e);
+        showMessage('Error: ' + e.message, false);
       }
-    } catch (e) {
-      console.error('Error fetching activity logs:', e);
-      showMessage('Error: ' + e.message, false);
-    }
-  }
-
-  function displayActivityLogs(logs) {
-    const container = document.getElementById('activityLogsContainer');
-    container.innerHTML = '';
-
-    if (logs.length === 0) {
-      container.innerHTML = '<div style="padding: 20px; text-align: center; color: #a5b4fc;">No activity logs found</div>';
-      return;
     }
 
-    logs.forEach(log => {
-      const date = new Date(log.timestamp);
-      const formattedDate = date.toLocaleString();
-      const actionType = log.action?.split(' ')[0]?.toLowerCase() || 'activity';
-      
-      // Color code based on action type
-      let actionColor = '#60a5fa';
-      if (actionType.includes('delete')) actionColor = '#ef4444';
-      else if (actionType.includes('create')) actionColor = '#10b981';
-      else if (actionType.includes('update')) actionColor = '#f59e0b';
-      else if (actionType.includes('login')) actionColor = '#6366f1';
-      else if (actionType.includes('logout')) actionColor = '#ec4899';
-
-      const logEntry = document.createElement('div');
-      logEntry.style.background = 'rgba(96,165,250,0.08)';
-      logEntry.style.padding = '12px';
-      logEntry.style.borderRadius = '6px';
-      logEntry.style.borderLeft = `4px solid ${actionColor}`;
-      logEntry.style.fontSize = '13px';
-      logEntry.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: start; gap: 10px;">
-          <div style="flex: 1;">
-            <strong style="color: ${actionColor};">${log.action || 'Activity'}</strong>
-            <div style="color: #a5b4fc; margin-top: 4px; font-size: 12px;">
-              ${formattedDate}
-            </div>
-            ${log.details ? `<div style="color: #a5b4fc; margin-top: 4px; font-size: 11px;">${log.details}</div>` : ''}
-            ${log.ipAddress ? `<div style="color: #64748b; margin-top: 4px; font-size: 11px;">IP: ${log.ipAddress}</div>` : ''}
-          </div>
-          <span style="background: ${actionColor}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; white-space: nowrap;">${actionType.toUpperCase()}</span>
-        </div>
-      `;
-      container.appendChild(logEntry);
-    });
-  }
-
-  function filterActivityLogs() {
-    const filterValue = document.getElementById('activityFilter').value;
-    const searchValue = document.getElementById('activitySearch').value.toLowerCase();
-
-    const filtered = allActivityLogs.filter(log => {
-      const matchesFilter = !filterValue || log.action.toLowerCase().includes(filterValue);
-      const matchesSearch = !searchValue || 
-        log.action.toLowerCase().includes(searchValue) || 
-        (log.details && log.details.toLowerCase().includes(searchValue));
-      
-      return matchesFilter && matchesSearch;
-    });
-
-    displayActivityLogs(filtered);
-  }
-
-  function exportActivityLogs() {
-    if (allActivityLogs.length === 0) {
-      alert('No activity logs to export');
-      return;
-    }
-
-    // Create CSV content
-    let csv = 'Action,Timestamp,Details,IP Address\n';
-    
-    allActivityLogs.forEach(log => {
-      const timestamp = new Date(log.timestamp).toLocaleString();
-      const details = (log.details || '').replace(/,/g, ';'); // Replace commas in details
-      const ipAddress = log.ipAddress || 'N/A';
-      
-      csv += `"${log.action}","${timestamp}","${details}","${ipAddress}"\n`;
-    });
-
-    // Create blob and download
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `activity-logs-${currentUserId}-${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-
-    showMessage('✅ Activity logs exported successfully', true);
-  }
-
-  let currentUserPrivileges = {};
-
-  async function viewPrivileges() {
-    if (!currentUserId) {
-      alert('Please select a user first by clicking Quick Actions');
-      return;
-    }
-
-    try {
-      // Fetch user details
-      const res = await fetch(`${API_BASE}/users/${currentUserId}`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-        credentials: 'include'
-      });
-
-      if (!res.ok) {
-        showMessage('Error fetching user details', false);
-        return;
-      }
-
-      const json = await res.json();
-      const user = json.user;
-
-      // Display user info
-      document.getElementById('privName').textContent = user.name || '-';
-      document.getElementById('privEmail').textContent = user.email || '-';
-      document.getElementById('privRole').textContent = user.role || '-';
-      document.getElementById('privStatus').textContent = user.isActive ? '✅ Active' : '❌ Inactive';
-
-      // Initialize default privileges based on user role
-      let defaultPermissions = {};
-      
-      // For admin/super_admin users, all admin permissions enabled by default
-      if (user.role === 'admin' || user.role === 'super_admin') {
-        defaultPermissions = {
-          users: true,
-          parents: true,
-          children: true,
-          activities: true,
-          analytics: true,
-          settings: true,
-          admins: user.role === 'super_admin', // only super_admin can manage admins
-          audit: true,
-        };
-      } else {
-        // For regular users (parent/child), these are their app features
-        defaultPermissions = {
-          'view_profile': true,
-          'edit_profile': true,
-          'view_mood_tracking': true,
-          'edit_mood_tracking': true,
-          'view_activities': true,
-          'edit_activities': true,
-          'view_chat': true,
-          'send_messages': true,
-          'view_learning': true,
-          'view_gamification': true,
-        };
-      }
-
-      // Merge with user's actual permissions (override defaults with what's stored)
-      currentUserPrivileges = { ...defaultPermissions };
-      if (user.permissions && typeof user.permissions === 'object') {
-        Object.assign(currentUserPrivileges, user.permissions);
-      }
-
-      console.log('Loaded privileges:', currentUserPrivileges);
-
-      // Build UI
-      const container = document.getElementById('privilegesContainer');
+    function displayActivityLogs(logs) {
+      const container = document.getElementById('activityLogsContainer');
       container.innerHTML = '';
 
-      const permissionsToShow = user.role === 'admin' || user.role === 'super_admin' ? 
-        Object.keys(defaultPermissions) : 
-        Object.keys(defaultPermissions);
+      if (!logs.length) {
+        container.innerHTML =
+          '<div style="padding:20px;text-align:center;color:#a5b4fc;">No activity logs found</div>';
+        return;
+      }
 
-      permissionsToShow.forEach(perm => {
-        const isChecked = currentUserPrivileges[perm] === true;
-        const checkbox = document.createElement('div');
-        checkbox.style.display = 'flex';
-        checkbox.style.alignItems = 'center';
-        checkbox.style.gap = '8px';
-        checkbox.style.padding = '10px';
-        checkbox.style.background = 'rgba(96,165,250,0.05)';
-        checkbox.style.borderRadius = '6px';
-        checkbox.innerHTML = `
+      logs.forEach(log => {
+        const formattedDate = new Date(log.createdAt).toLocaleString();
+        const action = log.action || 'ACTIVITY';
+
+        let color = '#60a5fa';
+        if (action.includes('DELETE')) color = '#ef4444';
+        else if (action.includes('CREATE')) color = '#10b981';
+        else if (action.includes('UPDATE')) color = '#f59e0b';
+        else if (action.includes('LOGIN')) color = '#6366f1';
+        else if (action.includes('LOGOUT')) color = '#ec4899';
+
+        container.innerHTML += `
+      <div style="background:rgba(96,165,250,0.08);padding:12px;border-left:4px solid ${color};border-radius:6px;">
+        <strong style="color:${color};">${action}</strong>
+        <div style="font-size:12px;color:#a5b4fc;">${formattedDate}</div>
+        ${log.ipAddress ? `<div style="font-size:11px;">IP: ${log.ipAddress}</div>` : ''}
+      </div>
+    `;
+      });
+    }
+
+    function filterActivityLogs() {
+      const filterValue = document.getElementById('activityFilter').value.toLowerCase();
+      const searchValue = document.getElementById('activitySearch').value.toLowerCase();
+
+      const filtered = allActivityLogs.filter(log => {
+        const action = (log.action || '').toLowerCase();
+        const details =
+          typeof log.details === 'string'
+            ? log.details.toLowerCase()
+            : JSON.stringify(log.details || {}).toLowerCase();
+
+        const matchesFilter = !filterValue || action.includes(filterValue);
+        const matchesSearch = !searchValue || action.includes(searchValue) || details.includes(searchValue);
+
+        return matchesFilter && matchesSearch;
+      });
+
+      displayActivityLogs(filtered);
+    }
+
+    function exportActivityLogs() {
+      if (allActivityLogs.length === 0) {
+        alert('No activity logs to export');
+        return;
+      }
+
+      // Create CSV content
+      let csv = 'Action,Timestamp,Details,IP Address\n';
+
+      allActivityLogs.forEach(log => {
+        const timestamp = new Date(log.createdAt).toLocaleString();
+        const details = (log.details || '').replace(/,/g, ';'); // Replace commas in details
+        const ipAddress = log.ipAddress || 'N/A';
+
+        csv += `"${log.action}","${timestamp}","${details}","${ipAddress}"\n`;
+      });
+
+      // Create blob and download
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `activity-logs-${currentUserId}-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      showMessage('✅ Activity logs exported successfully', true);
+    }
+
+    let currentUserPrivileges = {};
+
+    async function viewPrivileges() {
+      if (!currentUserId) {
+        alert('Please select a user first by clicking Quick Actions');
+        return;
+      }
+
+      try {
+        // Fetch user details
+        const res = await fetch(`${API_BASE}/users/${currentUserId}`, {
+          method: 'GET',
+          headers: getAuthHeaders(),
+          credentials: 'include'
+        });
+
+        if (!res.ok) {
+          showMessage('Error fetching user details', false);
+          return;
+        }
+
+        const json = await res.json();
+        const user = json.user;
+
+        // Display user info
+        document.getElementById('privName').textContent = user.name || '-';
+        document.getElementById('privEmail').textContent = user.email || '-';
+        document.getElementById('privRole').textContent = user.role || '-';
+        document.getElementById('privStatus').textContent = user.isActive ? '✅ Active' : '❌ Inactive';
+
+        // Initialize default privileges based on user role
+        let defaultPermissions = {};
+
+        // For admin/super_admin users, all admin permissions enabled by default
+        if (user.role === 'admin' || user.role === 'super_admin') {
+          defaultPermissions = {
+            users: true,
+            parents: true,
+            children: true,
+            activities: true,
+            analytics: true,
+            settings: true,
+            admins: user.role === 'super_admin', // only super_admin can manage admins
+            audit: true,
+          };
+        } else {
+          // For regular users (parent/child), these are their app features
+          defaultPermissions = {
+            'view_profile': true,
+            'edit_profile': true,
+            'view_mood_tracking': true,
+            'edit_mood_tracking': true,
+            'view_activities': true,
+            'edit_activities': true,
+            'view_chat': true,
+            'send_messages': true,
+            'view_learning': true,
+            'view_gamification': true,
+          };
+        }
+
+        // Merge with user's actual permissions (override defaults with what's stored)
+        currentUserPrivileges = { ...defaultPermissions };
+        if (user.permissions && typeof user.permissions === 'object') {
+          Object.assign(currentUserPrivileges, user.permissions);
+        }
+
+        console.log('Loaded privileges:', currentUserPrivileges);
+
+        // Build UI
+        const container = document.getElementById('privilegesContainer');
+        container.innerHTML = '';
+
+        const permissionsToShow = user.role === 'admin' || user.role === 'super_admin' ?
+          Object.keys(defaultPermissions) :
+          Object.keys(defaultPermissions);
+
+        permissionsToShow.forEach(perm => {
+          const isChecked = currentUserPrivileges[perm] === true;
+          const checkbox = document.createElement('div');
+          checkbox.style.display = 'flex';
+          checkbox.style.alignItems = 'center';
+          checkbox.style.gap = '8px';
+          checkbox.style.padding = '10px';
+          checkbox.style.background = 'rgba(96,165,250,0.05)';
+          checkbox.style.borderRadius = '6px';
+          checkbox.innerHTML = `
           <input type="checkbox" id="perm_${perm}" ${isChecked ? 'checked' : ''} onchange="updatePrivilege('${perm}', this.checked)">
           <label for="perm_${perm}" style="cursor: pointer; flex: 1; margin: 0; text-transform: capitalize;">${perm.replace(/_/g, ' ')}</label>
         `;
-        container.appendChild(checkbox);
-      });
+          container.appendChild(checkbox);
+        });
 
-      openModal('privilegesModal');
-    } catch (e) {
-      console.error('Error fetching privileges:', e);
-      showMessage('Error: ' + e.message, false);
-    }
-  }
-
-  function updatePrivilege(permissionName, isEnabled) {
-    currentUserPrivileges[permissionName] = isEnabled;
-  }
-
-  async function savePrivileges() {
-    if (!currentUserId) return;
-
-    const btn = document.getElementById('savePrivilegesBtn');
-    const originalText = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = '⏳ Saving...';
-
-    try {
-      const res = await fetch(`${API_BASE}/users/${currentUserId}`, {
-        method: 'PUT',
-        headers: getAuthHeaders(),
-        credentials: 'include',
-        body: JSON.stringify({ privileges: currentUserPrivileges })
-      });
-
-      const json = await res.json();
-      if (json.success) {
-        showMessage('✅ Privileges updated successfully', true);
-        setTimeout(() => closeModal('privilegesModal'), 500);
-      } else {
-        showMessage('❌ ' + (json.message || 'Failed to update privileges'), false);
+        openModal('privilegesModal');
+      } catch (e) {
+        console.error('Error fetching privileges:', e);
+        showMessage('Error: ' + e.message, false);
       }
-    } catch (e) {
-      showMessage('Error: ' + e.message, false);
-    } finally {
-      btn.disabled = false;
-      btn.textContent = originalText;
     }
-  }
 
-
-  function showMessage(msg, success) {
-    const div = document.createElement('div');
-    div.className = success ? 'success' : 'error';
-    div.textContent = msg;
-    document.getElementById('actionResult').innerHTML = '';
-    document.getElementById('actionResult').appendChild(div);
-  }
-
-  function handleLogout() {
-    if (!confirm('Are you sure you want to logout securely?')) return;
-    
-    console.log('handleLogout: Starting logout...');
-    clearInterval(authCheckInterval);
-    
-    // Clear token immediately
-    sessionStorage.removeItem('adminAccessToken');
-    console.log('handleLogout: Token cleared from sessionStorage');
-    
-    // Try to call backend logout (non-blocking)
-    const token = getAccessToken();
-    if (token) {
-      fetch(`${API_BASE}/logout`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'x-api-key': 'mobile',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({}),
-        credentials: 'include'
-      }).then(r => {
-        console.log('handleLogout: Backend logout response', r.status);
-      }).catch(e => {
-        console.error('handleLogout: Backend logout error', e);
-      });
+    function updatePrivilege(permissionName, isEnabled) {
+      currentUserPrivileges[permissionName] = isEnabled;
     }
-    
-    // Redirect immediately
-    console.log('handleLogout: Redirecting to login...');
-    setTimeout(() => {
-      window.location.href = '/admin-login.html';
-    }, 100);
-  }
 
-  // Verify auth on load
-  checkAuth().then(ok => {
-    if (ok) loadStats();
-  });
+    async function savePrivileges() {
+      if (!currentUserId) return;
 
-  // Clear sensitive data when page is hidden
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-      // Browser tab hidden
+      const btn = document.getElementById('savePrivilegesBtn');
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '⏳ Saving...';
+
+      try {
+        const res = await fetch(`${API_BASE}/users/${currentUserId}`, {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          credentials: 'include',
+          body: JSON.stringify({ privileges: currentUserPrivileges })
+        });
+
+        const json = await res.json();
+        if (json.success) {
+          showMessage('✅ Privileges updated successfully', true);
+          setTimeout(() => closeModal('privilegesModal'), 500);
+        } else {
+          showMessage('❌ ' + (json.message || 'Failed to update privileges'), false);
+        }
+      } catch (e) {
+        showMessage('Error: ' + e.message, false);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
     }
-  });
 
-  // Warn before unload
-  window.addEventListener('beforeunload', (e) => {
-    // Only warn if actively modifying
-  });
-</script>
+
+    function showMessage(msg, success) {
+      const div = document.createElement('div');
+      div.className = success ? 'success' : 'error';
+      div.textContent = msg;
+      document.getElementById('actionResult').innerHTML = '';
+      document.getElementById('actionResult').appendChild(div);
+    }
+
+    function handleLogout() {
+      if (!confirm('Are you sure you want to logout securely?')) return;
+
+      console.log('handleLogout: Starting logout...');
+      clearInterval(authCheckInterval);
+
+      // Clear token immediately
+      sessionStorage.removeItem('adminAccessToken');
+      console.log('handleLogout: Token cleared from sessionStorage');
+
+      // Try to call backend logout (non-blocking)
+      const token = getAccessToken();
+      if (token) {
+        fetch(`${API_BASE}/logout`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'x-api-key': 'mobile',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({}),
+          credentials: 'include'
+        }).then(r => {
+          console.log('handleLogout: Backend logout response', r.status);
+        }).catch(e => {
+          console.error('handleLogout: Backend logout error', e);
+        });
+      }
+
+      // Redirect immediately
+      console.log('handleLogout: Redirecting to login...');
+      setTimeout(() => {
+        window.location.href = '/admin-login.html';
+      }, 100);
+    }
+
+    // Verify auth on load
+    checkAuth().then(ok => {
+      if (ok) loadStats();
+    });
+
+    // Clear sensitive data when page is hidden
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        // Browser tab hidden
+      }
+    });
+
+    // Warn before unload
+    window.addEventListener('beforeunload', (e) => {
+      // Only warn if actively modifying
+    });
+  </script>
 </body>
+
 </html>

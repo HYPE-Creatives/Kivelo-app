@@ -2,50 +2,79 @@ import AuditLog from "../models/AuditLog.js";
 import { Parser as Json2csvParser } from "json2csv";
 
 // ========================= CREATE AUDIT LOG =========================
+// ========================= CREATE AUDIT LOG =========================
 export const createAuditLog = async (req, res) => {
   try {
-    const { action, resource, outcome, level = "info", metadata } = req.body;
+    const {
+      action,
+      resource,
+      outcome = "success",
+      level = "info",
+      metadata,
+      target,
+      source = "admin",
+    } = req.body;
 
-    // Attach actor automatically from the admin making the call
     const actor = req.admin
       ? {
-        id: req.admin._id,
-        model: "Admin",
-        ip: req.ip || req.headers["x-forwarded-for"] || "unknown",
-      }
-      : req.body.actor || {};
+          id: req.admin._id,
+          model: "Admin",
+          ip: req.ip || req.headers["x-forwarded-for"] || "unknown",
+        }
+      : undefined;
 
-    const newLog = await AuditLog.create({
+    const log = await AuditLog.create({
       actor,
       action,
+      target,              // 🔑 CRITICAL FIX
       resource,
       outcome,
       level,
       metadata,
-      timestamp: new Date(),
+      source,
+      request: {
+        method: req.method,
+        path: req.originalUrl,
+        userAgent: req.headers["user-agent"],
+      },
     });
 
     res.status(201).json({
       success: true,
-      message: "Audit log created successfully",
-      log: newLog,
+      log,
     });
   } catch (error) {
-    console.error("Error creating audit log:", error);
-    res
-      .status(500)
-      .json({ success: false, error: "Server error while creating audit log" });
+    console.error("createAuditLog:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to create audit log",
+    });
   }
 };
 
+
+// ========================= GET ALL AUDIT LOGS =========================
 // ========================= GET ALL AUDIT LOGS =========================
 export const getAuditLogs = async (req, res) => {
   try {
-    const { page = 1, per_page = 50, action, level, from, to } = req.query;
+    const {
+      page = 1,
+      per_page = 50,
+      action,
+      level,
+      actorId,
+      targetId,
+      from,
+      to,
+    } = req.query;
+
     const filter = {};
 
     if (action) filter.action = action;
     if (level) filter.level = level;
+    if (actorId) filter["actor.id"] = actorId;
+    if (targetId) filter["target.id"] = targetId;
+
     if (from || to) {
       filter.timestamp = {};
       if (from) filter.timestamp.$gte = new Date(from);
@@ -53,10 +82,12 @@ export const getAuditLogs = async (req, res) => {
     }
 
     const total = await AuditLog.countDocuments(filter);
+
     const logs = await AuditLog.find(filter)
       .sort({ timestamp: -1 })
       .skip((page - 1) * per_page)
-      .limit(Number(per_page));
+      .limit(Number(per_page))
+      .lean();
 
     res.json({
       success: true,
@@ -67,86 +98,156 @@ export const getAuditLogs = async (req, res) => {
     });
   } catch (error) {
     console.error("getAuditLogs:", error);
-    res.status(500).json({ success: false, error: "Failed to fetch audit logs" });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch audit logs",
+    });
   }
 };
 
+
+// ========================= GET SINGLE AUDIT LOG =========================
 // ========================= GET SINGLE AUDIT LOG =========================
 export const getAuditLogById = async (req, res) => {
   try {
-    const log = await AuditLog.findById(req.params.id);
-    if (!log)
-      return res
-        .status(404)
-        .json({ success: false, error: "Audit log not found" });
-    res.json({ success: true, log });
+    const { id } = req.params;
+
+    // Prevent CastError crashes
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid audit log ID",
+      });
+    }
+
+    const log = await AuditLog.findById(id).lean();
+
+    if (!log) {
+      return res.status(404).json({
+        success: false,
+        message: "Audit log not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      log,
+    });
   } catch (error) {
     console.error("getAuditLogById:", error);
-    res.status(500).json({ success: false, error: "Server error" });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch audit log",
+    });
   }
 };
 
+
 // ========================= EXPORT AUDIT LOGS =========================
 
+// ========================= EXPORT AUDIT LOGS =========================
 export const exportAuditLogs = async (req, res) => {
   try {
     const format = (req.query.format || "csv").toLowerCase();
-    const { action, from, to, level } = req.query;
+    const { action, level, actorId, targetId, from, to } = req.query;
 
     const filter = {};
+
     if (action) filter.action = action;
     if (level) filter.level = level;
+    if (actorId) filter["actor.id"] = actorId;
+    if (targetId) filter["target.id"] = targetId;
+
     if (from || to) {
       filter.timestamp = {};
       if (from) filter.timestamp.$gte = new Date(from);
       if (to) filter.timestamp.$lte = new Date(to);
     }
 
-    const logs = await AuditLog.find(filter).sort({ timestamp: -1 }).lean();
+    const logs = await AuditLog.find(filter)
+      .sort({ timestamp: -1 })
+      .lean();
 
-    // If no logs found
     if (!logs.length) {
-      return res
-        .status(404)
-        .json({ success: false, message: "No audit logs found for export" });
+      return res.status(404).json({
+        success: false,
+        message: "No audit logs found",
+      });
     }
 
-    // Handle JSON format
     if (format === "json") {
-      res.setHeader("Content-Type", "application/json");
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename=audit-${Date.now()}.json`
-      );
-      return res.status(200).json(logs);
+      return res.json(logs);
     }
 
-    // Handle CSV format
     const parser = new Json2csvParser({
-      header: true,
       fields: [
-        { label: "Timestamp", value: "timestamp" },
-        { label: "Actor ID", value: "actor.id" },
-        { label: "Actor Model", value: "actor.model" },
-        { label: "IP", value: "actor.ip" },
-        { label: "Action", value: "action" },
-        { label: "Outcome", value: "outcome" },
-        { label: "Level", value: "level" },
-        { label: "Resource Type", value: "resource.type" },
-        { label: "Resource ID", value: "resource.id" },
-        { label: "Metadata", value: (row) => JSON.stringify(row.metadata || {}) },
+        "timestamp",
+        "actor.id",
+        "actor.model",
+        "actor.ip",
+        "action",
+        "outcome",
+        "level",
+        "target.model",
+        "target.id",
       ],
     });
 
     const csv = parser.parse(logs);
+
     res.setHeader("Content-Type", "text/csv");
     res.setHeader(
       "Content-Disposition",
       `attachment; filename=audit-${Date.now()}.csv`
     );
-    return res.status(200).send(csv);
+    res.send(csv);
   } catch (error) {
     console.error("exportAuditLogs:", error);
-    res.status(500).json({ success: false, error: "Failed to export audit logs" });
+    res.status(500).json({
+      success: false,
+      message: "Failed to export audit logs",
+    });
+  }
+};
+
+
+// ========================= GET USER ACTIVITY LOGS =========================
+export const getUserActivityLogs = async (req, res) => {
+  try {
+    const { userId: id } = req.params;
+    const { days = 90, limit = 500 } = req.query;
+
+    if (!id || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID",
+      });
+    }
+
+    const since = new Date();
+    since.setDate(since.getDate() - Number(days));
+
+    const logs = await AuditLog.find({
+      $or: [
+        { "actor.id": id },   // user actions
+        { "target.id": id },  // admin actions ON user
+      ],
+      timestamp: { $gte: since },
+    })
+      .sort({ timestamp: -1 })
+      .limit(Number(limit))
+      .lean();
+
+    res.json({
+      success: true,
+      logs,
+      count: logs.length,
+    });
+  } catch (error) {
+    console.error("getUserActivityLogs:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch user activity logs",
+    });
   }
 };

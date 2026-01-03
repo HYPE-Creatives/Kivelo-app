@@ -4,6 +4,7 @@ import {
   getAuditLogById,
   createAuditLog,
   exportAuditLogs,
+  getUserActivityLogs
 } from "../controllers/auditController.js";
 import { requireAdminAuth, requirePermission } from "../middleware/adminMiddleware.js";
 
@@ -306,6 +307,73 @@ router.get("/", requireAdminAuth, requirePermission('audit'), getAuditLogs);
  *         description: Internal server error
  */
 router.get("/export", requireAdminAuth, requirePermission('audit'), exportAuditLogs);
+
+/**
+ * @swagger
+ * /api/v1/audit/users/{userId}/activity:
+ *   get:
+ *     summary: Retrieve activity logs for a specific user
+ *     description: >
+ *       Returns audit logs where the user is either the actor
+ *       or the target of an action (e.g. admin actions on the user).
+ *       Used for user activity timeline in admin dashboard.
+ *     tags: [Audit]
+ *     security:
+ *       - ApiKeyAuth: []
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID to retrieve activity for
+ *       - in: query
+ *         name: days
+ *         schema:
+ *           type: integer
+ *           default: 90
+ *         description: Number of days back to include
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 500
+ *           maximum: 1000
+ *         description: Maximum number of activity logs to return
+ *     responses:
+ *       200:
+ *         description: User activity logs retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 count:
+ *                   type: integer
+ *                   example: 12
+ *                 logs:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/AuditLog'
+ *       400:
+ *         description: Invalid user ID
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden - User doesn't have audit permission
+ *       500:
+ *         description: Internal server error
+ */
+router.get(
+  "/users/:userId/activity",
+  requireAdminAuth,
+  requirePermission("audit"),
+  getUserActivityLogs
+);
 
 /**
  * @swagger
