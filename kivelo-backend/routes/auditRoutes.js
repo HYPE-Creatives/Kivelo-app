@@ -369,11 +369,7 @@ router.get("/export", requireAdminAuth, requirePermission('audit'), exportAuditL
  *         description: Internal server error
  */
 router.get(
-  "/users/:userId/activity",
-  requireAdminAuth,
-  requirePermission("audit"),
-  getUserActivityLogs
-);
+  "/users/:userId/activity", requireAdminAuth, requirePermission("audit"), getUserActivityLogs);
 
 /**
  * @swagger
