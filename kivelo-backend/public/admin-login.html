@@ -1,0 +1,487 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Kivelo Admin Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    background: linear-gradient(135deg, #0a0e27 0%, #1a1d3a 50%, #2d1b69 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .login-container {
+    width: 100%;
+    max-width: 420px;
+    padding: 20px;
+  }
+
+  .login-box {
+    background: rgba(26, 29, 58, 0.95);
+    border: 1px solid rgba(96, 165, 250, 0.2);
+    border-radius: 16px;
+    padding: 40px;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3), 0 0 60px rgba(96, 165, 250, 0.1);
+    backdrop-filter: blur(10px);
+  }
+
+  .logo {
+    text-align: center;
+    margin-bottom: 30px;
+  }
+
+  .logo h1 {
+    margin: 0;
+    font-size: 28px;
+    background: linear-gradient(135deg, #60a5fa, #a78bfa, #f472b6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 700;
+  }
+
+  .logo p {
+    margin: 8px 0 0 0;
+    color: #a5b4fc;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  label {
+    display: block;
+    margin-bottom: 8px;
+    color: #a5b4fc;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid rgba(96, 165, 250, 0.3);
+    border-radius: 8px;
+    background: rgba(30, 33, 57, 0.8);
+    color: #e0e7ff;
+    font-family: inherit;
+    font-size: 14px;
+    transition: all 0.3s;
+  }
+
+  input:focus {
+    outline: none;
+    border-color: #60a5fa;
+    background: rgba(30, 33, 57, 0.95);
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.1);
+  }
+
+  input::placeholder {
+    color: rgba(165, 180, 252, 0.4);
+  }
+
+  .form-group input[type="password"] {
+    font-family: inherit;
+    letter-spacing: 0.1em;
+  }
+
+  .remember-me {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    color: #a5b4fc;
+  }
+
+  .remember-me input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+    accent-color: #60a5fa;
+    cursor: pointer;
+  }
+
+  .submit-btn {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(135deg, #60a5fa, #a78bfa);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 4px 15px rgba(96, 165, 250, 0.3);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+  }
+
+  .submit-btn:hover:not(:disabled) {
+    box-shadow: 0 6px 20px rgba(96, 165, 250, 0.4);
+    transform: translateY(-2px);
+  }
+
+  .submit-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+
+  .spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    border-top-color: #fff;
+    display: none;
+  }
+
+  .submit-btn.loading .spinner {
+    display: block;
+    animation: spin 0.8s linear infinite;
+  }
+
+  .submit-btn.loading span {
+    opacity: 0.7;
+  }
+
+  .alert {
+    padding: 12px 14px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    display: none;
+    animation: slideDown 0.3s ease-out;
+  }
+
+  .alert.error {
+    background: rgba(239, 68, 68, 0.15);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    display: block;
+  }
+
+  .alert.success {
+    background: rgba(16, 185, 129, 0.15);
+    color: #6ee7b7;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    display: block;
+  }
+
+  .security-info {
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(96, 165, 250, 0.1);
+    font-size: 11px;
+    color: rgba(165, 180, 252, 0.5);
+    text-align: center;
+  }
+
+  .security-info strong {
+    color: rgba(165, 180, 252, 0.7);
+  }
+
+  .status-icon {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    margin-right: 4px;
+  }
+
+  .failed-attempts {
+    margin-top: 15px;
+    padding: 10px 12px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 6px;
+    font-size: 12px;
+    color: #fca5a5;
+    display: none;
+    text-align: center;
+  }
+
+  .failed-attempts.show {
+    display: block;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (max-width: 480px) {
+    .login-box {
+      padding: 30px 20px;
+    }
+
+    .logo h1 {
+      font-size: 24px;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="login-container">
+  <div class="login-box">
+    <div class="logo">
+      <h1>🔐 Kivelo Admin</h1>
+      <p>Secure Portal</p>
+    </div>
+
+    <div id="alert" class="alert"></div>
+
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input 
+          id="email" 
+          type="email" 
+          placeholder="admin@kivelo.com" 
+          required 
+          autocomplete="email"
+          spellcheck="false"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input 
+          id="password" 
+          type="password" 
+          placeholder="••••••••" 
+          required 
+          autocomplete="current-password"
+        />
+      </div>
+
+      <div class="remember-me">
+        <input id="rememberMe" type="checkbox" />
+        <label for="rememberMe" style="margin: 0; text-transform: none; text-transform: capitalize;">Keep me logged in</label>
+      </div>
+
+      <button type="submit" class="submit-btn">
+        <span class="spinner"></span>
+        <span>Login Securely</span>
+      </button>
+    </form>
+
+    <div id="failedAttempts" class="failed-attempts"></div>
+
+    <div class="security-info">
+      <span class="status-icon"></span> <strong>Secure Connection</strong><br/>
+      HTTP-only sessions • Encrypted communications<br/>
+      ⚠️ Never share your password
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_BASE = '/api/v1/admin';
+  const LOGIN_ATTEMPTS_KEY = 'admin_login_attempts';
+  const LOGIN_TIMESTAMP_KEY = 'admin_login_timestamp';
+  const MAX_ATTEMPTS = 5;
+  const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
+
+  function getLoginAttempts() {
+    const data = localStorage.getItem(LOGIN_ATTEMPTS_KEY);
+    return data ? JSON.parse(data) : { count: 0, timestamp: null };
+  }
+
+  function setLoginAttempts(count, timestamp) {
+    localStorage.setItem(LOGIN_ATTEMPTS_KEY, JSON.stringify({ count, timestamp }));
+  }
+
+  function isLockedOut() {
+    const attempts = getLoginAttempts();
+    if (attempts.count < MAX_ATTEMPTS) return false;
+    
+    const now = Date.now();
+    const elapsed = now - attempts.timestamp;
+    return elapsed < LOCKOUT_DURATION;
+  }
+
+  function getRemainingLockoutTime() {
+    const attempts = getLoginAttempts();
+    const elapsed = Date.now() - attempts.timestamp;
+    const remaining = LOCKOUT_DURATION - elapsed;
+    return Math.ceil(remaining / 1000);
+  }
+
+  function showAlert(message, type) {
+    const alert = document.getElementById('alert');
+    alert.textContent = message;
+    alert.className = 'alert ' + type;
+    
+    if (type === 'error') {
+      setTimeout(() => { alert.className = 'alert'; }, 5000);
+    }
+  }
+
+  function updateFailedAttempts(remaining) {
+    const container = document.getElementById('failedAttempts');
+    if (remaining > 0) {
+      container.textContent = `⚠️ ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining before lockout`;
+      container.classList.add('show');
+    } else {
+      container.classList.remove('show');
+    }
+  }
+
+  function checkAndUpdateLockout() {
+    const locked = isLockedOut();
+    if (locked) {
+      const remaining = getRemainingLockoutTime();
+      const minutes = Math.ceil(remaining / 60);
+      showAlert(`🔒 Too many failed attempts. Try again in ${minutes} minute${minutes !== 1 ? 's' : ''}.`, 'error');
+      document.querySelector('.submit-btn').disabled = true;
+      
+      const checkInterval = setInterval(() => {
+        if (!isLockedOut()) {
+          clearInterval(checkInterval);
+          document.querySelector('.submit-btn').disabled = false;
+          showAlert('', '');
+        }
+      }, 1000);
+      
+      return true;
+    }
+    return false;
+  }
+
+  document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    if (checkAndUpdateLockout()) return;
+
+    const email = document.getElementById('email').value.toLowerCase().trim();
+    const password = document.getElementById('password').value;
+    const rememberMe = document.getElementById('rememberMe').checked;
+
+    if (!email || !password) {
+      showAlert('❌ Please enter both email and password', 'error');
+      return;
+    }
+
+    if (password.length < 6) {
+      showAlert('❌ Invalid password format', 'error');
+      return;
+    }
+
+    const btn = document.querySelector('.submit-btn');
+    btn.classList.add('loading');
+    btn.disabled = true;
+
+    try {
+      const response = await fetch(`${API_BASE}/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'mobile', // Default API key for login
+        },
+        credentials: 'include', // Critical: include cookies
+        body: JSON.stringify({
+          email,
+          password,
+          rememberMe
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Login failed');
+      }
+
+      if (!data.success) {
+        throw new Error(data.message || 'Login failed');
+      }
+
+      // Clear failed attempts on success
+      setLoginAttempts(0, null);
+      updateFailedAttempts(0);
+
+      // Store access token for dashboard
+      if (data.accessToken) {
+        sessionStorage.setItem('adminAccessToken', data.accessToken);
+        console.log('✓ Access token stored in sessionStorage');
+        console.log('✓ Token:', data.accessToken.substring(0, 50) + '...');
+      } else {
+        console.warn('⚠ No access token in response');
+      }
+
+      showAlert('✅ Login successful! Redirecting...', 'success');
+      
+      // Redirect after brief delay
+      setTimeout(() => {
+        window.location.href = '/admin';
+      }, 500);
+
+    } catch (error) {
+      console.error('Login error:', error);
+
+      // Increment failed attempts
+      const attempts = getLoginAttempts();
+      const newCount = attempts.count + 1;
+      setLoginAttempts(newCount, Date.now());
+
+      const remaining = MAX_ATTEMPTS - newCount;
+      updateFailedAttempts(remaining);
+
+      if (remaining <= 0) {
+        showAlert('🔒 Account locked due to too many failed attempts. Try again in 15 minutes.', 'error');
+        document.querySelector('.submit-btn').disabled = true;
+      } else {
+        showAlert(`❌ ${error.message}`, 'error');
+      }
+    } finally {
+      btn.classList.remove('loading');
+      btn.disabled = false;
+    }
+  });
+
+  // Auto-fill email if remembered
+  window.addEventListener('load', () => {
+    checkAndUpdateLockout();
+  });
+
+  // Prevent autocomplete vulnerabilities
+  document.addEventListener('keydown', (e) => {
+    // Block some potentially dangerous shortcuts
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'u' || e.key === 'U')) {
+      e.preventDefault();
+    }
+  });
+
+  // Clear sensitive data on page hide
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      // Page hidden - no action needed but shows awareness
+    }
+  });
+</script>
+</body>
+</html>

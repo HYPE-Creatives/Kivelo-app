@@ -18,6 +18,13 @@ import {
   getUsers,
   getUserDetails,
   updateUserStatus,
+  toggleUserBan,
+  forcePasswordReset,
+  forceLogout,
+  deleteUser,
+  getUserActivityLogs,
+  getUserStatistics,
+  editUserDetails,
 
   // Analytics
   getAdminDashboard,
@@ -931,6 +938,258 @@ router.get('/users/:id', requireAdminAuth, requirePermission('users'), getUserDe
  *         description: Internal server error
  */
 router.put('/users/:id/status', requireAdminAuth, requirePermission('users'), updateUserStatus);
+
+/**
+ * @swagger
+ * /api/v1/admin/users/{id}/ban:
+ *   put:
+ *     summary: Ban or unban a user
+ *     tags: [User Management]
+ *     security:
+ *       - ApiKeyAuth: []
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: User ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - banned
+ *             properties:
+ *               banned:
+ *                 type: boolean
+ *                 example: true
+ *               reason:
+ *                 type: string
+ *                 example: "Violating community guidelines"
+ *     responses:
+ *       200:
+ *         description: User ban status updated
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: User not found
+ */
+router.put('/users/:id/ban', requireAdminAuth, requirePermission('users'), toggleUserBan);
+
+/**
+ * @swagger
+ * /api/v1/admin/users/{id}/reset-password:
+ *   post:
+ *     summary: Force password reset for a user
+ *     tags: [User Management]
+ *     security:
+ *       - ApiKeyAuth: []
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: User ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - tempPassword
+ *             properties:
+ *               tempPassword:
+ *                 type: string
+ *                 example: "TempPass123!"
+ *     responses:
+ *       200:
+ *         description: Password reset initiated
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: User not found
+ */
+router.post('/users/:id/reset-password', requireAdminAuth, requirePermission('users'), forcePasswordReset);
+
+/**
+ * @swagger
+ * /api/v1/admin/users/{id}/force-logout:
+ *   post:
+ *     summary: Force logout a user from all sessions
+ *     tags: [User Management]
+ *     security:
+ *       - ApiKeyAuth: []
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: User ID
+ *     responses:
+ *       200:
+ *         description: User logged out
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: User not found
+ */
+router.post('/users/:id/force-logout', requireAdminAuth, requirePermission('users'), forceLogout);
+
+/**
+ * @swagger
+ * /api/v1/admin/users/{id}:
+ *   put:
+ *     summary: Edit user details
+ *     tags: [User Management]
+ *     security:
+ *       - ApiKeyAuth: []
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: User ID
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "Updated Name"
+ *               email:
+ *                 type: string
+ *                 example: "newemail@example.com"
+ *     responses:
+ *       200:
+ *         description: User details updated
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: User not found
+ */
+router.put('/users/:id', requireAdminAuth, requirePermission('users'), editUserDetails);
+
+/**
+ * @swagger
+ * /api/v1/admin/users/{id}/delete:
+ *   delete:
+ *     summary: Delete a user permanently
+ *     tags: [User Management]
+ *     security:
+ *       - ApiKeyAuth: []
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: User ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - confirmDelete
+ *             properties:
+ *               confirmDelete:
+ *                 type: boolean
+ *                 example: true
+ *     responses:
+ *       200:
+ *         description: User deleted successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: User not found
+ */
+router.delete('/users/:id/delete', requireAdminAuth, requirePermission('users'), deleteUser);
+
+/**
+ * @swagger
+ * /api/v1/admin/users/{id}/activity-logs:
+ *   get:
+ *     summary: Get user activity logs
+ *     tags: [User Management]
+ *     security:
+ *       - ApiKeyAuth: []
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: User ID
+ *       - in: query
+ *         name: days
+ *         schema:
+ *           type: integer
+ *           example: 30
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           example: 50
+ *     responses:
+ *       200:
+ *         description: Activity logs retrieved
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ */
+router.get('/users/:id/activity-logs', requireAdminAuth, requirePermission('users'), getUserActivityLogs);
+
+/**
+ * @swagger
+ * /api/v1/admin/users/statistics:
+ *   get:
+ *     summary: Get comprehensive user statistics
+ *     tags: [User Management]
+ *     security:
+ *       - ApiKeyAuth: []
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: days
+ *         schema:
+ *           type: integer
+ *           example: 30
+ *     responses:
+ *       200:
+ *         description: User statistics retrieved
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
+ */
+router.get('/users/statistics/overview', requireAdminAuth, requirePermission('users'), getUserStatistics);
 
 // ==================== ANALYTICS ROUTES ====================
 

@@ -42,6 +42,7 @@ import learningRoutes from './routes/learning.js';
 import journalRoutes from './routes/journal.js';
 import notificationRoute from './routes/notificationRoutes.js';
 import conversationRoutes from './routes/conversation.js';
+import advancedAnalyticsRoutes from './routes/advancedAnalytics.js';
 import "./jobs/auditRetention.js";
 import morgan from "morgan";
 import path from 'path';
@@ -157,11 +158,12 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+      scriptSrcAttr: ["'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'"],
-      fontSrc: ["'self'"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      connectSrc: ["'self'", "https://cdn.jsdelivr.net"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
       frameSrc: ["'none'"],
@@ -220,13 +222,6 @@ app.use(analyticsLogger);
 // ========================= LOGGING =========================
 app.use(morgan(config.logging.level));
 
-if (config.environment === 'development') {
-  app.use((req, res, next) => {
-    console.log("🔍 Incoming request body:", req.body);
-    next();
-  });
-}
-
 // ========================= STATIC FILES =========================
 app.use("/uploads", express.static(path.join(__dirname, "uploads"), {
   maxAge: config.environment === 'production' ? '7d' : '0',
@@ -259,6 +254,16 @@ app.get("/api-analytics/v1", (req, res) => {
   res.send(getAnalyticsDashboard());
 });
 
+// Admin Login Page Route
+app.get("/admin-login.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "admin-login.html"));
+});
+
+// Admin Dashboard Route
+app.get("/admin", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "admin-dashboard.html"));
+});
+
 // Health Check Route
 app.get("/api-health", (req, res) => {
   res.json({ 
@@ -289,6 +294,7 @@ app.use('/api/v1/journals', journalRoutes);
 app.use('/api/v1/notifications', notificationRoute);
 app.use('/api/v1/settings', settingsRoutes);
 app.use('/api/v1/conversations', conversationRoutes);
+app.use('/api/v1/advanced-analytics', advancedAnalyticsRoutes);
 
 // ===============================================================
 // 🔒 STRICT SWAGGER PROTECTION (fixed)

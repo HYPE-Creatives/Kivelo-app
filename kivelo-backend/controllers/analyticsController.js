@@ -56,17 +56,54 @@ export const getStats = async (req, res, next) => {
     const uniqueRoutes = new Set(logs.map(l => l.route)).size;
     const uniqueClients = new Set(logs.map(l => l.clientType)).size;
 
-    // Group by date (day) — adjust to hour if needed
-    const map = new Map();
+    // Calculate average response time
+    const avgResponseTime = logs.length > 0 
+      ? logs.reduce((sum, l) => sum + (l.responseTime || 0), 0) / logs.length 
+      : 0;
+
+    // Group by date (day)
+    const dateMap = new Map();
     logs.forEach(l => {
       const d = l.timestamp.toISOString().slice(0, 10);
-      map.set(d, (map.get(d) || 0) + 1);
+      dateMap.set(d, (dateMap.get(d) || 0) + 1);
     });
 
-    const chartLabels = Array.from(map.keys());
-    const chartData = Array.from(map.values());
+    const chartLabels = Array.from(dateMap.keys());
+    const chartData = Array.from(dateMap.values());
 
-    const result = { totalRequests, uniqueRoutes, uniqueClients, chartLabels, chartData };
+    // Route breakdown
+    const routeBreakdown = await ApiAnalytics.aggregate([
+      { $match: filter },
+      { $group: { _id: "$route", count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 10 }
+    ]);
+
+    // Client breakdown
+    const clientBreakdown = await ApiAnalytics.aggregate([
+      { $match: filter },
+      { $group: { _id: "$clientType", count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    // Status breakdown
+    const statusBreakdown = await ApiAnalytics.aggregate([
+      { $match: filter },
+      { $group: { _id: "$statusCode", count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    const result = { 
+      totalRequests, 
+      uniqueRoutes, 
+      uniqueClients,
+      avgResponseTime,
+      chartLabels, 
+      chartData,
+      routeBreakdown,
+      clientBreakdown,
+      statusBreakdown
+    };
     await setCache(cacheKey, result, 30); // 30s
     res.json(result);
   } catch (err) {

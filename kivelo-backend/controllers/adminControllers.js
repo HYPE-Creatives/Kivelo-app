@@ -899,3 +899,358 @@ export const changeAdminPassword = async (req, res) => {
   }
 };
 
+// ========================= ENHANCED USER MANAGEMENT =========================
+
+// Ban/Unban user
+export const toggleUserBan = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { banned, reason } = req.body;
+
+    const user = await User.findByIdAndUpdate(
+      id,
+      { 
+        banned,
+        banReason: banned ? reason : null,
+        bannedAt: banned ? new Date() : null
+      },
+      { new: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Log action in audit log
+    const { AuditLog } = await import('../models/AuditLog.js');
+    await AuditLog.create({
+      userId: req.user._id,
+      action: banned ? 'USER_BANNED' : 'USER_UNBANNED',
+      targetUserId: id,
+      details: { reason },
+      ipAddress: req.ip,
+      timestamp: new Date()
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `User ${banned ? 'banned' : 'unbanned'} successfully`,
+      user
+    });
+
+  } catch (error) {
+    console.error('Toggle user ban error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating user ban status'
+    });
+  }
+};
+
+// Force password reset
+export const forcePasswordReset = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tempPassword } = req.body;
+
+    if (!tempPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Temporary password is required'
+      });
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Hash and set temporary password
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(tempPassword, salt);
+    user.mustChangePassword = true;
+    await user.save();
+
+    // Log action
+    const { AuditLog } = await import('../models/AuditLog.js');
+    await AuditLog.create({
+      userId: req.user._id,
+      action: 'FORCE_PASSWORD_RESET',
+      targetUserId: id,
+      ipAddress: req.ip,
+      timestamp: new Date()
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset initiated. User must change password on next login.',
+      tempPassword
+    });
+
+  } catch (error) {
+    console.error('Force password reset error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error resetting password'
+    });
+  }
+};
+
+// Force logout (invalidate all sessions)
+export const forceLogout = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findByIdAndUpdate(
+      id,
+      { refreshToken: null, lastLogin: null },
+      { new: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Log action
+    const { AuditLog } = await import('../models/AuditLog.js');
+    await AuditLog.create({
+      userId: req.user._id,
+      action: 'FORCE_LOGOUT',
+      targetUserId: id,
+      ipAddress: req.ip,
+      timestamp: new Date()
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'User logged out successfully',
+      user
+    });
+
+  } catch (error) {
+    console.error('Force logout error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error forcing logout'
+    });
+  }
+};
+
+// Delete user permanently
+export const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { confirmDelete } = req.body;
+
+    if (!confirmDelete) {
+      return res.status(400).json({
+        success: false,
+        message: 'Confirmation required to delete user'
+      });
+    }
+
+    const user = await User.findByIdAndDelete(id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Delete related data
+    await Promise.all([
+      Parent.deleteMany({ user: id }),
+      Child.deleteMany({ user: id }),
+      Activity.deleteMany({ userId: id })
+    ]);
+
+    // Log action
+    const { AuditLog } = await import('../models/AuditLog.js');
+    await AuditLog.create({
+      userId: req.user._id,
+      action: 'USER_DELETED',
+      targetUserId: id,
+      details: { email: user.email, role: user.role },
+      ipAddress: req.ip,
+      timestamp: new Date()
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'User deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting user'
+    });
+  }
+};
+
+// Get user activity logs
+export const getUserActivityLogs = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { days = 30, limit = 50 } = req.query;
+
+    const { AuditLog } = await import('../models/AuditLog.js');
+    
+    const dateFilter = new Date();
+    dateFilter.setDate(dateFilter.getDate() - parseInt(days));
+
+    const logs = await AuditLog.find({
+      $or: [
+        { userId: id },
+        { targetUserId: id }
+      ],
+      timestamp: { $gte: dateFilter }
+    })
+      .sort({ timestamp: -1 })
+      .limit(parseInt(limit));
+
+    res.status(200).json({
+      success: true,
+      logs,
+      count: logs.length
+    });
+
+  } catch (error) {
+    console.error('Get user activity logs error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching user activity logs'
+    });
+  }
+};
+
+// Get comprehensive user statistics
+export const getUserStatistics = async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+
+    const dateFilter = new Date();
+    dateFilter.setDate(dateFilter.getDate() - parseInt(days));
+
+    const [
+      totalUsers,
+      totalParents,
+      totalChildren,
+      activeUsers,
+      bannedUsers,
+      newUsersThisPeriod,
+      usersByRole,
+      usersWithoutLogin,
+      suspiciousAccounts
+    ] = await Promise.all([
+      User.countDocuments(),
+      User.countDocuments({ role: 'parent' }),
+      User.countDocuments({ role: 'child' }),
+      User.countDocuments({ lastLogin: { $exists: true, $ne: null } }),
+      User.countDocuments({ banned: true }),
+      User.countDocuments({ createdAt: { $gte: dateFilter } }),
+      User.aggregate([
+        { $group: { _id: '$role', count: { $sum: 1 } } }
+      ]),
+      User.countDocuments({ lastLogin: null, createdAt: { $lte: dateFilter } }),
+      User.find({ failed_login_attempts: { $gte: 5 } }).select('email role failed_login_attempts')
+    ]);
+
+    // Daily signups over period
+    const dailySignups = await User.aggregate([
+      { $match: { createdAt: { $gte: dateFilter } } },
+      { $group: {
+        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+        count: { $sum: 1 }
+      }},
+      { $sort: { _id: 1 } }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalUsers,
+        totalParents,
+        totalChildren,
+        activeUsers,
+        bannedUsers,
+        newUsersThisPeriod,
+        usersWithoutLogin,
+        suspiciousAccounts: suspiciousAccounts.length,
+        usersByRole,
+        dailySignups,
+        period: days + ' days'
+      }
+    });
+
+  } catch (error) {
+    console.error('Get user statistics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching user statistics'
+    });
+  }
+};
+
+// Edit user details
+export const editUserDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, email } = req.body;
+
+    if (!name && !email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Name or email is required'
+      });
+    }
+
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (email) updateData.email = email.toLowerCase();
+
+    const user = await User.findByIdAndUpdate(id, updateData, { new: true }).select('-password');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Log action
+    const { AuditLog } = await import('../models/AuditLog.js');
+    await AuditLog.create({
+      userId: req.user._id,
+      action: 'USER_DETAILS_UPDATED',
+      targetUserId: id,
+      details: updateData,
+      ipAddress: req.ip,
+      timestamp: new Date()
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'User details updated successfully',
+      user
+    });
+
+  } catch (error) {
+    console.error('Edit user details error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating user details'
+    });
+  }
+};
+
