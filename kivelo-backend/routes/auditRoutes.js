@@ -310,7 +310,7 @@ router.get("/export", requireAdminAuth, requirePermission('audit'), exportAuditL
 
 /**
  * @swagger
- * /api/v1/audit/users/{userId}/activity:
+ * /api/v1/audit/users/{userId}/activity-logs:
  *   get:
  *     summary: Retrieve activity logs for a specific user
  *     description: >
