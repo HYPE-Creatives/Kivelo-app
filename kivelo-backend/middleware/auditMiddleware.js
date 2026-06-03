@@ -1,5 +1,6 @@
 // middlewares/auditMiddleware.js
 import AuditLog from "../models/AuditLog.js";
+import User from "../models/User.js";
 
 const redactPII = (obj, fields = ["password", "ssn", "creditCard"]) => {
   if (!obj || typeof obj !== "object") return obj;
@@ -89,6 +90,28 @@ export const auditLogger = (actionNameOrFn) => {
           console.error("Audit write failed:", err?.message || err);
           // optionally: push to fallback log queue or file when DB unreachable
         });
+
+        // Also record a summarized embedded activity for user-initiated actions
+        try {
+          if (actorId && actorModel !== "Admin") {
+            const activity = {
+              action,
+              description: undefined,
+              ip: logDoc.actor?.ip,
+              metadata: {
+                statusCode: res.statusCode,
+                durationMs,
+                method: capturedReq.method,
+                path: capturedReq.originalUrl,
+              },
+              createdAt: new Date(),
+            };
+            User.updateOne({ _id: actorId }, { $push: { activities: activity } })
+              .catch((err) => console.error("Embedded user activity write failed:", err?.message || err));
+          }
+        } catch (err) {
+          console.error("Embedded user activity write error:", err?.message || err);
+        }
       } catch (err) {
         console.error("Audit middleware error:", err?.message || err);
       }

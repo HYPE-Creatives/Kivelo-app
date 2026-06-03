@@ -9,7 +9,7 @@ import generateToken from '../utils/generateToken.js';
 import jwt from 'jsonwebtoken';
 import { setRefreshCookie, clearRefreshCookie, ADMIN_COOKIE } from "../utils/tokenCookies.js";
 import bcrypt from 'bcryptjs';
-import { fetchUserActivityLogs } from '../utils/logAudit.js';
+import { fetchUserActivityLogs, logAudit } from '../utils/logAudit.js';
 
 // ========================= ADMIN AUTHENTICATION =========================
 // Super Admin Initial Setup (Run once to create first super admin)
@@ -924,16 +924,15 @@ export const toggleUserBan = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    await AuditLog.create({
-      userId: req.admin._id,          // actor
-      targetUserId: user._id,         // affected user
+    await logAudit({
+      actor: { id: req.admin._id, model: 'Admin', ip: req.ip },
+      target: { id: user._id, model: 'User' },
       action: banned ? 'USER_BANNED' : 'USER_UNBANNED',
-      description: banned
-        ? `Admin banned user. Reason: ${reason || 'not provided'}`
-        : 'Admin unbanned user',
-      details: { reason },
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent']
+      resource: { type: 'user', id: String(user._id) },
+      level: 'info',
+      outcome: 'success',
+      metadata: { reason },
+      req,
     });
 
     res.json({
@@ -968,13 +967,14 @@ export const forcePasswordReset = async (req, res) => {
     user.mustChangePassword = true;
     await user.save();
 
-    await AuditLog.create({
-      userId: req.admin._id,
-      targetUserId: user._id,
+    await logAudit({
+      actor: { id: req.admin._id, model: 'Admin', ip: req.ip },
+      target: { id: user._id, model: 'User' },
       action: 'FORCE_PASSWORD_RESET',
-      description: 'Admin forced password reset for user',
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent']
+      resource: { type: 'user', id: String(user._id) },
+      level: 'info',
+      outcome: 'success',
+      req,
     });
 
     res.json({
@@ -1003,13 +1003,14 @@ export const forceLogout = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    await AuditLog.create({
-      userId: req.admin._id,
-      targetUserId: user._id,
+    await logAudit({
+      actor: { id: req.admin._id, model: 'Admin', ip: req.ip },
+      target: { id: user._id, model: 'User' },
       action: 'FORCE_LOGOUT',
-      description: 'Admin forced user logout',
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent']
+      resource: { type: 'user', id: String(user._id) },
+      level: 'info',
+      outcome: 'success',
+      req,
     });
 
     res.json({
@@ -1048,14 +1049,15 @@ export const deleteUser = async (req, res) => {
       Activity.deleteMany({ userId: id })
     ]);
 
-    await AuditLog.create({
-      userId: req.admin._id,
-      targetUserId: user._id,
+    await logAudit({
+      actor: { id: req.admin._id, model: 'Admin', ip: req.ip },
+      target: { id: user._id, model: 'User' },
       action: 'USER_DELETED',
-      description: 'Admin permanently deleted user',
-      details: { email: user.email, role: user.role },
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent']
+      resource: { type: 'user', id: String(user._id) },
+      level: 'info',
+      outcome: 'success',
+      metadata: { email: user.email, role: user.role },
+      req,
     });
 
     res.json({ success: true, message: 'User deleted successfully' });
@@ -1072,13 +1074,46 @@ export const getUserActivityLogs = async (req, res) => {
     const { id } = req.params;
     const { days = 90, limit = 500 } = req.query;
 
-    const { logs, count } = await fetchUserActivityLogs({
-      userId: id,
-      days,
-      limit,
-    });
+    const { logs } = await fetchUserActivityLogs({ userId: id, days, limit });
+    const userIdStr = String(id);
 
-    return res.json({ success: true, logs, count });
+    // Normalize and robustly filter user-initiated actions
+    const filtered = (logs || [])
+      .map((l) => {
+        const isEmbedded = l?._source === 'embedded';
+        const actorId = l?.actor?.id ? String(l.actor.id) : null;
+        const actorModel = l?.actor?.model || null;
+        const action = l?.action || '';
+        const createdAt = l?.timestamp || l?.createdAt || null;
+        const ipAddress = l?.actor?.ip || l?.metadata?.ip || l?.request?.ip || undefined;
+        const details = l?.metadata?.description || l?.description || l?.metadata || undefined;
+
+        return {
+          ...l,
+          createdAt,
+          ipAddress,
+          details,
+          _flags: { isEmbedded, actorId, actorModel, action }
+        };
+      })
+      .filter((l) => {
+        const { isEmbedded, actorId, actorModel, action } = l._flags || {};
+        if (isEmbedded) return true; // embedded user activities are user-initiated
+        // Admit canonical user actions
+        const isUserActor = actorId === userIdStr && actorModel !== 'Admin';
+        if (isUserActor) return true;
+        // Action-name heuristics (covers login/logout/oauth/user actions)
+        const a = (action || '').toLowerCase();
+        const isUserActionPattern = a.startsWith('user.') || a.startsWith('parent.') || a.startsWith('child.') || a.startsWith('oauth.') || a.includes('login') || a.includes('logout');
+        const isAdminOnly = a.includes('force_logout') || a.includes('user_banned') || a.includes('user_unbanned') || a.includes('user_deleted') || a.includes('force_password_reset');
+        if (isAdminOnly) return false;
+        // If action matches user patterns and actor id matches user
+        if (isUserActionPattern && actorId === userIdStr) return true;
+        return false;
+      })
+      .map(({ _flags, ...rest }) => rest); // strip helper flags
+
+    return res.json({ success: true, logs: filtered, count: filtered.length });
   } catch (error) {
     if (error && error.message === 'INVALID_USER_ID') {
       return res.status(400).json({ success: false, message: 'Invalid user ID' });
@@ -1112,14 +1147,15 @@ export const editUserDetails = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    await AuditLog.create({
-      userId: req.admin._id,
-      targetUserId: user._id,
+    await logAudit({
+      actor: { id: req.admin._id, model: 'Admin', ip: req.ip },
+      target: { id: user._id, model: 'User' },
       action: 'USER_DETAILS_UPDATED',
-      description: 'Admin updated user details',
-      details: updateData,
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent']
+      resource: { type: 'user', id: String(user._id) },
+      level: 'info',
+      outcome: 'success',
+      metadata: updateData,
+      req,
     });
 
     res.json({

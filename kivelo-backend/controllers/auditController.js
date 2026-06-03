@@ -65,8 +65,11 @@ export const getAuditLogs = async (req, res) => {
       level,
       actorId,
       targetId,
+      userId,
       from,
       to,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
     } = req.query;
 
     const filter = {};
@@ -76,6 +79,12 @@ export const getAuditLogs = async (req, res) => {
     if (actorId) filter["actor.id"] = actorId;
     if (targetId) filter["target.id"] = targetId;
 
+    // Allow userId convenience filter (matches either actor or target)
+    if (userId && userId.match(/^[0-9a-fA-F]{24}$/)) {
+      const uid = new mongoose.Types.ObjectId(userId);
+      filter.$or = [{ "actor.id": uid }, { "target.id": uid }];
+    }
+
     if (from || to) {
       filter.timestamp = {};
       if (from) filter.timestamp.$gte = new Date(from);
@@ -84,8 +93,11 @@ export const getAuditLogs = async (req, res) => {
 
     const total = await AuditLog.countDocuments(filter);
 
+    const sortField = sortBy === 'createdAt' ? 'timestamp' : sortBy;
+    const sortDir = String(sortOrder).toLowerCase() === 'asc' ? 1 : -1;
+
     const logs = await AuditLog.find(filter)
-      .sort({ timestamp: -1 })
+      .sort({ [sortField]: sortDir })
       .skip((page - 1) * per_page)
       .limit(Number(per_page))
       .lean();
@@ -216,39 +228,46 @@ export const exportAuditLogs = async (req, res) => {
 export const getUserActivityLogs = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { days = 90, limit = 500 } = req.query;
+    const { days, limit = 500 } = req.query;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid user ID",
-      });
+      return res.status(400).json({ success: false, message: "Invalid user ID" });
     }
 
-    const since = new Date();
-    since.setDate(since.getDate() - Number(days));
+    const uid = new mongoose.Types.ObjectId(userId);
 
-    const logs = await AuditLog.find({
-      timestamp: { $gte: since },
-      archived: false,
+    const safeLimit = Math.min(Number(limit) || 500, 1000);
+
+    // Build query base
+    const query = {
+      archived: { $ne: true },
       $or: [
-        { "actor.id": userId },
-        { "target.id": userId },
+        { "actor.id": uid },
+        { "target.id": uid },
+        // legacy support if present
+        { userId: uid },
+        { targetUserId: uid },
       ],
-    })
-      .sort({ timestamp: -1 })
-      .limit(Number(limit));
+    };
 
-    res.json({
-      success: true,
-      logs,
-      count: logs.length,
-    });
+    // Apply time window only if 'days' is provided and valid
+    if (days !== undefined) {
+      const n = Number(days);
+      if (!Number.isNaN(n) && n > 0) {
+        const since = new Date();
+        since.setDate(since.getDate() - n);
+        query.timestamp = { $gte: since };
+      }
+    }
+
+    const logs = await AuditLog.find(query)
+      .sort({ timestamp: -1 })
+      .limit(safeLimit)
+      .lean();
+
+    res.json({ success: true, logs, count: logs.length });
   } catch (error) {
     console.error("getUserActivityLogs error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch user activity logs",
-    });
+    res.status(500).json({ success: false, message: "Failed to fetch user activity logs" });
   }
 };
